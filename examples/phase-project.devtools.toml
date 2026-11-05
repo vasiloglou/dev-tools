@@ -1,9 +1,11 @@
 # Example .devtools.toml for a project that uses the phase workflow and the component index.
 # Copy it to the project root, adjust the values, then run:
 #   python3 <dev-tools>/devtools/sync.py apply --project .
+# In a new project, follow with:
+#   python3 .claude/skills/process-phase/scripts/phase_tool.py setup
 
-# Commands the project runs after a sync that changed a file (for example, regenerating
-# an index that lists the synced scripts).
+# Commands the project runs after a sync that changed a file. This one regenerates the
+# component index (its first run also writes a starter catalog).
 after_apply = ["python3 scripts/components_index.py write"]
 
 [[sync]]
@@ -24,6 +26,30 @@ capabilities_script = ""
 capabilities_target = "docs/CAPABILITIES.md"
 process_skill = ".claude/skills/process-phase"
 branch_prefix = "phase/"
+# First status at which `advance` blocks on missing files. A project whose earlier phases
+# ran when the first two steps only warned keeps "plan_approved".
+gated_from = "context_approved"
+
+# The skill that writes a phase's acceptance tests, and the helper agents the steps use.
+[[sync]]
+source = "skills/phase/phase-tests"
+dest = ".claude/skills/phase-tests"
+
+[[sync]]
+source = "agents"
+dest = ".claude/agents"
+
+# Selecting tests by phase (`pytest --phase NN`). A project that already has a root
+# conftest.py uses dest = "phase_selection.py" and adds `pytest_plugins = ["phase_selection"]`
+# to its own conftest.py.
+[[sync]]
+source = "skills/phase/pytest/phase_selection.py"
+dest = "conftest.py"
+
+# The component index: the skill and its script.
+[[sync]]
+source = "skills/components/SKILL.md"
+dest = ".claude/skills/components/SKILL.md"
 
 [[sync]]
 source = "skills/components/scripts/components_index.py"
@@ -32,6 +58,6 @@ dest = "scripts/components_index.py"
 [sync.settings."components_index.settings.json"]
 package_dir = "src/myapp"
 import_prefix = "myapp"
-extra_source_dirs = ["scripts"]
+extra_source_dirs = []
 docs_dir = "docs/components"
 script_path = "scripts/components_index.py"

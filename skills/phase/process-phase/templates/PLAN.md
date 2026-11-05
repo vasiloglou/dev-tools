@@ -17,6 +17,9 @@ metrics_expected: {}        # {<metric>: {target: , baseline: , source: PT|DEC-N
 llm_dependency: none        # none | fake | replay
 gap_closure: false
 autonomous: true
+# When this plan automates a prove.md step, uncomment both lines; NN-EVIDENCE/parity/<goal id>.md is then required.
+# prove_method: G1
+# budget_basis: same-asset   # or: scaled from G1 (<formula>)
 ---
 
 # Plan {{PHASE}}-01: <title> (Phase {{PHASE}}: {{TITLE}})
@@ -26,7 +29,7 @@ autonomous: true
 
 ## Reuse
 <!-- components skill, Consult. `check --plan` requires searched: and external:, plus reuse: with existing COMPONENTS.md ids or new_component: with a reason. -->
-searched: <queries (scripts/components_index.py search ...), capability index, git grep on earlier phase branches>
+searched: <queries (scripts/components_index.py search ...), git grep on earlier phase branches>
 external: <dependency names checked, with version>
 reuse: <component or subsystem ids, e.g. area.capability (adapt: ...)>
 new_component: <area.capability because <reason no existing component fits>; delete this line when nothing new is built>
@@ -54,6 +57,10 @@ Proven method: <prove.md section this plan automates, with its measured cost, ti
 - **done:** [ ]
 
 </tasks>
+
+## Deferred
+<!-- Items this plan leaves out and where each goes (NN.1 or a todo), so a budget checkpoint can cut further without a redesign. "None" if nothing is deferred. -->
+-
 
 ## Validation
 

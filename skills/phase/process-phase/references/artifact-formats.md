@@ -26,7 +26,7 @@ These formats are parsed by `phase_tool.py`. Keep them exact.
 tests/acceptance/pNN_<slug_with_underscores>/   test_<capability>.py, pNN_helpers.py, conftest.py
 ```
 
-Acceptance directories replace `-` with `_` in the phase slug: slug `data-import` in phase 4 gives `p04_data_import`.
+Acceptance directories replace `-` with `_` in the phase slug: slug `data-import` in phase 4 gives `p04_data_import`. Give test files names that are unique across phases (for example `test_p04_import.py`), or give each package an `__init__.py`: pytest otherwise refuses two test files with the same base name.
 
 ## STATE.md
 
@@ -72,7 +72,7 @@ The heading is exactly `## Phase N: <Title>`, where N is an integer (`N.M` for a
 - **Risks:** RK-NN, RK-NN
 ```
 
-No other `## Phase` headings may appear anywhere in the file.
+No other `## Phase` headings may appear anywhere in the file. Whole-number phases are numbered without gaps, starting at 0 or 1; `N.M` phases are inserted between them later. Only **Depends on** decides what may start.
 
 ## REQUIREMENTS.md rows
 
@@ -80,6 +80,27 @@ No other `## Phase` headings may appear anywhere in the file.
 - `| REQ-IN-001 | <text> | U04b, U18 | 2 | Planned |`
 
 The last column is `Planned` or `Validated`. `req-coverage` checks both directions: every U row is referenced by at least one REQ, and every REQ lists at least one roadmap phase.
+
+## Other top-level files
+
+- `DECISIONS.md`: one table row per decision, starting `| DEC-NNN |` (three digits), with the date, the decision, the reason and who approved it. `activate`, `--override` and `--relock` accept only a DEC id that has a row.
+- `MIGRATION.md`: a table of modules being replaced (`| Module | Status | Replaced by |`); empty when nothing is. `migration-check` reads it.
+- `planned-paths.txt`: one path per line that the roadmap will create; `#` starts a comment. `check --ignored` fails if `.gitignore` would hide one.
+- `MANIFESTO.md`, `RISKS.md`, `OPEN-QUESTIONS.md`, `GLOSSARY.md`, `README.md`: free text and tables using the ids below.
+
+## Starting a new project
+
+```bash
+python3 .claude/skills/process-phase/scripts/phase_tool.py setup [--name NAME] [--base-branch B] [--release-branch B]
+```
+
+`setup` writes the eleven top-level files from `templates/planning/` with one placeholder phase, one requirement and a `DEC-001` row for adopting the workflow. It never overwrites a file that exists. Fill in the first phase, commit, and `check --all` is clean.
+
+`check --all` asks for a decision row whenever the skill's rule text changes against the base branch. That includes the first sync of the skill (covered by `DEC-001`), a later sync that brings changed text, and edits to the project's own `references/project.md`: add one DEC row for each such change.
+
+## Settings
+
+`scripts/phase_tool.settings.json` (written by the sync from `.devtools.toml`) holds the project's paths and names. `gated_from` sets the first status at which `advance` blocks on missing files: `context_approved` (default, every step enforced), or `tests_approved` / `plan_approved` for a project whose earlier phases were run when the first steps only warned.
 
 ## Identifier formats
 

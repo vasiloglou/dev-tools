@@ -75,24 +75,17 @@ coverage: 4/4 src/shelf modules assigned to components; external: none</pre></di
     <div>
       <span class="num">Kept honest</span>
       <h3>It notices when the code moves on</h3>
-      <p>Add a file and the check fails, because the index no longer matches the source. The coverage line then names every file that no component has claimed. Closing a phase includes giving each new file a home, so the map is complete at the start of the next phase.</p>
+      <p>Add a file and the check fails: first because the index no longer matches the source, and then, in its strict form, for as long as no component has claimed the file. Closing a phase runs the strict check, so the map is complete at the start of the next phase.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a new file appears</b><em>captured</em></div>
 <pre><span class="p">$</span> <span class="cmd">git status --short src</span>
-?? src/shelf/report.py
+?? src/shelf/export.py
 
-<span class="p">$</span> <span class="cmd">components --check</span>
-stale or missing: docs/components/modules/_root.md
-<span class="dim">exit code 1</span>
-
-<span class="p">$</span> <span class="cmd">components stats</span>
-coverage: 4/5 src/shelf modules assigned to components; external: none
-src/shelf/report.py
-
-<span class="p">$</span> <span class="cmd">components stats</span>
-coverage: 5/5 src/shelf modules assigned to components; external: none</pre></div>
-      <p class="caption">The new file makes the index stale, and coverage drops to 4 of 5 with the file named. After it is given a component: 5 of 5.</p>
+<span class="p">$</span> <span class="cmd">components write &amp;&amp; components --check --strict</span>
+no component: src/shelf/export.py (add it to the modules of an entry in docs/components/COMPONENTS.md)
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">A new file is added and the index regenerated. The strict check still fails, and names the file, until a component claims it.</p>
     </div>
   </div>
 </div></section>
@@ -105,7 +98,7 @@ coverage: 5/5 src/shelf modules assigned to components; external: none</pre></di
     <tr><td>Planning</td><td>"Add a helper to format sizes"</td><td>"Reuse <code>humanize_bytes</code> from the units component"</td></tr>
     <tr><td>Changing shared code</td><td>Callers found by search, some missed</td><td>The component's <em>used by</em> list is the set of callers to keep working</td></tr>
     <tr><td>Reaching for a library</td><td>A new dependency, or a hand-written copy</td><td>The index of installed libraries shows what is already available</td></tr>
-    <tr><td>Finishing</td><td>New files nobody will find again</td><td>Each new file is given a component when the phase closes, and the coverage line shows any that were missed</td></tr>
+    <tr><td>Finishing</td><td>New files nobody will find again</td><td>Each new file must be given a component before the phase can close; the strict check names any that were missed</td></tr>
   </table></div>
   <div class="callout">
     <p><strong>It reads source text only.</strong> The index is built by parsing files, never by importing or running your code, so it works on a project that does not currently start.</p>

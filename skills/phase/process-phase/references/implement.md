@@ -23,7 +23,7 @@ review is optional, not part of every write round. The validation policy in
 
 ### 1.1 Coder pool and limits
 
-Coders and parallelism are per developer. Resolve them once per Implement session with the project's coder-pool command (`references/project.md`). It merges the team configuration with the developer's local, gitignored one (a worktree without one reads the main checkout's) and prints:
+Coders and parallelism are per developer. Resolve them once per Implement session with the project's coder-pool command (`references/project.md`). A project that names no such command uses the team defaults at the end of this list. It merges the team configuration with the developer's local, gitignored one (a worktree without one reads the main checkout's) and prints:
 
 - **`coders:`** the pool, one line per `tool/account`, in preference order, with its `model`, `effort`, `risk` and `env`. Each line is a pool you can send tracks to. Prefix the account's `env` to every command of that pool, resume included; a track keeps its account for all its rounds.
 - **`parallel:`** `max_tracks`, `max_sessions_per_account`, `capacity` and `effective_tracks = min(max_tracks, capacity)`. At most `max_sessions_per_account` concurrent sessions per account and at most `effective_tracks` tracks in total.
@@ -118,7 +118,7 @@ Reuse the result while relevant code/inputs are unchanged; record command,
 result and tested diff/revision. Do not run whole phases, earlier phases or the
 full suite automatically after each task, merge or handoff.
 
-Run `.claude/skills/process-phase/scripts/codex_gate.py --allow <file> … --max-added <budget>` in the track worktree after every round of any coder, then `git status --short` and `check --testlock NN`. Preserve unrelated work.
+Run `python3 .claude/skills/process-phase/scripts/codex_gate.py --allow <file> … --ignore '.planning/phases/NN-<slug>/NN-EVIDENCE/*' --max-added <budget>` in the track worktree after every round of any coder (`--ignore` keeps the supervisor's own briefs and run logs out of the path check and the line count; in a pattern, `*` also matches `/`), then `git status --short` and `check --testlock NN`. Preserve unrelated work.
 An unexpected edit needs inspection, not an indiscriminate reset or cleanup.
 The only full regression run belongs at the end of Verify, after focused fixes.
 

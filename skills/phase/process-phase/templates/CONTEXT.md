@@ -18,6 +18,13 @@ evidence_gate: required
 |---|---|---|---|---|---|---|
 | G1 | | | | | | |
 
+## Components in scope
+<!-- From the component index, before any architecture decision (discuss.md §1): one row per capability the phase needs. -->
+
+| Capability | Component id or external name | Status | Reuse / adapt / reject |
+|---|---|---|---|
+| | | | |
+
 ## Time budget
 <!-- Phase time budget in hours; scope checkpoints at 50% and every further 25%. -->
 -
@@ -27,9 +34,9 @@ evidence_gate: required
 - 
 
 ## Entry Criteria
-<!-- Copied from ROADMAP "Depends on" + baseline: NN-EVIDENCE/baseline.txt green. -->
+<!-- Copied from ROADMAP "Depends on", plus the baseline. Orient does not run a new full suite: cite an existing result, or write "unknown". -->
 - Phases listed in **Depends on** are `complete`.
-- Baseline suite green (`{{PHASE}}-EVIDENCE/baseline.txt`).
+- Baseline: an existing suite or CI result with its revision and known failures (`{{PHASE}}-EVIDENCE/baseline.txt`), or "unknown".
 
 ## Exit Criteria
 <!-- Copied verbatim from the ROADMAP block; each becomes >=1 acceptance test in Step 2. A Killed goal or deferral removes or changes one only through a user-approved DEC that amends it here and in the ROADMAP (cite the DEC). -->

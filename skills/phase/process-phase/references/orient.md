@@ -74,6 +74,7 @@ worktree src first on PYTHONPATH so an editable install cannot select other code
 
 ## 6. Hand-off
 
-- If the phase directory does not exist, run `phase_tool.py init --phase NN`. It creates `.planning/phases/NN-<slug>/` with `NN-CONTEXT.md`, `NN-DISCUSSION-LOG.md` and `NN-TESTS.md` copied from `templates/` (placeholders `{{PHASE}}`, `{{TITLE}}`, `{{SLUG}}` filled), plus `NN-EVIDENCE/.gitkeep`. Other templates (PLAN, SUMMARY, VERIFICATION, UAT, RESEARCH, continue-here) are copied by hand when their step starts; `check --context` / `--plan` flag any placeholder left unfilled.
+- If `.planning/` itself does not exist, this is a new project: run `phase_tool.py setup`, fill in the first roadmap phase with the user, commit, and stop until `check --all` is clean.
+- If the phase directory does not exist, run `phase_tool.py init --phase NN`. It creates `.planning/phases/NN-<slug>/` with `NN-CONTEXT.md`, `NN-DISCUSSION-LOG.md`, `NN-TESTS.md` and `NN-DEFERRED.md` copied from `templates/` (placeholders `{{PHASE}}`, `{{TITLE}}`, `{{SLUG}}` filled), plus `NN-EVIDENCE/.gitkeep`. Other templates (PLAN, SUMMARY, VERIFICATION, UAT, RESEARCH, continue-here) are copied by hand when their step starts; `check --context` / `--plan` flag any placeholder left unfilled.
 - Announce, in two or three lines: the phase, the status, the step you are about to run, and the gates that apply.
 - Continue with the step. Orient itself commits nothing, apart from an optional WIP commit the user chose.

@@ -15,7 +15,7 @@ Not every unit of work earns a record. The driving agent works in one of two lan
 Two rules keep the lanes honest:
 
 - **Prefer milestone-level records over per-unit ones.** A run of routine work that ends in one material event takes one record citing the run, not a record per unit. A suite of like cases takes **one batched record** naming every case and its exit verbatim — never one record and commit per case.
-- **A commit needs the user's explicit go-ahead.** The record and the commit are the driving agent's acts, performed only on the user's authorization — never implied by a green exit.
+- **A commit needs the user's explicit go-ahead.** The record and the commit are the driving agent's acts, performed only on the user's authorization — never implied by a green exit. For a milestone phase that go-ahead is the phase's own authorization: the spec approved at the owner gate, or `auto=true`, covers the phase's commits and its record commit over the artifacts that spec declared. A separate stop is owed only when the commit would exceed it — a path the spec did not declare, or a record that departs from the approved spec (a selected gate that exited non-zero, a criterion left unmet).
 
 The lane choice gates the *record*, not the discipline: whichever lane a unit of work ran in, its own gate command and exit are what they are, and neither lane adds authority to a claim or waives a skill's Limits.
 
@@ -30,10 +30,11 @@ Layout:
   PROJECT.md                          # one-pager: the problem, in the user's words
   milestones/
     <milestone-name>/                 # e.g. v1, v2-search
-      001-phase-1.md                  # one record per material event (evidence lane)
-      002-phase-2.md
-      003-phase-3.md
+      001-plan.md                     # one record per material event (evidence lane)
+      002-phase-1.md
+      003-phase-2.md
       ...
+      NNN-close.md
 ```
 
 The directory is **append-only**. A record is never edited after its commit — a correction is a **new** record, with the next number, citing the record it corrects by path and sha256. Deleting or rewriting a record destroys evidence the same way editing a retained attempt would.
@@ -55,7 +56,9 @@ station: "phase-3"        # which unit of work produced this record: a step of a
 skill: <owning skill>     # the skill that owned the work, or "n/a -- <why>"
 scope: phase-3            # == the commit scope token and the filename token
 date: <YYYY-MM-DD>
-gate:
+gate:                     # the one gate run. When several gates were selected,
+                          # write `gates:` instead -- a list of these
+                          # command/exit entries, one per gate (rules below)
   command: "pytest tests/test_settings_loader.py"
   exit: 0
 evidence:
@@ -101,6 +104,8 @@ for an exit code -- write "exited 0", not "passed"; "exited 3", not "failed".
 Rules the shape carries:
 
 - **The claim never merges families.** A record about one gate's outcome cites another gate's result by digest if it needs to; it never presents the two as one verdict.
+- **Every selected gate is in the front matter with its own exit.** `gate` holds a single gate and remains valid for a unit that ran one. A unit that ran several writes `gates`, a list of `command`/`exit` entries in the same shape, one per gate. A gate that exited non-zero is never reported in the body only, and `gate` never shows one green command out of a selection that also holds a red one.
+- **A ruling is recorded as a ruling, not as a run.** Where the gate is an approval rather than a command (the plan gate, the close ruling), `command` reads `ruling: <owner | delegated (auto=true)> <approved | amended | refused> <artifact path> sha256 <64 hex>` and `exit` reads `n/a -- ruling`, never an invented exit code. `Gate output (verbatim)` carries the ruling's exact wording, its date and its authorization source.
 - **The boundary section is not optional.** A green exit is a narrow claim; the record states what it is narrow about. Every skill's Limits section is the source text.
 - **Digests are computed from bytes on disk** after the last write, with `shasum -a 256`, never copied from memory or an earlier run.
 - **A citation names committed bytes -- and an exception declares itself.** A record cites an artifact by path AND digest, and the digest of an uncommitted working-tree file is NOT a citation, because the reader must be able to check the claim out of history. The one admitted exception is run evidence deliberately kept out of the tree (a large run log, a retained attempt): its digest may be recorded, but the record must say plainly that the bytes live outside history and the claim is correspondingly weaker -- checkable only by whoever holds the bytes. An undeclared exception is an overclaim.
@@ -139,7 +144,7 @@ A record of a refuted premise is `docs`, with the refutation in the body.
 
 ### Scope tokens
 
-The scope token names the unit of work and is the same in the record's `scope:` field, its filename and the commit. A milestone phase uses its phase token (`phase-N`). The tokens, types and record triggers for a project's own workflow steps are listed in `references/project.md`. The lane rule above decides whether a record is due at all.
+The scope token names the unit of work and is the same in the record's `scope:` field, its filename and the commit. A milestone phase uses its phase token: `phase-N`, where N is the plan's phase ID (`phase-3`, `phase-6a`). The milestone is named by the record's directory and by the record path that closes the commit body, never by the token. The plan gate uses `plan` and the milestone close uses `close` (both below). The tokens, types and record triggers for a project's own workflow steps are listed in `references/project.md`. The lane rule above decides whether a record is due at all.
 
 ### What is staged
 
@@ -160,10 +165,23 @@ Some skills run a bounded transaction with a declared write set — no path outs
 - Never authority the gate did not grant — a recorded green gate still says nothing about code it did not exercise; the record repeats that boundary, it cannot waive it.
 - Never a substitute for retained evidence — retained run and review output stays where it is; the record cites it, it does not copy it.
 
+## The plan-gate record
+
+The plan gate -- the plan review and the owner or delegated approval of the
+milestone plan -- is a material event with a record, `NNN-plan.md`, scope
+`plan`. It is written when the gate is ruled, by whichever skill is driving
+then, never when the plan is merely drafted. Its gate is a ruling (above)
+binding the plan by path and SHA-256, and its body states the plan review: the
+instrument, the reviewed digest, the findings and their dispositions -- or,
+where no review ran, that it did not and why. A plan amended and gated again
+takes a new record with the next number.
+
 ## The milestone-close record
 
-Closing a milestone is itself a material event with a record, and that record
-owes two sections no phase record can discharge for it:
+Closing a milestone is itself a material event with a record -- `NNN-close.md`,
+scope `close`, its exit-gate commands and the close ruling as separate `gates`
+entries -- and that record owes two sections no phase record can discharge for
+it:
 
 - **The open-questions sweep** -- REQUIRED. Every record in the milestone
   directory is re-read and every open question it raised is dispositioned:

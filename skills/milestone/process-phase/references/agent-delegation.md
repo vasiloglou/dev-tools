@@ -24,6 +24,11 @@ Three corollaries:
   everything" when it did not.
 - **Delegation happens on the owner's go-ahead**, like every other step in this
   protocol. Fanning out is a real cost and the owner decides whether to spend it.
+  The go-ahead is asked once, when the phase is invoked and before step 0
+  begins, unless the request already carries it; `auto=true` delegates approval
+  rulings, not this spend. Without a go-ahead — none given, or none answered —
+  the default is one reader working through the same sources sequentially; a
+  missing go-ahead never blocks step 0.
 
 ## Step 0 — harvest: the natural fan-out
 

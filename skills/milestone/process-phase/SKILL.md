@@ -27,7 +27,7 @@ names; this table is the contract.
 | 3 | **Implement + verify** | code + tests; the plan's section 9 row and the phase's impact-closure gates run | no |
 | 4 | **Adversarial review of the diff** | `notes/phase-N-<reviewer>-review.md` + one regression test per finding | no |
 | 5 | **Refactoring review** | the record's `Refactoring review` section | no |
-| 6 | **Record + commit** | `milestones/<milestone>/NNN-phase-N.md` + a commit in the record contract's grammar | done |
+| 6 | **Record + commit** | `milestones/<milestone>/NNN-phase-N.md` + a commit in the record contract's grammar | done; a STOP only as step 6 says |
 
 **When to use:**
 - The owner says "phase N", "the next phase", or "process this phase"
@@ -40,6 +40,7 @@ names; this table is the contract.
   reviewer in a different tool), and this skill consumes the plan, never edits
   it. A phase that finds the plan wrong records a **refuted premise** and an
   open-questions row naming the repair; the plan is repaired at milestone close
+  ([process-milestone](../process-milestone/SKILL.md))
 - The milestone-close record — it cites every phase record and performs the
   open-questions sweep, which is not a phase's work
 - Work that one of the project's own workflow skills owns
@@ -97,7 +98,8 @@ missing half of what binds it. Collect all of it, by name, before writing prose.
 plan and several records, which is exactly what parallel readers are good at and
 exactly where a single pass silently skips a row. See
 [`references/agent-delegation.md`](references/agent-delegation.md) for what to
-delegate, what each agent returns, and the rule that governs every finding one
+delegate, when the owner's go-ahead for it is asked and the default without
+one, what each agent returns, and the rule that governs every finding one
 brings back.
 
 **Output:** an obligations table at the head of the spec note. Never a pointer —
@@ -109,6 +111,9 @@ Expand the phase's plan section into a scannable spec at
 `notes/phase-N-spec.md`: exact schema fragments, exact function signatures, the
 rule list, and the test list with expected exits. Full contract in
 [`references/spec-note-contract.md`](references/spec-note-contract.md).
+A draft that `start-milestone` already wrote at that path for the first phase
+is the starting point: complete it under the contract, step 0's obligations
+table included, and do not start a second file.
 The test list includes a verification-selection ledger under
 [`references/verification-selection.md`](references/verification-selection.md):
 plan-mandated gates, direct phase tests, impact closure, and an explicit
@@ -187,6 +192,11 @@ evidence never becomes evidence about changed bytes.
   changed inputs and downstream contracts, not by age or runtime, and apply the
   inheritance, invalidation, cadence, and isolation rules in
   [`references/verification-selection.md`](references/verification-selection.md).
+- A selected test that already fails on the base tree, before the phase's first
+  edit, is a known red. The known-red rule in
+  [`references/review-and-record.md`](references/review-and-record.md) (the
+  phase extensions) applies here, at step 3; its proof goes in with the
+  implementation findings.
 - Use the reduced test selection for ordinary phase work: direct phase
   tests and focused affected-consumer tests under the project's default test
   configuration. Preserve the configured exclusions; do not launch an
@@ -254,6 +264,12 @@ The commit uses the record contract's grammar with a phase scope token, an
 evidence-bearing body, `--` rather than em-dashes, **no backticks anywhere in
 the message**, and the record path on its own closing line. Stage by explicit
 path — never `git add -A`.
+
+This step has no STOP while the commit stays inside what the gate at step 2
+approved. The go-ahead rule, and the case in which the commit does stop for the
+owner, are in
+[`references/milestone-record-format.md`](references/milestone-record-format.md)
+(When a record is due).
 
 ## Phase shapes this protocol has to cover
 

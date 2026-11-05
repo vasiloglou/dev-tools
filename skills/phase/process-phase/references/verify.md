@@ -9,7 +9,9 @@ supersedes older repeat-run requirements in plans and decisions.
    Reuse results for unchanged tested code. Run only any uncovered required tests
    (including relevant slow tests), rather than rerunning whole phase packages.
 2. Run the default full suite **once**, after fixes and focused tests are done.
-   Keep one log with the command, tested revision/diff, counts and failures.
+   Run it with `-rfE` so the log names every failed and errored test even if a
+   worker crashes. Keep one log with the command, tested revision/diff, counts
+   and failures.
    Golden, architecture and skill tests already covered by that run do not get
    separate duplicate runs.
 3. Complete only the remaining static checks in `gates.md`. Reuse valid existing
@@ -39,6 +41,9 @@ merely because a report is being finalized.
 A missing report row at Close needs a targeted check, not another full test run.
 
 Use `phase_tool.py advance --to verified` only when required results are current
-and no unapproved blocker remains; otherwise report `gaps_found` or
-`human_needed`. A delegated verifier reports the result to the supervisor and
+and no unapproved blocker remains. With a failing required test or unmet exit
+criterion, use `advance --to gaps_found`. When only a person's decision is
+outstanding (a human acceptance criterion, or a failure that cannot be
+attributed), leave the status at `implemented`, write `human_needed` and the
+open question in `NN-VERIFICATION.md`, and ask the user. A delegated verifier (the `phase-verifier` agent) reports the result to the supervisor and
 does not change status or fix code.

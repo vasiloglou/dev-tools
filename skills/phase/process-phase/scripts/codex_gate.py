@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check a coding round's changed paths and added-line budget."""
+"""Check a coding round's changed paths and added-line budget.
+
+``--ignore`` names paths the supervisor writes itself during a round (briefs, run logs);
+they are neither checked against the allowlist nor counted.
+"""
 
 import argparse
 import fnmatch
@@ -16,9 +20,10 @@ def main():
     parser.add_argument("--allow", action="append", required=True)
     parser.add_argument("--max-added", type=int, required=True)
     parser.add_argument("--base", default="HEAD")
+    parser.add_argument("--ignore", action="append", default=[])
     args = parser.parse_args()
     root = Path(git("rev-parse", "--show-toplevel").decode().strip())
-    paths, added = set(), 0
+    paths, added, counts = set(), 0, {}
     # Disable rename folding so each changed path is checked independently.
     records = iter(git("-C", str(root), "diff", "--numstat", "-z", "--no-renames", args.base, "--").split(b"\0"))
     for record in records:
@@ -26,13 +31,17 @@ def main():
             continue
         count, _, path = record.split(b"\t", 2)
         paths.add(path.decode())
-        if count != b"-":
-            added += int(count)
+        counts[path.decode()] = 0 if count == b"-" else int(count)
+        added += counts[path.decode()]
     for raw in git("-C", str(root), "ls-files", "--others", "--exclude-standard", "-z").split(b"\0"):
         if raw:
             path = raw.decode()
             paths.add(path)
-            added += len((root / path).read_bytes().splitlines())
+            counts[path] = len((root / path).read_bytes().splitlines())
+            added += counts[path]
+    for path in [p for p in paths if any(fnmatch.fnmatch(p, pattern) for pattern in args.ignore)]:
+        paths.discard(path)
+        added -= counts[path]
     violations = ["outside allowlist: " + p for p in sorted(paths)
                   if not any(fnmatch.fnmatch(p, pattern) for pattern in args.allow)]
     if added > args.max_added:

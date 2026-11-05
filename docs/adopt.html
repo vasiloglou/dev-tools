@@ -161,12 +161,34 @@ after_apply: python3 scripts/components_index.py write
     <li><strong>Keep what you have customised.</strong> Exclude the files you want to stay yours and move your project-specific rules into <code>project.md</code> over time.</li>
     <li><strong>Stay with your workflow.</strong> A project built around phases keeps phases; one built around milestones keeps milestones.</li>
   </ul>
-  <h2>What is not packaged yet</h2>
-  <p>Honest limits of the prototype:</p>
+  <h2>For a brand-new project</h2>
+  <p>One more command after the sync writes the starter planning files: a roadmap with one placeholder phase, the project state, and the first decision on record (adopting the workflow). The first sync also writes a starter component catalog. Fill in your first phase and you can run it.</p>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>a new project · from empty to ready</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+<span class="ok">applied: {&quot;create&quot;: 51}</span>
+after_apply: python3 scripts/components_index.py write
+wrote docs/components/COMPONENTS.md: add one entry per component, then run `python3 scripts/components_index.py write`
+
+<span class="p">$</span> <span class="cmd">phase-tool setup --name widget</span>
+<span class="ok">phase_tool.setup: ok</span>
+…
+next: [&quot;describe the first phase in .planning/ROADMAP.md and its requirement in REQUIREMENTS.md&quot;, &quot;put your name on the DEC-001 row in .planning/DECISIONS.md&quot;, &quot;commit, then run &#x27;phase_tool.py check --all&#x27;&quot;]
+
+<span class="p">$</span> <span class="cmd">git add -A &amp;&amp; git commit -qm &#x27;Start the project&#x27; &amp;&amp; phase-tool check --all</span>
+<span class="ok">phase_tool.check: ok</span>
+checks: [&quot;files&quot;, &quot;state&quot;, &quot;roadmap&quot;, &quot;requirements&quot;, &quot;docs&quot;, &quot;ignored&quot;, &quot;skills&quot;, &quot;testlocks&quot;, &quot;capabilities&quot;, &quot;citations&quot;, &quot;rule-decs&quot;]
+
+<span class="p">$</span> <span class="cmd">phase-tool status --brief</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 01
+phase_status: not_started
+active_step: None
+next_step: discuss</pre></div>
+      <p class="caption">Sync, set up, commit. The consistency check is clean and phase 1 is waiting for its first step. The list of eleven created files is cut from the middle.</p>
+  <h2>Still rough</h2>
   <ul>
-    <li><strong>Starting from an empty project.</strong> The phase workflow expects a planning folder with a roadmap, a state file and a handful of companion files. Nothing creates them for you yet; the demo project wrote them by hand from the format reference that ships with the skill.</li>
-    <li><strong>The component index</strong> needs its catalog file to exist before the first run.</li>
-    <li><strong>Selecting one phase's tests</strong> uses a small test-runner hook that each project currently supplies itself.</li>
+    <li><strong>One rules file per agent.</strong> A project that serves both Claude Code and Codex has to keep its own <code>project.md</code> identical in both places by hand.</li>
+    <li><strong>A person's override is trusted.</strong> A recorded, approved decision can waive a missing file at a step. The tool does not second-guess it.</li>
   </ul>
   <div class="next">
     <a class="btn primary" href="phase.html">See the phase workflow</a>

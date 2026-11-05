@@ -10,17 +10,17 @@ python3 .claude/skills/process-phase/scripts/phase_tool.py complete --phase NN
 
 `complete` is the only way to reach `complete`. It:
 - sets `**Status:** complete` on the phase in `ROADMAP.md`;
-- adds `NN` to `completed_phases` in `STATE.md`, moves `current_phase` to the next phase with `phase_status: not_started` and `active_step: null`, and updates `last_activity`;
+- adds `NN` to `completed_phases` in `STATE.md`, moves `current_phase` to the lowest phase that is not complete and whose dependencies are complete (so after an out-of-order close it goes back to the phase that was skipped), with `phase_status: not_started` and `active_step: null`, and updates `last_activity`. If nothing can start yet, it takes the lowest incomplete phase and prints its `blockers`;
 - marks the phase's REQ rows `Validated` in `REQUIREMENTS.md`.
 
-Consequence: from now on the plain `pytest` run collects `tests/acceptance/pNN_*`. Phase NN's acceptance tests become part of the regression suite that every later phase must keep green.
+Consequence: from now on the plain `pytest` run collects `tests/acceptance/pNN_*` (the phase-selection plugin, `specify.md` §4, reads `completed_phases`). Phase NN's acceptance tests become part of the regression suite that every later phase must keep green.
 
 Update the rest by hand, and show each change to the user:
 - `DECISIONS.md`: append the DEC entries made during the phase, if not already there.
 - `MIGRATION.md`: set the status for modules moved, shimmed or frozen.
 - `RISKS.md`: record the spike verdicts, and the new status of each RK row this phase owned.
 - `STATE.md` digest: add lessons `LS-NN`, one line each, phrased as a rule for the next phases.
-- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets a `retrieval-cases.toml` case. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `scripts/components_index.py`, confirm `--check` is clean, and run the project's component check against the phase base (`references/project.md`): fix every major, and remove or justify each `new caller of` a deprecated or duplicate component.
+- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets its entry's `does` and `verbs` corrected so the search finds it next time. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `scripts/components_index.py`, and confirm `scripts/components_index.py --check --strict` is clean (the index matches the source and every module has a component). If the project has its own component check (`references/project.md`), run it against the phase base: fix every major, and remove or justify each `new caller of` a deprecated or duplicate component.
 
 ## 1b. Reuse verification
 
@@ -49,14 +49,17 @@ Compare the realized shape with `.planning/MANIFESTO.md`:
 
 ## 3. Commit
 
+Record on the phase branch that the work returns to the base branch, so the merge in §4 carries it and leaves the base branch clean:
+
 ```bash
-git add .planning/
+python3 .claude/skills/process-phase/scripts/phase_tool.py branch --set <base_branch>
+git add .planning/ docs/components/
 git commit -m "docs(NN): complete phase — <one-line outcome>"
 ```
 
 ## 4. Merge back into base_branch
 
-- Ask the user to approve merging `phase/NN-<slug>` into `base_branch` (STATE frontmatter). On yes: `git switch <base_branch> && git merge --no-ff phase/NN-<slug> -m "merge: phase NN <title>"`, then `phase_tool.py branch --set <base_branch>`. This is local; nothing is pushed.
+- Ask the user to approve merging `phase/NN-<slug>` into `base_branch` (STATE frontmatter). On yes: `git switch <base_branch> && git merge --no-ff phase/NN-<slug> -m "merge: phase NN <title>"`. This is local; nothing is pushed.
 - If the user prefers a PR, offer one from `phase/NN-<slug>` to `base_branch` with the summary, tests turned green, gates and evidence links. `git push` and `gh pr create` are deliberately **not** in the skill's `allowed-tools`, so they always prompt. Push only after the user says yes, for this push.
 
 ## 5. Release to main (separate gate)
@@ -71,7 +74,7 @@ Never propose the release as part of routine closing. Mention it as an option at
 
 ## 6. Offer the next phase
 
-Show `status` for the next phase and ask whether to start `/process-phase next`.
+Show `phase_tool.py status` (it now names the phase `complete` selected, with any blockers) and ask whether to start `/process-phase next`. To take a different phase that can start, use `activate --phase NN --dec DEC-NNN`.
 
 ## Bootstrap exception
 

@@ -11,7 +11,7 @@ Prototype. The project lists what it takes in ``.devtools.toml``::
     [sync.settings."scripts/phase_tool.settings.json"]   # written inside dest (beside dest for a file)
     planning_dir = ".planning"
 
-    after_apply = ["python scripts/components_index.py"]  # optional, top level: run when apply changed a file
+    after_apply = ["python3 scripts/components_index.py write"]  # optional, top level: run when apply changed a file
 
 ``apply`` copies the files, writes the settings files and records every managed file in
 ``.devtools-receipt.json`` (sha256 and mode). It refuses to overwrite a file the project
@@ -20,6 +20,8 @@ changed by hand, or one it does not manage yet, unless told to (``--force``, ``-
 
 Exit codes: 0 ok; 1 check found drift; 2 usage or configuration; 3 apply refused (nothing written);
 4 files were written but an after_apply command failed.
+
+Needs Python 3.11 or newer.
 """
 from __future__ import annotations
 
@@ -33,8 +35,12 @@ import stat
 import subprocess
 import sys
 import tempfile
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python older than 3.11
+    sys.exit("sync.py needs Python 3.11 or newer (this is %d.%d)" % sys.version_info[:2])
 
 SOURCE_ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ".devtools.toml"
@@ -233,9 +239,15 @@ def cmd_apply(args) -> int:
     print("applied:", json.dumps(counts, sort_keys=True))
     if set(counts) - {"keep"}:
         for command in config.get("after_apply", []):
-            print("after_apply:", command)
-            if subprocess.run(shlex.split(command), cwd=project).returncode != 0:
+            print("after_apply:", command, flush=True)
+            try:
+                code = subprocess.run(shlex.split(command), cwd=project).returncode
+            except OSError as error:  # the command itself could not be started
+                print(error, file=sys.stderr)
+                code = 1
+            if code != 0:
                 print(f"after_apply failed: {command}", file=sys.stderr)
+                print("the files and the receipt are written; run the command by hand once it works", file=sys.stderr)
                 return 4
     return 0
 

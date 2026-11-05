@@ -112,8 +112,22 @@ answers.
 
 ## Sections that appear once the phase is running
 
-These are appended during step 3. The spec is otherwise treated as append-only
-after approval — a reviewed sentence is not rewritten in place.
+These are appended during step 3. After approval the spec is append-only — a
+reviewed sentence is not rewritten in place — with four exceptions that change
+**at their own site**, because that is where a reader looks for them:
+
+- the **status line** (section 1), replaced outright with the current state and
+  its date;
+- a **decision row's ruling** (section 7), written into the row with the owner
+  mark and date;
+- an **owner amendment** to an approved gate or requirement;
+- a **correction to an argument** that a reproduced review finding refuted
+  ([`review-and-record.md`](review-and-record.md)).
+
+Each carries its provenance tag (section 2) and a date. An amendment, a
+correction and a ruling that replaces an earlier ruling keep the prior wording
+beside the new. Everything else — findings, experiments,
+measurements, refuted premises — is appended in the sections below.
 
 ### Implementation findings, recorded as they were found
 

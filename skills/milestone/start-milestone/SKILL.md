@@ -136,6 +136,12 @@ Select a review instrument explicitly; using this skill does not activate
 any review instrument or authorize reviewer subagents. Never claim a review
 opinion over amended bytes that were not reviewed.
 
+The plan review and the plan gate are recorded in the plan-gate record of the
+[milestone record format](../process-phase/references/milestone-record-format.md).
+Before that record exists, say in the plan's status line and in the report
+whether the plan review ran (instrument and reviewed SHA-256) or did not (and
+why), so an unreviewed plan never reads as reviewed.
+
 Report the canonical plan and first draft spec, phase count, readiness, decisions
 and next action. Default `auto=false`; implementation follows the concrete spec's
 owner gate. Existing explicit delegation remains effective within its scope.

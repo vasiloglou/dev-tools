@@ -43,18 +43,25 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
 Rules that belong to one project go in a file that project owns,
 `references/project.md` beside the synced skill. The sync never touches it.
 
-See `examples/phase-project.devtools.toml` for a complete project file.
+See `examples/phase-project.devtools.toml` for a complete project file. A new project follows
+the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
+
+The sync command and the component index need Python 3.11 or newer; the phase state tool
+runs on 3.9.
 
 ## What is here
 
 | Path | What |
 |---|---|
-| `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks. |
+| `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks, and `phase_tool.py setup` writes a new project's starter planning files. |
+| `skills/phase/phase-tests/` | How a phase's acceptance tests are written and locked. |
+| `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
+| `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
-| `skills/components/scripts/components_index.py` | Generates and searches the component index. |
+| `skills/components/` | The component index: the skill, and `scripts/components_index.py`, which generates, checks and searches it. |
 | `devtools/sync.py` | The sync command. |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
-| `tests/` | Tests for the sync command. |
+| `tests/` | Tests for the sync command and for the scripts a project runs after a sync. |
 
 ## Tests
 

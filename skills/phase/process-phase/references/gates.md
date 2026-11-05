@@ -24,7 +24,7 @@ directory. Keep useful focused output and `P/NN-EVIDENCE/runs/pytest.txt`.
 
 | ID | Check | Satisfy it without duplicate execution |
 |---|---|---|
-| PG1 | Final full regression (all phases) | One `.venv/bin/python -m pytest -q -p no:cacheprovider` run after focused fixes. Compare with an available prior baseline; report unknown baseline honestly. No unexplained regression or silently waived failure. |
+| PG1 | Final full regression (all phases) | One `.venv/bin/python -m pytest -q -rfE -p no:cacheprovider` run after focused fixes (`-rfE` names every failed and errored test in the log). Compare with an available prior baseline; report unknown baseline honestly. No unexplained regression or silently waived failure. |
 | PG2 | Approved acceptance tests | Reuse current focused/default results; run only uncovered required cases, including relevant slow tests. No mandatory separate slow-critical campaign. |
 | PG3 | Test lock | `PT check --testlock NN --format json`; no dirty lock. |
 | PG5 | Declared goldens (from1) | `PT golden-diff --format json`; undeclared[]. Reuse final PG1 golden-test results. |

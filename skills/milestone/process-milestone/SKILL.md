@@ -52,7 +52,9 @@ its own explicit current owner request for subject and scope.
 ## Resolve readiness before execution
 
 Read `{{devtools:planning_dir}}/PROJECT.md`, the whole effective canonical milestone plan,
-amendments, plan review/gate records, applicable question registers and prior
+amendments, the plan-gate record
+([milestone record format](../process-phase/references/milestone-record-format.md))
+and any retained plan-review notes, applicable question registers and prior
 phase/close records. Resolve all output beneath
 `{{devtools:planning_dir}}/milestones/<milestone>/`; reject paths escaping the repository or
 symlinks redirecting planning elsewhere. Preserve canonical plan paths and IDs.
@@ -62,7 +64,8 @@ If the plan or scaffold is missing, report the prerequisite and offer
 project's own scaffold workflow (`references/project.md`). Do not invent a plan
 or invoke planning or other workflow skills automatically.
 A draft plan may be prepared for its required review and owner/delegated gate;
-implementation cannot begin before that gate is satisfied.
+implementation cannot begin before that gate is satisfied. Once ruled, the gate
+is recorded as that format's plan-gate record.
 
 Build a phase readiness table from records: phase ID, dependencies, approved
 spec/gate, completed criteria, review/record evidence and next action. Completion
@@ -123,6 +126,13 @@ evidence, accepted as an explicit residual, or deferred to a named owner/target.
 Record missing acceptance evidence honestly; a successful sequence of activities
 does not establish closure. A separately required human acceptance or external
 prerequisite remains pending unless the effective authorization satisfies it.
+
+Repair the plan. Phases defer plan repairs to this point: for every refuted
+premise or open-questions row in which a phase record names a plan repair,
+amend the canonical plan with provenance (the raising record's path, the date,
+the prior wording retained), or disposition the row in the sweep as carried or
+retired with its reason. A repair is a plan amendment and falls under the close
+ruling; the close record cites the amended plan's SHA-256.
 
 Write the next numbered milestone close record using the
 [milestone record format](../process-phase/references/milestone-record-format.md).

@@ -322,27 +322,29 @@ phase_status: not_started</pre></div>
       <p class="caption">First try: the decision is not on record yet. Phase 4 is refused because it depends on unfinished work. Phase 3 starts once the decision is written down.</p>
     </div>
     <div>
-<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · after phase 3 closed</b><em>captured</em></div>
-<pre><span class="p">$</span> <span class="cmd">phase-tool status --phase 03</span>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · closing phase 3 before phase 2</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool status --brief</span>
 <span class="ok">phase_tool.status: ok</span>
 current_phase: 03
-phase_status: complete
-active_step: None
-next_step: orient
-completed_phases: [&quot;00&quot;, &quot;01&quot;, &quot;03&quot;]
-…
-phase_title: Size report
-…
-branch: develop
-…
+phase_status: verified
+active_step: close
+next_step: close
 
-<span class="p">$</span> <span class="cmd">phase-tool status --phase next --brief</span>
+<span class="p">$</span> <span class="cmd">phase-tool complete --phase 03</span>
+<span class="ok">phase_tool.complete: ok</span>
+phase: 03
+completed_phases: [&quot;00&quot;, &quot;01&quot;, &quot;03&quot;]
+current_phase: 02
+validated_reqs: 1
+updated: [&quot;.planning/ROADMAP.md&quot;, &quot;.planning/STATE.md&quot;, &quot;.planning/REQUIREMENTS.md&quot;]
+
+<span class="p">$</span> <span class="cmd">phase-tool status --brief</span>
 <span class="ok">phase_tool.status: ok</span>
 current_phase: 02
 phase_status: not_started
 active_step: None
 next_step: discuss</pre></div>
-      <p class="caption">Phases 0, 1 and 3 are complete; phase 2 was never started. Asked what comes next, the tool answers phase 2.</p>
+      <p class="caption">Phase 3 is closed while phase 2 was never started. The tool goes back to phase 2, the one that can start, and not on to phase 4, which is still blocked.</p>
     </div>
   </div>
 </div></section>

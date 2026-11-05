@@ -41,6 +41,8 @@ Each helper's docstring names the `prove.md` §4 oracle case it was validated ag
 .venv/bin/pytest --phase NN -q -rA -p no:cacheprovider 2>&1 | tee .planning/phases/NN-<slug>/NN-EVIDENCE/red.txt
 ```
 
+`--phase NN` selects one phase's acceptance tests, and keeps the tests of phases that are not complete out of the plain `pytest` run. It comes from the phase-selection plugin shipped beside this skill (`skills/phase/pytest/phase_selection.py` in the shared source, used as the project's root `conftest.py` or loaded from it). A project with its own selection mechanism names the command in `references/project.md`.
+
 Classify every failure:
 
 | Outcome | Verdict |

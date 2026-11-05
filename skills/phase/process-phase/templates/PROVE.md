@@ -23,7 +23,7 @@
 <!-- Only the targets that held (Go, or a Pivot whose measured replacement target held in §3) and the observable outcomes the prototype showed matter. Specify locks exactly these; NN-01 automates this prototype on the same asset and metric. -->
 
 ### Method record (required)
-<!-- One row per goal with verdict Go or Pivot: exactly what the run that met the target used. Every cell is filled; "To fill" or an empty cell fails `phase_tool check --prove NN`, and the gate from tests_approved on cannot be waived by --override. A promoted step's plan, brief, budget and parity file are taken from its row. For a phase that inherits an earlier proof, copy the earlier row and name its evidence folder. -->
+<!-- One row per goal with verdict Go or Pivot: exactly what the run that met the target used. Every cell is filled (write `none` where a column does not apply, as for a hand-run or $0 script with no model, turns or spend); "To fill" or an empty cell fails `phase_tool check --prove NN`, and the gate from tests_approved on cannot be waived by --override. A promoted step's plan, brief, budget and parity file are taken from its row. For a phase that inherits an earlier proof, copy the earlier row and name its evidence folder. -->
 
 | Goal | Asset (hash) | Metric before → after; items lost | Inputs given (paths) | Tools allowed | Instruction file (path, sha256) | Model, effort | Turns | Wall | Spend | Evidence folder |
 |---|---|---|---|---|---|---|---|---|---|---|

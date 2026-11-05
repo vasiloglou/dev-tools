@@ -119,8 +119,8 @@ ordinary corrective work does not reopen this gate.
 python3 .claude/skills/process-phase/scripts/phase_tool.py check --context .planning/phases/NN-<slug>/NN-CONTEXT.md
 # human approves the CX table and NN-EVIDENCE/prove.md
 python3 .claude/skills/process-phase/scripts/phase_tool.py advance --to context_approved
-git add .planning/phases/NN-<slug>/NN-CONTEXT.md .planning/phases/NN-<slug>/NN-DISCUSSION-LOG.md .planning/phases/NN-<slug>/NN-EVIDENCE/prove.md .planning/STATE.md .planning/ROADMAP.md
+git add .planning/phases/NN-<slug>/ .planning/STATE.md .planning/ROADMAP.md
 git commit -m "docs(NN): capture phase context"
 ```
 
-Exactly one commit leaves this step, and no PLAN or test files exist yet.
+Exactly one commit leaves this step. It takes the whole phase directory: the files `init` created (`NN-TESTS.md` and `NN-DEFERRED.md` are still the unfilled templates) and the prototype scripts and outputs under `NN-EVIDENCE/`, so nothing is left untracked for the coder's scope check to count. No PLAN and no test code exist yet.

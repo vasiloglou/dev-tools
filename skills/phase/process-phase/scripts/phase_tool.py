@@ -4,6 +4,7 @@
 Stdlib only; runs on the system python3 (3.9). Every command prints exactly one JSON
 envelope with ``--format json`` or a short human summary with ``--format md`` (default).
 
+    phase_tool.py setup [--name NAME] [--base-branch B] [--release-branch B]
     phase_tool.py status [--phase NN|next] [--brief]
     phase_tool.py init --phase NN
     phase_tool.py activate --phase NN --dec DEC-NNN
@@ -53,6 +54,9 @@ DEFAULT_SETTINGS = {
     "capabilities_target": "docs/CAPABILITIES.md",
     "process_skill": ".claude/skills/process-phase",
     "branch_prefix": "phase/",
+    # First status whose missing artifacts block ``advance``. "context_approved" enforces
+    # every step; "plan_approved" only warns for the first two (for phases begun under that rule).
+    "gated_from": "context_approved",
 }
 
 
@@ -92,8 +96,8 @@ NEXT_STEP = {
 }
 # Artifacts expected once a status is reached. Entries are (status, reported name, glob).
 # Plans and summaries are per plan: NN-MM-PLAN.md. ``status`` reports missing ones.
-# ``advance`` treats them as warnings up to tests_approved and as blockers from plan_approved on
-# (see GATED_FROM): reaching plan_approved needs everything the earlier steps promised.
+# ``advance`` treats them as blockers from GATED_FROM on (the ``gated_from`` setting) and as
+# warnings before it.
 ARTIFACTS = [
     ("context_approved", "{nn}-CONTEXT.md", "{nn}-CONTEXT.md"),
     ("tests_approved", "{nn}-TESTLOCK.json", "{nn}-TESTLOCK.json"),
@@ -102,7 +106,9 @@ ARTIFACTS = [
     ("implemented", "{nn}-MM-SUMMARY.md", "{nn}-[0-9][0-9]-SUMMARY.md"),
     ("verified", "{nn}-VERIFICATION.md", "{nn}-VERIFICATION.md"),
 ]
-GATED_FROM = "plan_approved"
+GATED_FROM = SETTINGS["gated_from"]
+if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
+    raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
 IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
 IGNORED_SUFFIXES = (".pyc", ".pyo")
 DEC_ID = re.compile(r"^DEC-\d{3}$")
@@ -258,12 +264,13 @@ class Planning:
     def require(self) -> None:
         if not self.dir.is_dir():
             raise ToolError("NO_PLANNING", "no %s/ under %s" % (PLANNING, self.root),
-                            "run from the repo root or pass --root")
+                            "run from the repo root or pass --root; a new project starts with 'phase_tool.py setup'")
 
     def state(self) -> dict:
         path = self.dir / "STATE.md"
         if not path.is_file():
-            raise ToolError("NO_STATE", PLANNING + "/STATE.md is missing", "create it from the spec")
+            raise ToolError("NO_STATE", PLANNING + "/STATE.md is missing",
+                            "run 'phase_tool.py setup' to create the missing planning files")
         return parse_frontmatter(path.read_text(encoding="utf-8"))
 
     def roadmap_text(self) -> str:
@@ -387,13 +394,17 @@ def missing_artifacts(pl: Planning, nn: str, status: str) -> list:
     return missing
 
 
+def open_phases(pl: Planning, completed: list) -> list:
+    """Roadmap phases that are not complete, lowest first; those that can start come before blocked ones."""
+    todo = [p for p in pl.phases() if p["id"] not in completed and p["status"] != "complete"]
+    ready = [p["id"] for p in todo if all(d in completed for d in p["depends_on"])]
+    return ready + [p["id"] for p in todo if p["id"] not in ready]
+
+
 def next_phase(pl: Planning, state: dict) -> str:
-    """Lowest roadmap phase that is not complete (the current phase while it is open)."""
-    completed = sorted(phase_list(state.get("completed_phases", "")), key=phase_key)
-    for phase in pl.phases():
-        if phase["id"] not in completed and phase["status"] != "complete":
-            return phase["id"]
-    return norm_phase(state.get("current_phase", "00"))
+    """Lowest incomplete roadmap phase whose dependencies are complete (else the lowest incomplete one)."""
+    todo = open_phases(pl, phase_list(state.get("completed_phases", "")))
+    return todo[0] if todo else norm_phase(state.get("current_phase", "00"))
 
 
 def cmd_status(pl: Planning, args) -> dict:
@@ -449,6 +460,34 @@ CONTEXT_SKELETON = """# Phase {{PHASE}}: {{TITLE}} - Context
 
 ## Open questions
 """
+
+
+def cmd_setup(pl: Planning, args) -> dict:
+    """Create the planning files a new project needs; never overwrites an existing file."""
+    branch = (git(pl.root, "rev-parse", "--abbrev-ref", "HEAD") or "").strip()
+    base = args.base_branch or (branch if branch and branch != "HEAD" else "main")
+    subs = {"{{NAME}}": args.name or pl.root.name, "{{DATE}}": today(), "{{BASE}}": base,
+            "{{RELEASE}}": args.release_branch or base,
+            "{{TOOL}}": rel(pl.root, Path(__file__).resolve())}
+    source = TEMPLATES_DIR / "planning"
+    if not source.is_dir():
+        raise ToolError("NO_TEMPLATES", "%s is missing" % source, "sync the whole process-phase skill directory")
+    created, kept = [], []
+    pl.dir.mkdir(parents=True, exist_ok=True)
+    for template in sorted(source.iterdir()):
+        dest = pl.dir / template.name
+        if dest.exists():
+            kept.append(rel(pl.root, dest))
+            continue
+        text = template.read_text(encoding="utf-8")
+        for key, value in subs.items():
+            text = text.replace(key, value)
+        dest.write_text(text, encoding="utf-8")
+        created.append(rel(pl.root, dest))
+    return {"created": created, "kept": kept,
+            "next": ["describe the first phase in %s/ROADMAP.md and its requirement in REQUIREMENTS.md" % PLANNING,
+                     "put your name on the DEC-001 row in %s/DECISIONS.md" % PLANNING,
+                     "commit, then run 'phase_tool.py check --all'"]}
 
 
 def cmd_init(pl: Planning, args) -> dict:
@@ -531,7 +570,8 @@ def check_roadmap(pl: Planning) -> list:
         return [issue(f, 0, "roadmap", "no '## Phase N: Title' sections")]
     issues = []
     nums = [p["num"] for p in phases if "." not in p["id"]]
-    if nums != list(range(len(nums))):
+    first = 1 if nums and nums[0] == 1 else 0
+    if nums != list(range(first, first + len(nums))):
         issues.append(issue(f, phases[0]["_line"], "roadmap", "phases not contiguous from 0: %s" % nums))
     ids = {p["id"] for p in phases}
     keys = [phase_key(p["id"]) for p in phases]
@@ -1156,6 +1196,12 @@ def cmd_advance(pl: Planning, args) -> dict:
             hint = "use 'phase_tool.py complete --phase %s' after verification" % nn
         raise ToolError("INVALID_TRANSITION", "%s -> %s is not allowed" % (current, target), hint,
                         1, {"phase": nn, "from": current, "to": target})
+    completed = phase_list(state.get("completed_phases", ""))
+    waiting = [d for d in (pl.phase(nn) or {}).get("depends_on", []) if d not in completed]
+    if waiting:
+        raise ToolError("DEPENDENCIES_INCOMPLETE", "phase %s depends on %s, not complete" % (nn, ", ".join(waiting)),
+                        "finish those phases first, or 'activate --phase NN --dec DEC-NNN' a phase that can start",
+                        1, {"phase": nn, "from": current, "to": target, "waiting_on": waiting})
     problems = gate_problems(pl, nn, target)
     # Only missing artifacts can be waived by a DEC; a dirty test lock or unsupported evidence never can.
     hard = [p for p in problems if not p.startswith("missing artifact: ")]
@@ -1256,9 +1302,8 @@ def cmd_complete(pl: Planning, args) -> dict:
     updated = []
     if set_roadmap_status(pl, nn, "complete"):
         updated.append(PLANNING + "/ROADMAP.md")
-    ids = [p["id"] for p in pl.phases()]
-    later = [i for i in ids if phase_key(i) > phase_key(nn) and i not in completed]
     completed = sorted(completed, key=phase_key)
+    later = open_phases(pl, completed)
     updates = {"completed_phases": ",".join(completed), "active_step": None, "last_activity": today()}
     updates.update({"current_phase": later[0], "phase_status": "not_started"} if later
                    else {"phase_status": "complete"})
@@ -1267,8 +1312,13 @@ def cmd_complete(pl: Planning, args) -> dict:
     validated = validate_requirements(pl, completed)
     if validated:
         updated.append(PLANNING + "/REQUIREMENTS.md")
-    return {"phase": nn, "completed_phases": completed,
+    data = {"phase": nn, "completed_phases": completed,
             "current_phase": later[0] if later else nn, "validated_reqs": validated, "updated": updated}
+    if later:
+        waiting = [d for d in (pl.phase(later[0]) or {}).get("depends_on", []) if d not in completed]
+        if waiting:
+            data["blockers"] = ["phase %s not complete" % d for d in waiting]
+    return data
 
 
 # --------------------------------------------------------------------------- migration / goldens / evidence
@@ -1369,7 +1419,7 @@ def cmd_evidence_check(pl: Planning, args) -> dict:
 
 
 COMMANDS = {
-    "status": cmd_status, "init": cmd_init, "activate": cmd_activate, "roadmap": cmd_roadmap, "check": cmd_check,
+    "setup": cmd_setup, "status": cmd_status, "init": cmd_init, "activate": cmd_activate, "roadmap": cmd_roadmap, "check": cmd_check,
     "req-coverage": cmd_req_coverage, "testlock": cmd_testlock, "advance": cmd_advance,
     "complete": cmd_complete, "branch": cmd_branch, "migration-check": cmd_migration_check,
     "golden-diff": cmd_golden_diff, "evidence-check": cmd_evidence_check,
@@ -1385,6 +1435,10 @@ def build_parser() -> Parser:
     common.add_argument("--format", choices=["json", "md"], default=argparse.SUPPRESS)
     common.add_argument("--root", default=argparse.SUPPRESS)
     sub = parser.add_subparsers(dest="cmd", required=True, parser_class=Parser)
+    p = sub.add_parser("setup", parents=[common])
+    p.add_argument("--name")
+    p.add_argument("--base-branch")
+    p.add_argument("--release-branch")
     p = sub.add_parser("status", parents=[common])
     p.add_argument("--phase")
     p.add_argument("--brief", action="store_true")

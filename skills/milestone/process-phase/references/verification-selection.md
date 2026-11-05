@@ -54,7 +54,9 @@ what the phase is and is not claiming.
 ## Selection rules
 
 1. **Run plan-mandated gates verbatim unless the owner amends them.** Record an
-   explicit owner amendment at the original gate's site in the phase spec. If
+   explicit owner amendment at the original gate's site in the phase spec,
+   marked as [`spec-note-contract.md`](spec-note-contract.md) requires of a
+   change made in place after approval. If
    a mandated command is invalid, unavailable, or contradicts the phase,
    record a refuted premise and return to the owner gate. Do not silently
    substitute a narrower command.
@@ -67,7 +69,8 @@ what the phase is and is not claiming.
    contracts, not filename vintage.
 4. **Record the selected gate, not an implicit full-suite replay.** On each
    edit, run the direct tests and affected consumers. A phase record's `gate`
-   names the exact selected command and its exit. Use the reduced
+   (or `gates`, when several were selected) names the exact selected command
+   and its exit. Use the reduced
    selection above. A full default or broad-lane run requires
    explicit owner or separately configured CI selection. When impact cannot
    be bounded, report the missing assurance and the specific additional gate

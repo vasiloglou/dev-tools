@@ -1,0 +1,2 @@
+# Paths the roadmap will create. `check --ignored` fails if .gitignore would hide one.
+tests/acceptance/p01_first_phase/

@@ -3,7 +3,7 @@ name: process-phase
 description: Runs one roadmap phase through the .planning/ contract, test first. Steps are Orient, Discuss, Specify, Plan, Implement with focused red/green tests, Verify with one final full regression run, and Close. Human gates follow Discuss, Specify and Plan, and Close has one too. Reuse valid test results; no repeated replay or evidence-review loops. phase_tool.py owns every status transition. Use when the user explicitly invokes /process-phase to start, resume or advance a phase, or asks what comes next on the roadmap. Explicit invocation only. Not for ad-hoc fixes outside the roadmap or for amending MANIFESTO.md outside a phase close.
 argument-hint: "[NN|next] [--step discuss|specify|plan|implement|verify|close] [--mode guided|fast]"
 disable-model-invocation: true
-allowed-tools: Read Grep Glob Edit Write Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git add *) Bash(git commit *) Bash(git switch *) Bash(git merge *) Bash(git stash *) Bash(git worktree *) Bash(python3 .claude/skills/process-phase/scripts/phase_tool.py *) Bash(.venv/bin/pytest *) Bash(.venv/bin/python -m pytest *) Bash(codex exec *) Bash(git checkout -- *)
+allowed-tools: Read Grep Glob Edit Write Bash(git status *) Bash(git diff *) Bash(git log *) Bash(git add *) Bash(git commit *) Bash(git switch *) Bash(git merge *) Bash(git stash *) Bash(git worktree *) Bash(python3 .claude/skills/process-phase/scripts/phase_tool.py *) Bash(python3 .claude/skills/process-phase/scripts/codex_gate.py *) Bash(python3 scripts/components_index.py *) Bash(.venv/bin/pytest *) Bash(.venv/bin/python -m pytest *) Bash(codex exec *) Bash(git checkout -- *)
 ---
 
 # process-phase
@@ -61,7 +61,12 @@ Python with worktree `src` first on PYTHONPATH, for example
 `phase_tool.py status --phase NN --format json` gives the current step, missing
 artifacts and applicable check IDs. The PG ids in `scripts/gates.json` remain for
 compatibility; `references/gates.md` defines how existing results satisfy them without reruns.
-Use `advance --to <status>` and `complete --phase NN` for transitions.
+Use `advance --to <status>` and `complete --phase NN` for transitions. `advance`
+refuses a transition while a file the step should have produced is missing, or
+while the phase depends on one that is not complete.
+
+A project with no `.planning/` yet starts with `phase_tool.py setup`, which writes
+the starter planning files (`references/artifact-formats.md`).
 
 Inserted phases accept `N.M` or `NN.M`; paths use `NN.M` and acceptance packages
 use underscores, for example `tests/acceptance/p06_1_<slug>/`.

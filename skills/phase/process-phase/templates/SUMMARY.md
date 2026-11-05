@@ -19,7 +19,7 @@ status: complete            # complete | partial
 |---|---|
 
 ## Rounds
-<!-- More than 3 codex rounds requires an AskUserQuestion escalation first; record it here. -->
+<!-- Record a task that got stuck on the same failing test, and any approval the user gave to switch it to the stuck-task model (implement.md §2.2). Ordinary corrective rounds need no escalation. -->
 | Task | Codex rounds | Reviewer verdict | Escalated? |
 |---|---|---|---|
 

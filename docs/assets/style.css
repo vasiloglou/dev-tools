@@ -213,3 +213,6 @@ footer a { color: var(--muted); }
   html { scroll-behavior: auto; }
   .btn:hover { transform: none; }
 }
+
+.narrow > h2 { margin-top: 1.5em; }
+.narrow > h2:first-child { margin-top: 0; }

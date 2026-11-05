@@ -123,7 +123,8 @@ gate:
   exit: 0
   output: "<verbatim test summary line>"
   note: >-
-    The selected direct and downstream controls; list additional commands in the body.
+    The selected direct and downstream controls. Several selected gates: use
+    `gates`, one entry per gate with its own exit (base contract).
 slow_cadence:
   command: "<the project's broad-lane command>"
   trigger: "explicit owner request or separately scoped CI selection"
@@ -136,7 +137,8 @@ evidence:
 
 Every phase record carries `gate` and exactly one of `slow_gate` or
 `slow_cadence`. `gate` records the focused command actually executed, with
-its exit and a verbatim output summary. Use `slow_gate` with the exact command,
+its exit and a verbatim output summary; a verification selection with several
+gates takes the base contract's `gates` list instead. Use `slow_gate` with the exact command,
 exit, and a verbatim output summary when the broad lane ran; use `slow_cadence`
 with a concrete trigger and reason
 when it did not. A collection-only check never counts as a `slow_gate` result.
@@ -149,13 +151,15 @@ the project defines are in `references/project.md`.
 > **A known red is proven, not asserted.** If the suite exits non-zero for a
 > reason that predates the phase, verify it in a throwaway worktree at the commit
 > the phase began from and say that you verified it there. "This was already
-> failing" is a claim like any other.
+> failing" is a claim like any other. The proof is owed when the red is first
+> met -- normally step 3, before the phase builds on it -- not when the record
+> is written.
 
 Body sections, beyond the base contract:
 
 - **What shipped** — module by module, with the design decisions that survived.
 - **Gate output (verbatim)** — the exact commands and their exact output,
-  including the lint gate.
+  including the project's lint command where `references/project.md` names one.
 - **Any criterion that was measured** — with the measurement, the threshold, and,
   if the threshold moved, the arithmetic that moved it.
 - **`Refactoring review`** — step 5's output, executed and deferred halves both.
@@ -179,8 +183,9 @@ obligation does not retroactively widen what the phase established.
 
 ### The commit
 
-The record contract's grammar with a phase scope token:
-`feat(<milestone>-<phase>): ...`, and `test(...)`,
+The record contract's grammar with the phase scope token that contract defines
+([`milestone-record-format.md`](milestone-record-format.md), Scope tokens):
+`feat(phase-N): ...`, and `test(...)`,
 `fix(...)`, `docs(...)` for the same phase as the work warrants — a phase is
 normally several commits, each naming what it turned green.
 

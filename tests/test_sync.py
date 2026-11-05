@@ -183,6 +183,13 @@ def test_failing_after_apply_is_reported(source, project):
     assert run("check", "--project", project) == 0, "the files and receipt are still consistent"
 
 
+def test_after_apply_command_that_does_not_exist_is_reported(source, project, capsys):
+    (project / ".devtools.toml").write_text(
+        CONFIG.replace("[[sync]]", 'after_apply = ["no-such-command-here"]\n\n[[sync]]', 1))
+    assert apply(source, project) == 4
+    assert "after_apply failed: no-such-command-here" in capsys.readouterr().err
+
+
 def test_unknown_top_level_key_is_an_error(source, project):
     (project / ".devtools.toml").write_text('surprise = 1\n' + CONFIG)
     assert apply(source, project) == 2
