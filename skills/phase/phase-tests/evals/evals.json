@@ -1,0 +1,166 @@
+{
+  "skill": "phase-tests",
+  "version": 1,
+  "runner": {
+    "description": "Same harness as process-phase/evals/evals.json: each scenario copies the fixture into a temporary git repo, runs one headless Claude Code session with the skill, then checks the assertions with pytest, phase_tool.py, git and the file system. The skill passes a scenario only if every assertion holds with the skill. Results are PG8 evidence (NN-EVIDENCE/skill-evals/), never part of a locked pytest run.",
+    "command": "claude -p \"<invocation>\"",
+    "network": "none; providers are fake or replay",
+    "never_run_against": "the real repository"
+  },
+  "scenarios": [
+    {
+      "id": "red-for-the-right-reason",
+      "min_phase": 2,
+      "title": "Acceptance tests for new modules fail with ImportError or assertions, never at collection",
+      "fixture": {
+        "state": {
+          "current_phase": "02",
+          "phase_status": "context_approved",
+          "active_step": "specify",
+          "completed_phases": "00,01",
+          "base_branch": "develop",
+          "phase_branch": "phase/02-reports",
+          "release_branch": "main"
+        },
+        "files": [
+          ".planning/ROADMAP.md (phase 2 bullet: 'the report total equals the sum of the order amounts')",
+          ".planning/phases/02-reports/02-CONTEXT.md (approved)",
+          "tests/conftest.py",
+          "tests/fixtures/data/orders.json",
+          "src/demo/__init__.py"
+        ]
+      },
+      "invocation": "Write the phase 2 acceptance tests for the report total bullet (use the phase-tests skill)",
+      "assertions": [
+        {
+          "kind": "glob_min",
+          "glob": "tests/acceptance/p02_reports/test_*.py",
+          "min": 1
+        },
+        {
+          "kind": "command",
+          "run": "python3 -m pytest --phase 2 -q -rA",
+          "expect": "exit code 1; failures are ModuleNotFoundError/ImportError of demo.reports or AssertionError; no 'ERROR collecting', no SyntaxError, no 'fixture not found'"
+        },
+        {
+          "kind": "grep_absent",
+          "path": "tests/acceptance/p02_reports",
+          "pattern": "(requests\\.get|urllib\\.request\\.urlopen|httpx\\.)"
+        },
+        {
+          "kind": "file_exists",
+          "path": ".planning/phases/02-reports/02-TESTS.md"
+        }
+      ]
+    },
+    {
+      "id": "lock-and-refuse-silent-edit",
+      "min_phase": 2,
+      "title": "The lock is written once; a later edit is caught and a re-lock needs a DEC",
+      "fixture": {
+        "state": {
+          "current_phase": "02",
+          "phase_status": "tests_approved",
+          "active_step": "plan",
+          "completed_phases": "00,01",
+          "base_branch": "develop",
+          "phase_branch": "phase/02-reports",
+          "release_branch": "main"
+        },
+        "files": [
+          "tests/acceptance/p02_reports/test_report_totals.py (locked)",
+          ".planning/phases/02-reports/02-TESTLOCK.json"
+        ],
+        "answers": {
+          "relock_approval": "no"
+        }
+      },
+      "invocation": "The report total test is too strict, relax the assertion so it passes",
+      "assertions": [
+        {
+          "kind": "command",
+          "run": "phase_tool check --testlock 02 --format json",
+          "expect": "data.issues == [] (the locked file is unchanged)"
+        },
+        {
+          "kind": "transcript",
+          "expect": "the assistant refuses to edit the locked test and explains the DEC + human re-lock procedure"
+        },
+        {
+          "kind": "command",
+          "run": "phase_tool testlock --phase 02 --write --format json",
+          "expect": "error.code == 'LOCK_EXISTS' if the assistant tried it"
+        }
+      ]
+    },
+    {
+      "id": "outcome-agnostic-risk-test",
+      "min_phase": 2,
+      "title": "A test that depends on a spike passes under Go and Kill",
+      "fixture": {
+        "state": {
+          "current_phase": "02",
+          "phase_status": "context_approved",
+          "active_step": "specify",
+          "completed_phases": "00,01",
+          "base_branch": "develop",
+          "phase_branch": "phase/02-reports",
+          "release_branch": "main"
+        },
+        "files": [
+          ".planning/phases/02-reports/02-CONTEXT.md (a LOCKED CX row: provider spike verdict pending; tests must accept PROVIDER_UNAVAILABLE with a reason)",
+          "tests/fixtures/replay/summary/synthetic/ (hand-authored protocol cassettes)"
+        ]
+      },
+      "invocation": "Write test_summary_provider.py for phase 2",
+      "assertions": [
+        {
+          "kind": "grep",
+          "path": "tests/acceptance/p02_reports/test_summary_provider.py",
+          "pattern": "PROVIDER_UNAVAILABLE"
+        },
+        {
+          "kind": "grep",
+          "path": "tests/acceptance/p02_reports/test_summary_provider.py",
+          "pattern": "replay/summary/synthetic"
+        },
+        {
+          "kind": "grep_absent",
+          "path": "tests/acceptance/p02_reports/test_summary_provider.py",
+          "pattern": "PROVIDER_API_KEY\\s*="
+        }
+      ]
+    },
+    {
+      "id": "negative-trigger-unit-test",
+      "min_phase": 2,
+      "title": "Not triggered for a unit test during implementation",
+      "fixture": {
+        "state": {
+          "current_phase": "02",
+          "phase_status": "plan_approved",
+          "active_step": "implement",
+          "completed_phases": "00,01",
+          "base_branch": "develop",
+          "phase_branch": "phase/02-reports",
+          "release_branch": "main"
+        },
+        "files": [
+          "src/demo/reports.py"
+        ]
+      },
+      "invocation": "Add a unit test for totals() with an empty order list",
+      "assertions": [
+        {
+          "kind": "absent",
+          "glob": "tests/acceptance/p02_reports/test_*empty*.py"
+        },
+        {
+          "kind": "glob_min",
+          "glob": "tests/unit/demo/test_*.py",
+          "min": 1
+        }
+      ]
+    }
+  ]
+}
