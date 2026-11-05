@@ -1,0 +1,164 @@
+{
+  "skill": "process-phase",
+  "version": 1,
+  "runner": {
+    "description": "Each scenario copies a fixture repo (a tiny .planning/ plus a minimal package and tests) into a temporary git repo, writes the scripted answers to .planning/.eval-answers.yaml, and runs headless Claude Code with the skill's allowed-tools. Assertions are then checked with phase_tool.py, git and the file system. The skill passes a scenario only if every assertion holds. Scenarios whose min_phase is later than the run's --phase are skipped.",
+    "command": "claude -p \"<invocation>\" --allowedTools \"<process-phase allowed-tools>\"",
+    "phase_tool": "python3 .claude/skills/process-phase/scripts/phase_tool.py",
+    "network": "none; providers are fake or replay",
+    "never_run_against": ".planning/ of the real repository"
+  },
+  "scenarios": [
+    {
+      "id": "fresh-phase-discuss",
+      "min_phase": 1,
+      "title": "Fresh phase: Discuss produces an approved CONTEXT, goals/targets and prove.md, and nothing else",
+      "fixture": {
+        "state": {
+          "current_phase": "01",
+          "phase_status": "not_started",
+          "active_step": "null",
+          "completed_phases": "00",
+          "base_branch": "develop",
+          "phase_branch": "develop",
+          "release_branch": "main"
+        },
+        "files": [
+          ".planning/STATE.md",
+          ".planning/ROADMAP.md (phases 0-1; phase 1 with two acceptance bullets)",
+          ".planning/REQUIREMENTS.md",
+          "src/demo/__init__.py",
+          "tests/test_smoke.py"
+        ],
+        "venv": "absent (fresh clone)",
+        "answers": {
+          "batch_1": "accept all recommendations",
+          "context_approval": "yes"
+        }
+      },
+      "invocation": "/process-phase 01 --step discuss",
+      "assertions": [
+        {"kind": "injection", "check": "the status injection line ran without error (phase_tool uses only python3)"},
+        {"kind": "file_exists", "path": ".planning/phases/01-parser/01-CONTEXT.md"},
+        {"kind": "file_exists", "path": ".planning/phases/01-parser/01-DISCUSSION-LOG.md"},
+        {"kind": "file_exists", "path": ".planning/phases/01-parser/01-EVIDENCE/prove.md"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-EVIDENCE/prove.md", "pattern": "## 1\\. Goals and targets"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-EVIDENCE/prove.md", "pattern": "Go|Pivot|Kill|DEC-\\d+"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-CONTEXT.md", "pattern": "## Goals and targets"},
+        {"kind": "command", "run": "phase_tool check --context .planning/phases/01-parser/01-CONTEXT.md --format json", "expect": "data.issues == []"},
+        {"kind": "command", "run": "phase_tool status --format json", "expect": "data.phase_status == 'context_approved'"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-CONTEXT.md", "pattern": "\\| CX-\\d+ \\| (LOCKED|DEFERRED|DISCRETION) \\|"},
+        {"kind": "git_log", "expect": "exactly one new commit, message 'docs(01): capture phase context'"},
+        {"kind": "absent", "glob": ".planning/phases/01-parser/01-*-PLAN.md"},
+        {"kind": "absent", "glob": "tests/acceptance/p01_*/*.py"},
+        {"kind": "questions_log", "expect": "number of questions asked <= number of scripted answers"}
+      ]
+    },
+    {
+      "id": "specify-red-and-lock",
+      "min_phase": 1,
+      "title": "Specify writes acceptance tests that are red for the right reason and locks them",
+      "fixture": {
+        "state": {
+          "current_phase": "01",
+          "phase_status": "context_approved",
+          "active_step": "specify",
+          "completed_phases": "00",
+          "base_branch": "develop",
+          "phase_branch": "phase/01-parser",
+          "release_branch": "main"
+        },
+        "files": [
+          ".planning/ROADMAP.md (phase 1 acceptance bullets: 'parse_line returns a record with id/name/amount' and 'an unknown field raises ParseError with code UNKNOWN_FIELD')",
+          ".planning/phases/01-parser/01-CONTEXT.md (approved)",
+          "tests/conftest.py (the --phase plugin)",
+          "src/demo/__init__.py (no parser module yet)"
+        ],
+        "answers": {
+          "tests_approval": "yes"
+        }
+      },
+      "invocation": "/process-phase 01 --step specify",
+      "assertions": [
+        {"kind": "glob_min", "glob": "tests/acceptance/p01_parser/test_*.py", "min": 1},
+        {"kind": "command", "run": "python3 -m pytest --phase 01 -q", "expect": "exit code 1; no 'ERROR collecting'; no SyntaxError"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-EVIDENCE/red.txt", "pattern": "(ModuleNotFoundError|ImportError|AssertionError)"},
+        {"kind": "file_exists", "path": ".planning/phases/01-parser/01-TESTS.md"},
+        {"kind": "traceability", "expect": "each of the two ROADMAP acceptance bullets maps to >= 1 test id in 01-TESTS.md, and every test id in the files appears in 01-TESTS.md"},
+        {"kind": "json", "path": ".planning/phases/01-parser/01-TESTLOCK.json", "expect": "phase == '01' and every tests/acceptance/p01_parser/*.py file has a sha256 entry"},
+        {"kind": "command", "run": "phase_tool check --testlock 01 --format json", "expect": "data.issues == []"},
+        {"kind": "command", "run": "phase_tool status --format json", "expect": "data.phase_status == 'tests_approved'"},
+        {"kind": "git_log", "expect": "newest commit message 'test(01): acceptance tests (red)'"},
+        {"kind": "absent", "glob": "src/demo/parser*"},
+        {"kind": "absent", "glob": ".planning/phases/01-parser/01-*-PLAN.md"}
+      ]
+    },
+    {
+      "id": "resume-mid-implement",
+      "min_phase": 1,
+      "title": "Resume mid-implement from .continue-here.md without re-planning or discarding work",
+      "fixture": {
+        "state": {
+          "current_phase": "01",
+          "phase_status": "plan_approved",
+          "active_step": "implement",
+          "completed_phases": "00",
+          "base_branch": "develop",
+          "phase_branch": "phase/01-parser",
+          "release_branch": "main"
+        },
+        "files": [
+          ".planning/phases/01-parser/01-TESTLOCK.json (matches the committed tests)",
+          ".planning/phases/01-parser/01-01-PLAN.md (T1 done, T2 pending, T2 turns_green names one acceptance test)",
+          ".planning/phases/01-parser/.continue-here.md (next task 01-01-T2; dirty files src/demo/parser.py and tests/unit/test_parser.py)"
+        ],
+        "dirty": ["src/demo/parser.py", "tests/unit/test_parser.py"],
+        "answers": {}
+      },
+      "invocation": "/process-phase next",
+      "assertions": [
+        {"kind": "no_discard", "expect": "the pre-existing edits in src/demo/parser.py and tests/unit/test_parser.py are still present in HEAD or the working tree"},
+        {"kind": "unchanged", "path": ".planning/phases/01-parser/01-01-PLAN.md"},
+        {"kind": "command", "run": "phase_tool check --testlock 01 --format json", "expect": "data.issues == []"},
+        {"kind": "git_log", "expect": "next commit message matches '^feat\\(01-01\\): '"},
+        {"kind": "command", "run": "python3 -m pytest --phase 01 -q -k <T2 test>", "expect": "the test named in T2 turns_green passes"},
+        {"kind": "absent", "path": ".planning/phases/01-parser/.continue-here.md", "when": "plan 01-01 completed in the run"},
+        {"kind": "absent", "glob": ".planning/phases/01-parser/01-02-PLAN.md"}
+      ]
+    },
+    {
+      "id": "verify-with-gaps",
+      "min_phase": 1,
+      "title": "Fresh-context verify finds a failing acceptance criterion and routes to gap closure",
+      "fixture": {
+        "state": {
+          "current_phase": "01",
+          "phase_status": "implemented",
+          "active_step": "verify",
+          "completed_phases": "00",
+          "base_branch": "develop",
+          "phase_branch": "phase/01-parser",
+          "release_branch": "main"
+        },
+        "files": [
+          "tests/acceptance/p01_parser/test_parse.py (locked; one test fails against the fixture code: ParseError lacks 'hint')",
+          ".planning/phases/01-parser/01-01-SUMMARY.md (claims all tests green)"
+        ],
+        "answers": {
+          "gap_plan_approval": "yes"
+        }
+      },
+      "invocation": "/process-phase 01 --step verify",
+      "assertions": [
+        {"kind": "file_exists", "path": ".planning/phases/01-parser/01-EVIDENCE/runs/pytest-phase.txt"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-VERIFICATION.md", "pattern": "status: gaps_found"},
+        {"kind": "grep", "path": ".planning/phases/01-parser/01-VERIFICATION.md", "pattern": "test_parse.py::"},
+        {"kind": "command", "run": "phase_tool evidence-check --format json", "expect": "data.unsupported == []"},
+        {"kind": "glob_min", "glob": ".planning/phases/01-parser/01-*-PLAN.md", "min": 1, "where": "frontmatter gap_closure: true and turns_green names the failing test"},
+        {"kind": "command", "run": "phase_tool status --format json", "expect": "data.phase_status == 'plan_approved' only after the scripted approval; 'gaps_found' before it"},
+        {"kind": "unchanged", "path": "tests/acceptance/p01_parser/test_parse.py"},
+        {"kind": "not_claimed", "expect": "the run never reports the phase as verified and never runs 'phase_tool complete'"}
+      ]
+    }
+  ]
+}

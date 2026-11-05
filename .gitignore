@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Working notes about the projects this was extracted from; kept local, never committed.
+notes/

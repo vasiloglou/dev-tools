@@ -1,0 +1,65 @@
+{
+  "PG1": {
+    "name": "One final full regression run",
+    "check": "Run .venv/bin/python -m pytest -q -p no:cacheprovider once after focused fixes; reuse the result across checks. No Orient/Implement/fresh-verifier repeats.",
+    "from_phase": 0
+  },
+  "PG2": {
+    "name": "Approved acceptance coverage",
+    "check": "Reuse current focused/default-suite results; run only uncovered required acceptance or relevant slow tests before the final full run.",
+    "from_phase": 0
+  },
+  "PG3": {
+    "name": "Acceptance test lock unchanged",
+    "check": "python3 .claude/skills/process-phase/scripts/phase_tool.py check --testlock {NN} --format json",
+    "from_phase": 0
+  },
+  "PG5": {
+    "name": "Declared goldens and golden coverage",
+    "check": "phase_tool.py golden-diff --format json; reuse final PG1 golden-test results.",
+    "from_phase": 1,
+    "reuse_from": "PG1"
+  },
+  "PG6": {
+    "name": "Architecture and layering coverage",
+    "check": "Reuse final PG1 architecture results; preserve explicit baseline exceptions.",
+    "from_phase": 0,
+    "reuse_from": "PG1"
+  },
+  "PG8": {
+    "name": "Planning/skill consistency",
+    "check": "phase_tool.py check --all; reuse final PG1 skill-fact results. No live eval unless requested.",
+    "from_phase": 0
+  },
+  "PG9": {
+    "name": "Requirement coverage",
+    "check": "python3 .claude/skills/process-phase/scripts/phase_tool.py req-coverage --format json",
+    "from_phase": 0
+  },
+  "PG10": {
+    "name": "Migration ledger consistent",
+    "check": "python3 .claude/skills/process-phase/scripts/phase_tool.py migration-check --format json",
+    "from_phase": 1
+  },
+  "PG11": {
+    "name": "Cited result paths exist",
+    "check": "phase_tool.py evidence-check --phase NN --format json once; mechanical path check only, no review loop.",
+    "from_phase": 0
+  },
+  "PG12": {
+    "name": "Approved outcome targets",
+    "check": "Reuse required focused/integration test results for plan targets; no separate replay/benchmark campaign unless explicitly requested.",
+    "from_phase": 1
+  },
+  "PG13": {
+    "name": "Optional code review",
+    "check": "Not required by default. If requested or needed for a concrete correctness concern, inspect the relevant diff once and use focused tests only.",
+    "from_phase": 1,
+    "required": false
+  },
+  "PG14": {
+    "name": "No TODO, stub or NotImplemented in new code",
+    "check": "grep files changed in the phase for TODO|FIXME|XXX|NotImplementedError|raise NotImplemented|# stub; no hits in product code",
+    "from_phase": 1
+  }
+}

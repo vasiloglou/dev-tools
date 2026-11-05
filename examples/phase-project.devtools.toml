@@ -1,0 +1,37 @@
+# Example .devtools.toml for a project that uses the phase workflow and the component index.
+# Copy it to the project root, adjust the values, then run:
+#   python3 <dev-tools>/devtools/sync.py apply --project .
+
+# Commands the project runs after a sync that changed a file (for example, regenerating
+# an index that lists the synced scripts).
+after_apply = ["python scripts/components_index.py"]
+
+[[sync]]
+source = "skills/phase/process-phase"
+dest = ".claude/skills/process-phase"
+# Files in this directory that the project keeps as its own instead of the shipped ones.
+# exclude = ["scripts/gates.json"]
+
+[sync.settings."scripts/phase_tool.settings.json"]
+planning_dir = ".planning"
+acceptance_dir = "tests/acceptance"
+golden_dir = "tests/golden"
+package_prefix = "myapp"
+skill_roots = [".claude/skills"]
+agents_dir = ".claude/agents"
+components_catalog = "docs/components/COMPONENTS.md"
+capabilities_script = ""
+capabilities_target = "docs/CAPABILITIES.md"
+process_skill = ".claude/skills/process-phase"
+branch_prefix = "phase/"
+
+[[sync]]
+source = "skills/components/scripts/components_index.py"
+dest = "scripts/components_index.py"
+
+[sync.settings."components_index.settings.json"]
+package_dir = "src/myapp"
+import_prefix = "myapp"
+extra_source_dirs = ["scripts"]
+docs_dir = "docs/components"
+script_path = "scripts/components_index.py"

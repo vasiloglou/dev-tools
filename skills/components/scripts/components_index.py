@@ -1,0 +1,614 @@
+#!/usr/bin/env python3
+"""Generate and search the component catalog using source ASTs, never package imports."""
+from __future__ import annotations
+
+import argparse
+import ast
+import json
+from importlib import metadata, util
+import re
+import sys
+import tokenize
+import tomllib
+from pathlib import Path
+
+# Project settings live beside this script, in components_index.settings.json.
+DEFAULT_SETTINGS = {
+    'package_dir': 'src',
+    'import_prefix': '',
+    'extra_source_dirs': [],
+    'docs_dir': 'docs/components',
+    'script_path': 'scripts/components_index.py',
+}
+
+
+def load_settings(path: Path) -> dict:
+    settings = dict(DEFAULT_SETTINGS)
+    if path.is_file():
+        loaded = json.loads(path.read_text(encoding='utf-8'))
+        unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+        if unknown:
+            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
+        settings.update(loaded)
+    return settings
+
+
+SETTINGS = load_settings(Path(__file__).resolve().with_suffix('.settings.json'))
+PACKAGE_DIR = SETTINGS['package_dir'].strip('/')
+PACKAGE = SETTINGS['import_prefix'] or PACKAGE_DIR.rsplit('/', 1)[-1]
+SOURCE_ROOT = PACKAGE_DIR[:len(PACKAGE_DIR) - len(PACKAGE)]
+EXTRA_DIRS = tuple(SETTINGS['extra_source_dirs'])
+LABEL = SETTINGS['script_path']
+ROOT = Path(__file__).resolve().parents[len(Path(LABEL).parts) - 1]
+BASE = SETTINGS['docs_dir'].strip('/') + '/'
+VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
+STOPWORDS = frozenset('a an the to of for and or in on from with into by is it its end'.split())
+
+
+def read_components(root: Path) -> list[dict]:
+    """Read component headings and single-line fields, retaining duplicate ids."""
+    return parse_components((root / BASE / 'COMPONENTS.md').read_text(encoding='utf-8'))
+
+
+def parse_components(text: str) -> list[dict]:
+    entries = []
+    for match in re.finditer(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', text, re.M | re.S):
+        entry = dict(re.findall(r'^- ([a-z_]+):[ \t]*(.*)$', match[2], re.M))
+        entry['id'] = match[1].strip()
+        entries.append(entry)
+    return entries
+
+
+def values(entry: dict, key: str) -> list[str]:
+    return [s.strip() for s in entry.get(key, '').split(',') if s.strip()]
+
+
+def covers(entry: dict, path: str) -> bool:
+    return not subsystem(entry) and any(path == p or (p.endswith('/') and path.startswith(p))
+               for p in values(entry, 'modules'))
+
+
+def sources(root: Path, directory: str):
+    for path in sorted((root / directory).rglob('*.py')):
+        parts = path.relative_to(root / directory).parts
+        if not any(p in {'tests', 'fixtures', '__pycache__'} or p.startswith('fake_')
+                   for p in parts):
+            yield path
+
+
+def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
+    paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
+    return [p for p in paths if not any(covers(e, p) for e in entries)], len(paths)
+
+
+def validate(root: Path, entries: list[dict], external_names: set[str]) -> list[str]:
+    errors, seen = [], set()
+    ids = {e['id'] for e in entries}
+    for entry in entries:
+        name = entry['id']
+        if name in seen:
+            errors.append(f'{name}: duplicate id')
+        seen.add(name)
+        if not re.fullmatch(r'[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*', name):
+            errors.append(f'{name}: invalid component id')
+        required = ('does', 'verbs', 'status', 'components' if subsystem(entry) else 'modules')
+        for key in required:
+            if key not in entry or (not entry[key] and key != 'modules'):
+                errors.append(f'{name}: missing {key}')
+        status = entry.get('status', '')
+        if status.startswith('duplicate-of '):
+            if status.removeprefix('duplicate-of ') not in ids:
+                errors.append(f'{name}: unknown duplicate-of id')
+        elif status not in {'canonical', 'experimental', 'deprecated', 'external'}:
+            errors.append(f'{name}: invalid status {status}')
+        if subsystem(entry):
+            errors.extend(validate_subsystem(entry, entries))
+        elif not entry.get('modules') and status != 'external':
+            errors.append(f'{name}: modules may be empty only for external status')
+        if status == 'external' and not entry.get('external'):
+            errors.append(f'{name}: external status needs external names')
+        for key in ('modules', 'duplicates', 'tests'):
+            for path in values(entry, key):
+                target = root / path
+                if (Path(path).is_absolute() or '..' in Path(path).parts
+                        or not target.exists() or (path.endswith('/') and not target.is_dir())):
+                    errors.append(f'{name}: {key} path missing or invalid: {path}')
+        for dotted in values(entry, 'external'):
+            if dotted not in external_names:
+                errors.append(f'{name}: external name missing: {dotted}')
+    return errors
+
+
+def validate_subsystem(entry: dict, entries: list[dict]) -> list[str]:
+    errors = []
+    if 'modules' in entry:
+        errors.append(f'{entry["id"]}: modules not allowed on subsystem')
+    ids = {e['id'] for e in entries if not subsystem(e)}
+    for key in ('components', 'flow'):
+        members = values(entry, key) if key == 'components' else entry.get(key, '').split('->')
+        for member in (m.strip() for m in members if m.strip()):
+            if member not in ids:
+                errors.append(f'{entry["id"]}: {key} requires existing component, not subsystem: {member}')
+    return errors
+
+
+def summary(node: ast.AST) -> str:
+    doc = ast.get_docstring(node) or '(no docstring)'
+    return shorten(doc.strip().splitlines()[0], 120)
+
+
+def shorten(text: str, length: int) -> str:
+    return text if len(text) <= length else text[:length - 1] + '…'
+
+
+def signature(node: ast.FunctionDef | ast.AsyncFunctionDef, name: str) -> str:
+    args = node.args
+    parts = [a.arg for a in args.posonlyargs]
+    if parts:
+        parts.append('/')
+    parts.extend(a.arg for a in args.args)
+    if args.vararg:
+        parts.append('*' + args.vararg.arg)
+    elif args.kwonlyargs:
+        parts.append('*')
+    parts.extend(a.arg for a in args.kwonlyargs)
+    if args.kwarg:
+        parts.append('**' + args.kwarg.arg)
+    result = f'{name}({", ".join(parts)})'
+    if node.returns:
+        result += ' -> ' + getattr(node, '_return_source', ast.unparse(node.returns))
+    return shorten(result, 100)
+
+
+def tool_kind(node: ast.AST) -> str:
+    for dec in node.decorator_list:
+        if isinstance(dec, ast.Call) and ast.unparse(dec.func).split('.')[-1] == 'tool':
+            for kw in dec.keywords:
+                if kw.arg == 'id' and isinstance(kw.value, ast.Constant):
+                    return f' @tool {kw.value.value}'
+    return ''
+
+
+def symbols(tree: ast.AST, prefix: str = '', methods: bool = True):
+    """Public definitions in source order; never descend into function bodies."""
+    for node in tree.body:
+        if not isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if node.name.startswith('_'):
+            continue
+        name = prefix + node.name
+        if isinstance(node, ast.ClassDef):
+            bases = [ast.unparse(b) for b in node.bases if ast.unparse(b) != 'object']
+            kind = 'class' + (f'({", ".join(bases)})' if bases else '')
+            label = name
+        else:
+            kind = 'method' if prefix else ('async function' if isinstance(node, ast.AsyncFunctionDef) else 'function')
+            label = signature(node, name)
+        yield {'id': name, 'label': label, 'kind': kind + tool_kind(node),
+               'line': node.lineno, 'summary': summary(node)}
+        if isinstance(node, ast.ClassDef) and methods:
+            yield from symbols(node, name + '.')
+
+
+def parse(path: Path) -> ast.Module:
+    with tokenize.open(path) as stream:
+        source = stream.read()
+    tree = ast.parse(source, filename=str(path))
+    lines = source.encode('utf-8').splitlines(keepends=True)
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.returns:
+            annotation = node.returns
+            span = lines[annotation.lineno - 1:annotation.end_lineno]
+            span[-1] = span[-1][:annotation.end_col_offset]
+            span[0] = span[0][annotation.col_offset:]
+            node._return_source = b''.join(span).decode('utf-8')
+    return tree
+
+
+def cell(text: str) -> str:
+    return text.replace('|', r'\|').replace('\n', ' ')
+
+
+def table(rows: list[dict]) -> list[str]:
+    lines = ['| Symbol | Kind | Line | Summary |', '| --- | --- | --- | --- |']
+    for row in rows:
+        lines.append(f'| `{cell(row["label"])}` | {cell(row["kind"])} | {row["line"]} | {cell(row["summary"])} |')
+    return lines
+
+
+def module_inventory(root: Path, entries: list[dict]) -> tuple[dict, list[dict]]:
+    groups, hits = {}, []
+    for directory in (PACKAGE_DIR, *EXTRA_DIRS):
+        for path in sources(root, directory):
+            relative = path.relative_to(root).as_posix()
+            parts = path.relative_to(root / directory).parts
+            group = (parts[0] if len(parts) > 1 else '_root') if directory == PACKAGE_DIR else directory
+            dotted = relative.removesuffix('.py').removeprefix(SOURCE_ROOT).replace('/', '.')
+            tree = parse(path)
+            rows = list(symbols(tree))
+            owners = ', '.join(e['id'] for e in entries if covers(e, relative)) or 'unassigned'
+            lines = groups.setdefault(group, [f'# {group} symbol inventory', '', f'Generated by `{LABEL}`.', ''])
+            lines.extend([f'## {dotted} — `{relative}`', f'Components: {owners}', summary(tree), '', *table(rows), ''])
+            hits.append({'kind': 'module', 'id': relative, 'summary': summary(tree),
+                         'text': ' '.join([dotted, summary(tree), *(r['label'] + ' ' + r['summary'] for r in rows)])})
+    return {BASE + f'modules/{k}.md': '\n'.join(v) for k, v in sorted(groups.items())}, hits
+
+
+def external_source(dist, dotted: str) -> Path:
+    """Locate metadata-owned source first, or probe only the top-level package spec."""
+    relative = dotted.replace('.', '/')
+    candidates = (relative + '.py', relative + '/__init__.py')
+    files = {str(p): p for p in (dist.files or [])}
+    for name in candidates:
+        if name in files:
+            path = Path(dist.locate_file(files[name]))
+            if not path.is_file():
+                raise ValueError(f'{dotted}: listed external module source missing: {path}')
+            return path
+    top, *rest = dotted.split('.')
+    spec = util.find_spec(top)  # Dotted find_spec would import parent packages.
+    if spec and spec.origin:
+        base = Path(spec.origin).parent
+        target = base.joinpath(*rest)
+        for path in (target.with_suffix('.py'), target / '__init__.py'):
+            if path.is_file():
+                return path
+    raise ValueError(f'{dotted}: listed external module source missing')
+
+
+def external_inventory(root: Path) -> tuple[dict, list[dict], dict, list[str]]:
+    config = tomllib.loads((root / BASE / 'external.toml').read_text(encoding='utf-8'))
+    files, hits, versions, errors = {}, [], {}, []
+    skipped = external_skips(root)
+    recorded, _ = recorded_external(root)
+    for name, settings in sorted(config.items()):
+        path = BASE + f'external/{name}.md'
+        if path in skipped:
+            files[path] = (root / path).read_text(encoding='utf-8')
+            hits.extend(h for h in recorded if h['id'].startswith(tuple(m + '.' for m in settings['modules'])))
+            continue
+        try:
+            dist = metadata.distribution(name)
+        except metadata.PackageNotFoundError:
+            errors.append(f'{name}: distribution not installed')
+            continue
+        versions[name] = dist.version
+        lines = [f'# {name} external capabilities', '', f'Version: {dist.version}', '', f'Generated by `{LABEL}`.', '']
+        for dotted in sorted(settings['modules']):
+            try:
+                tree = parse(external_source(dist, dotted))
+            except (OSError, ValueError, SyntaxError) as exc:
+                errors.append(f'{dotted}: {exc}')
+                continue
+            rows = list(symbols(tree, methods=False))
+            for row in rows:
+                full = dotted + '.' + row['id']
+                row['label'] = dotted + '.' + row['label']
+                hits.append({'kind': 'external', 'id': full, 'summary': row['summary'],
+                             'text': full + ' ' + row['summary']})
+            lines.extend([f'## {dotted}', summary(tree), '', *table(rows), ''])
+        files[BASE + f'external/{name}.md'] = '\n'.join(lines)
+    return files, hits, versions, errors
+
+
+def verb_block(entries: list[dict]) -> str:
+    verbs = {}
+    for entry in entries:
+        for verb in values(entry, 'verbs'):
+            verbs.setdefault(verb.lower(), set()).add(entry['id'])
+    lines = ['<!-- verbs:begin -->', '## Verbs', '']
+    lines.extend(f'- {verb}: {", ".join(sorted(ids))}' for verb, ids in sorted(verbs.items()))
+    return '\n'.join([*lines, '<!-- verbs:end -->'])
+
+
+def subsystem(entry: dict) -> bool:
+    return entry['id'].startswith('subsystem.')
+
+
+def import_nodes(tree: ast.AST):
+    """Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms."""
+    if isinstance(tree, ast.If) and ast.unparse(tree.test) in {'TYPE_CHECKING', 'typing.TYPE_CHECKING'}:
+        for child in tree.orelse:
+            yield from import_nodes(child)
+        return
+    if isinstance(tree, (ast.Import, ast.ImportFrom)):
+        yield tree
+    for child in ast.iter_child_nodes(tree):
+        yield from import_nodes(child)
+
+
+def resolve_imports(tree: ast.AST, path: str, available: set[str]) -> set[str]:
+    """Resolve only the project's own modules; from-import symbols fall back to their base."""
+    def resolve(dotted):
+        if dotted != PACKAGE and not dotted.startswith(PACKAGE + '.'):
+            return None
+        stem = SOURCE_ROOT + dotted.replace('.', '/')
+        return next((p for p in (stem + '.py', stem + '/__init__.py') if p in available), None)
+
+    package = path.removeprefix(SOURCE_ROOT).split('/')[:-1]
+    imported = set()
+    for node in import_nodes(tree):
+        if isinstance(node, ast.Import):
+            targets = [resolve(alias.name) for alias in node.names]
+        else:
+            base = node.module or ''
+            if node.level:
+                if not path.startswith(PACKAGE_DIR + '/') or node.level > len(package):
+                    continue
+                base = '.'.join(package[:len(package) - node.level + 1] + ([base] if base else []))
+            targets = [resolve(base + '.' + alias.name) or resolve(base) for alias in node.names]
+        imported.update(p for p in targets if p)
+    return imported
+
+
+def component_graph(root: Path, entries: list[dict], overrides=None) -> dict:
+    """Map component pairs to sorted module evidence, optionally at a base revision."""
+    overrides = overrides or {}
+    paths = {p.relative_to(root).as_posix() for p in (root / PACKAGE_DIR).rglob('*.py')}
+    for entry in entries:
+        for name in values(entry, 'modules') if not subsystem(entry) else []:
+            if Path(name).is_absolute() or '..' in Path(name).parts:
+                continue
+            target = root / name
+            members = target.rglob('*.py') if target.is_dir() else [target]
+            paths.update(p.relative_to(root).as_posix() for p in members if p.suffix == '.py' and p.is_file())
+    paths.update(overrides)
+    paths = {p for p in paths if overrides.get(p, '') is not None}
+    owners = {p: {e['id'] for e in entries if covers(e, p)} for p in paths}
+    edges = {}
+    for path in sorted(paths):
+        if not owners[path]:
+            continue
+        tree = ast.parse(overrides[path], filename=path) if path in overrides else parse(root / path)
+        for target in sorted(resolve_imports(tree, path, paths)):
+            for caller in sorted(owners[path] - owners[target]):
+                for callee in sorted(owners[target]):
+                    edges.setdefault((caller, callee), []).append((path, target))
+    return {edge: sorted(set(pairs)) for edge, pairs in sorted(edges.items())}
+
+
+def relations(entries: list[dict], edges: dict) -> dict:
+    result = {e['id']: {'uses': set(), 'used_by': set(), 'part_of': set()} for e in entries}
+    for caller, callee in edges:
+        result[caller]['uses'].add(callee)
+        result[callee]['used_by'].add(caller)
+    for entry in entries:
+        if not subsystem(entry):
+            continue
+        members = set(values(entry, 'components')) & result.keys()
+        result[entry['id']]['members_uses'] = set().union(*(result[m]['uses'] for m in members)) - members
+        for member in members:
+            result[member]['part_of'].add(entry['id'])
+    return result
+
+
+def listing(ids, cap=None) -> str:
+    names = sorted(ids)
+    if cap and len(names) > cap:
+        names = names[:cap] + [f'… +{len(names) - cap} more (graph.md)']
+    return ', '.join(names) or '(none)'
+
+
+def rewrite(text: str, entries: list[dict], edges: dict) -> str:
+    """Replace only generated fields, preserving the authored catalog content."""
+    links = relations(entries, edges)
+    by_id = {e['id']: e for e in entries}
+
+    def section(match):
+        name, body = match[1].strip(), match[2]
+        body = re.sub(r'^- (?:uses|used_by|part_of|members_uses):[^\n]*\n?', '', body, flags=re.M)
+        data = links[name]
+        if subsystem(by_id[name]):
+            line = '- members_uses: ' + listing(data['members_uses'], 12) + '\n'
+            body = re.sub(r'(^- components:[^\n]*)(?:\n|$)', lambda m: m[1] + '\n' + line, body, flags=re.M)
+        else:
+            lines = f'- uses: {listing(data["uses"])}\n- used_by: {listing(data["used_by"], 12)}\n'
+            if data['part_of']:
+                lines += '- part_of: ' + listing(data['part_of']) + '\n'
+            body = re.sub(r'(^- modules:[^\n]*)(?:\n|$)', lambda m: m[1] + '\n' + lines, body, flags=re.M)
+        return '### ' + match[1] + '\n' + body
+
+    return re.sub(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', section, text, flags=re.M | re.S)
+
+
+def graph_text(entries: list[dict], edges: dict) -> str:
+    links = relations(entries, edges)
+    lines = ['# Component import graph', '', f'Generated by `{LABEL}`.', '']
+    for entry in sorted(entries, key=lambda e: e['id']):
+        name = entry['id']
+        lines.extend(['### ' + name])
+        if subsystem(entry):
+            lines.extend(['- members_uses: ' + listing(links[name]['members_uses']), ''])
+            continue
+        lines.extend(['- uses: ' + listing(links[name]['uses']),
+                      '- used_by: ' + listing(links[name]['used_by']), ''])
+        for callee in sorted(links[name]['uses']):
+            lines.append(f'#### {name} -> {callee}')
+            lines.extend(f'- `{source} -> {target}`' for source, target in edges[name, callee][:3])
+            lines.append('')
+    return '\n'.join(lines)
+
+
+def components_text(root: Path, entries: list[dict], edges: dict | None = None) -> str:
+    text = (root / BASE / 'COMPONENTS.md').read_text(encoding='utf-8')
+    text = rewrite(text, entries, component_graph(root, entries) if edges is None else edges)
+    block = verb_block(entries)
+    if VERBS.search(text):
+        return VERBS.sub(lambda _: block, text)
+    match = re.search(r'^### ', text, re.M)
+    offset = match.start() if match else len(text)
+    return text[:offset].rstrip() + '\n\n' + block + '\n\n' + text[offset:]
+
+
+def build_index(root: Path) -> tuple[dict[str, str], list[str]]:
+    entries = read_components(root)
+    external, hits, _, errors = external_inventory(root)
+    errors.extend(validate(root, entries, {h['id'] for h in hits}))
+    modules, _ = module_inventory(root, entries)
+    edges = component_graph(root, entries)
+    return {**modules, **external, BASE + 'COMPONENTS.md': components_text(root, entries, edges),
+            BASE + 'graph.md': graph_text(entries, edges)}, errors
+
+
+def tokens(text: str) -> set[str]:
+    return {word[:-1] if len(word) > 3 and word.endswith('s') else word
+            for word in re.findall(r'[a-z0-9]+', text.lower()) if word not in STOPWORDS}
+
+
+def recorded_external(root: Path) -> tuple[list[dict], dict[str, str]]:
+    """Search the recorded catalog even without the dependency installed."""
+    hits, versions = [], {}
+    for path in sorted((root / BASE / 'external').glob('*.md')):
+        text = path.read_text(encoding='utf-8')
+        version = re.search(r'^Version: (.+)$', text, re.M)
+        if version:
+            versions[path.stem] = version[1]
+        for line in text.splitlines():
+            if not line.startswith('| `'):
+                continue
+            columns = [v.strip() for v in re.split(r'(?<!\\)\|', line)[1:-1]]
+            if len(columns) != 4:
+                continue
+            name = columns[0].strip('`').split('(', 1)[0]
+            description = columns[3].replace(r'\|', '|')
+            hits.append({'kind': 'external', 'id': name, 'summary': description,
+                         'text': name + ' ' + description})
+    return hits, versions
+
+
+def search(root: Path, query: str, limit: int | None = 5, *,
+           entries=None, modules=None, external=None) -> list[dict]:
+    entries = read_components(root) if entries is None else entries
+    external = recorded_external(root)[0] if external is None else external
+    modules = module_inventory(root, entries)[1] if modules is None else modules
+    external = [dict(hit) for hit in external]
+    hits = [{'kind': 'subsystem' if subsystem(e) else 'component',
+             'id': e['id'], 'summary': e.get('does', ''), 'flow': e.get('flow', ''),
+             'text': ' '.join(e.get(k, '') for k in ('id', 'does', 'verbs'))} for e in entries]
+    # Component context also makes dependency names discoverable by capability vocabulary.
+    for hit in external:
+        hit['text'] += ' ' + ' '.join(e.get('does', '') + ' ' + e.get('verbs', '')
+                                     for e in entries if hit['id'] in values(e, 'external'))
+    words = tokens(query)
+    ranked = []
+    for hit in hits + external + modules:
+        overlap = len(words & tokens(hit['text']))
+        if overlap:
+            ranked.append((overlap, hit))
+    order = {'subsystem': 0, 'component': 1, 'external': 2, 'module': 3}
+    ranked.sort(key=lambda pair: (-pair[0], order[pair[1]['kind']], pair[1]['id']))
+    return [h for _, h in ranked[:None if limit is None else max(0, limit)]]
+
+
+def coverage_line(root: Path, entries: list[dict]) -> str:
+    unassigned, total = coverage(root, entries)
+    _, versions = recorded_external(root)
+    external = ', '.join(f'{k} {v}' for k, v in versions.items()) or 'none'
+    return f'coverage: {total - len(unassigned)}/{total} {PACKAGE_DIR} modules assigned to components; external: {external}'
+
+
+def generated_paths(root: Path) -> set[str]:
+    return {p.relative_to(root).as_posix() for folder in ('modules', 'external')
+            for p in (root / BASE / folder).glob('*.md')}
+
+
+def external_skips(root: Path) -> dict[str, str]:
+    """Explain recorded inventories that cannot be reproduced by this installation."""
+    config = tomllib.loads((root / BASE / 'external.toml').read_text(encoding='utf-8'))
+    _, versions = recorded_external(root)
+    skipped = {}
+    for name in sorted(config.keys() & versions.keys()):
+        try:
+            installed = metadata.version(name)
+        except metadata.PackageNotFoundError:
+            installed = None
+        if installed != versions[name]:
+            relative = f'external/{name}.md'
+            skipped[BASE + relative] = (
+                f'skipped {relative}: installed {installed or "none"} != recorded {versions[name]}')
+    return skipped
+
+
+def stale_files(root: Path, files: dict[str, str] | None = None) -> list[str]:
+    """Return sorted stale or missing index paths without writing or printing."""
+    if files is None:
+        files, _ = build_index(root)
+    stale = generated_paths(root) - files.keys()
+    different = [name for name, text in files.items()
+                 if not (root / name).is_file() or (root / name).read_bytes() != text.encode('utf-8')]
+    return sorted((set(different) | stale) - external_skips(root).keys())
+
+
+def write_or_check(root: Path, check: bool) -> int:
+    files, errors = build_index(root)
+    for message in external_skips(root).values():
+        print(message)
+    if check:
+        stale = stale_files(root, files)
+        for name in stale:
+            print(f'stale or missing: {name}')
+        for error in errors:
+            print(error)
+        return int(bool(stale or errors))
+    if errors:
+        for error in errors:
+            print(error, file=sys.stderr)
+        return 1
+    for name, text in files.items():
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(text.encode('utf-8'))
+    for name in generated_paths(root) - files.keys():
+        (root / name).unlink()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--root', type=Path, default=ROOT)
+    parser.add_argument('--check', action='store_true')
+    commands = parser.add_subparsers(dest='command')
+    commands.add_parser('write')
+    find = commands.add_parser('search')
+    find.add_argument('words', nargs='+')
+    find.add_argument('--limit', type=int, default=5)
+    stats = commands.add_parser('stats')
+    stats.add_argument('--write-baseline', action='store_true')
+    args = parser.parse_args(argv)
+    if args.check and args.command:
+        parser.error('--check cannot be combined with a subcommand')
+    try:
+        if args.command == 'search':
+            hits = search(args.root, ' '.join(args.words), None)
+            budget = 7000
+            for hit in hits[:max(0, args.limit)]:
+                line = f'{hit["kind"]} {hit["id"]}: {hit["summary"]}'
+                if hit.get('flow'):
+                    line += '\nflow: ' + hit['flow']
+                if len(line) > budget:
+                    break
+                print(line)
+                budget -= len(line) + 1
+            if not any(h['kind'] in {'component', 'subsystem'} for h in hits):
+                print('no component matched: this is not proof that nothing exists; search modules/ and git grep')
+            print(coverage_line(args.root, read_components(args.root)))
+            return 0
+        if args.command == 'stats':
+            entries = read_components(args.root)
+            unassigned, _ = coverage(args.root, entries)
+            print(coverage_line(args.root, entries))
+            print('\n'.join(unassigned))
+            if args.write_baseline:
+                target = args.root / BASE / 'unassigned-baseline.txt'
+                if target.is_file() and len(unassigned) > len(target.read_text().splitlines()):
+                    raise ValueError('unassigned baseline cannot grow; assign new modules to components')
+                target.write_text(''.join(p + '\n' for p in unassigned), encoding='utf-8')
+            return 0
+        return write_or_check(args.root, args.check)
+    except (OSError, ValueError, SyntaxError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())
