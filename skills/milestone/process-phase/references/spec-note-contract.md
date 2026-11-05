@@ -50,6 +50,13 @@ bands, never adjectives: "exits 0", not "passes".
 
 ### 6. Design
 
+In a project with a component index, open with a reuse table, one row per
+capability the phase builds: the capability in plain words, the searches run
+(`components_index.py search <words>`, twice with different words, plus the
+`git grep` when the search missed), what was found, and the decision: `reuse`,
+`adapt`, or `new` with the reason nothing existing fits. New code beside a
+`canonical` component needs that reason on the page.
+
 Module by module. For each: the path, an honest line estimate, and the **exact**
 surface — function signatures with keyword-only markers where they matter, schema
 fragments as literal JSON, enum members spelled the way the schema spells them.

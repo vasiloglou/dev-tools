@@ -60,13 +60,13 @@ coverage: 4/4 src/shelf modules assigned to components; external: none</pre></di
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · one entry in the catalog</b><em>captured</em></div>
 <pre><span class="p">$</span> <span class="cmd">grep -A8 &#x27;### report.rows&#x27; docs/components/COMPONENTS.md</span>
 ### report.rows
-<span class="bad">- does: Order file entries largest first and pair each path with its human-readable size, as rows for a size report</span>
-<span class="bad">- verbs: sort by size, largest files first, build report rows</span>
-<span class="bad">- status: canonical</span>
-<span class="bad">- modules: src/shelf/report.py</span>
-<span class="bad">- uses: format.sizes, fs.scan</span>
-<span class="bad">- used_by: (none)</span>
-<span class="bad">- tests: tests/unit/shelf/test_report.py</span></pre></div>
+- does: Order file entries largest first and pair each path with its human-readable size, as rows for a size report
+- verbs: sort by size, largest files first, build report rows
+- status: canonical
+- modules: src/shelf/report.py
+- uses: format.sizes, fs.scan
+- used_by: (none)
+- tests: tests/unit/shelf/test_report.py</pre></div>
       <p class="caption">The purpose, verbs, files and tests were written by hand. The two lines saying what it uses and what uses it were generated.</p>
     </div>
   </div>
@@ -90,7 +90,154 @@ no component: src/shelf/export.py (add it to the modules of an entry in docs/com
   </div>
 </div></section>
 
-<section class="band"><div class="wrap narrow">
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>Starting it, keeping it, and looking at it again</h2>
+    <p>A map is only worth having if someone draws it and keeps it true. The skill gives the agent three more jobs: build the index for a codebase that has none, check it against every change, and now and then review the whole thing against the code.</p>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Build</span>
+      <h3>No index yet? The agent writes the first one.</h3>
+      <p>The tool does the mechanical half: it lists every file, class and function straight from the source, and prints a stub for each file with its summary, what it imports and what imports it.</p>
+      <p>The agent does the half that needs reading. It opens the code, groups files into capabilities, and writes each entry in the words someone would search for. A stub left as it came is refused. Whatever cannot be finished in one sitting is recorded in a list that is only allowed to shrink.</p>
+      <p>It ends by using the map: it searches for things a newcomer would ask for, and fixes the entries until they are found.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the same project with no index</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">components stats</span>
+coverage: 0/5 src/shelf modules assigned to components; external: none
+src/shelf/__init__.py
+src/shelf/cli.py
+src/shelf/report.py
+src/shelf/scan.py
+src/shelf/units.py
+
+<span class="p">$</span> <span class="cmd">components draft</span>
+# Draft entries for 5 module(s) that no component covers.
+# One stub per module. Merge the stubs that are one capability (a path ending in /
+# covers a whole folder), rewrite every <span class="warn">TODO</span> after reading the code, drop the
+# indented lines, then add the entries to docs/components/COMPONENTS.md.
+…
+### shelf.report
+- does: <span class="warn">TODO</span> Build the rows of a size report: each file with a human-readable size, largest first.
+- verbs: <span class="warn">TODO</span>
+- status: canonical
+- modules: src/shelf/report.py
+- tests: tests/unit/shelf/test_report.py
+  symbols: report_rows(entries) -&gt; list[tuple[str, str]]
+  imports: src/shelf/scan.py, src/shelf/units.py
+  imported by (1): src/shelf/cli.py
+  imported from tests and scripts (1): tests/unit/shelf/test_report.py
+…
+### shelf.scan
+- does: <span class="warn">TODO</span> Walk a folder and list the regular files in it.
+- verbs: <span class="warn">TODO</span>
+- status: canonical
+- modules: src/shelf/scan.py
+- tests: tests/test_scan.py
+  symbols: FileEntry; scan_folder(folder) -&gt; list[FileEntry]; total_size(entries) -&gt; int
+  imports: (nothing in the package)
+  imported by (2): src/shelf/cli.py, src/shelf/report.py
+  imported from tests and scripts (2): tests/test_scan.py, tests/unit/shelf/test_report.py
+…</pre></div>
+      <p class="caption">Nothing is assigned yet. The draft gives the agent one stub per file to start from; three of the five are cut here. Every TODO has to be rewritten after reading the code.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">Every change</span>
+      <h3>Checked against what the change touched</h3>
+      <p>Before a pull request, one command compares the index with the files the branch changed.</p>
+      <ul>
+        <li><strong>Fail:</strong> a new file no component has claimed, or generated pages that no longer match the source.</li>
+        <li><strong>Warning:</strong> new code that calls a component marked as retired or as a duplicate.</li>
+        <li><strong>Reread:</strong> the code of a component changed and its description did not. A script cannot tell whether a sentence is still true, so it names the entry and the agent reads it beside the change.</li>
+      </ul>
+      <p>The same command runs in automated checks; an example job for GitHub ships with the skills. Both workflows run it: the phase workflow when a phase closes, the milestone workflow before a phase is recorded.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a branch that adds one file and changes another</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git status --short</span>
+ M src/shelf/scan.py
+?? src/shelf/export.py
+
+<span class="p">$</span> <span class="cmd">components write &amp;&amp; components changed --base develop</span>
+fail: no component: src/shelf/export.py (new file; add it to the modules of an entry in docs/components/COMPONENTS.md)
+reread: fs.scan (entry not edited): src/shelf/scan.py
+changed against develop (d74dcb8): 3 file(s) differ; 1 to fix, 0 warning(s), 1 to reread
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">git diff -U0 docs/components/COMPONENTS.md | grep &#x27;^[+-]- does&#x27;</span>
+-- does: Walk a folder tree and list every regular file with its size in bytes
++- does: Walk a folder tree and list every regular file that is not hidden, with its size in bytes
++- does: Write the file list as CSV text with a readable size column (to_csv)
+
+<span class="p">$</span> <span class="cmd">components write &amp;&amp; components changed --base develop</span>
+changed against develop (d74dcb8): 5 file(s) differ; 0 to fix, 0 warning(s), 0 to reread</pre></div>
+      <p class="caption">The new file has no component, and the scan now skips hidden files while its entry still says "every regular file". The agent adds one entry and corrects the other; the check is clean.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Review</span>
+      <h3>From time to time, the whole index against the code</h3>
+      <p>Checks keep the form right. They do not notice that two components do the same job, that something is no longer used, or that a description has drifted. A review does.</p>
+      <p>It starts from a list of leads the tool can see: descriptions older than their code, the same name written in two places, components that import each other, retired code that is still called. Each lead is a place to look, not a finding.</p>
+      <p>Then the agent rereads every entry beside its code, repairs the index, and writes down the code changes it would suggest, each one checked in the code, sized, and with what could break. It changes no code. You decide which suggestions become work.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · four commits later</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git log --oneline -4 --no-decorate 3d8b198</span>
+3d8b198 Add an ordering helper for file entries
+efb2de6 Leave hidden files out of a scan
+94d1095 Add CSV export
+fde4628 Update the shared skills
+
+<span class="p">$</span> <span class="cmd">components review</span>
+## Descriptions older than their code (3)
+cli.commands: 2 commit(s) to its modules since 5d50bf4 (2026-11-05), when its does and verbs were last edited
+fs.scan: 1 commit(s) to its modules since 5d50bf4 (2026-11-05), when its does and verbs were last edited
+report.rows: 1 commit(s) to its modules since fbf96b3 (2026-11-05), when its does and verbs were last edited
+
+…
+## Components nothing in the package imports (an entry point, or unused?) (1)
+cli.commands (defines main)
+
+## Modules nothing in the package imports, inside a component that is used (1)
+src/shelf/sorting.py (report.rows)
+
+## The same public name in two or three components (a duplicate?) (1)
+humanize_bytes: src/shelf/export.py (report.csv), src/shelf/units.py (format.sizes)
+
+…
+## Components with no tests listed (1)
+report.csv
+
+…
+## No subsystem entries (1)
+the main paths through the system are not described
+
+…</pre></div>
+      <p class="caption">Eight leads after four ordinary commits, while every check that runs with a change was passing. The groups with nothing in them are cut.</p>
+<div class="table-scroll"><table>
+        <tr><th>Kind</th><th>What</th><th>Checked how</th></tr>
+        <tr><td>Defect</td><td><code>to_csv</code> joins the fields with commas and quotes nothing, so a path with a comma, a quote or a line break gives a broken row</td><td>ran <code>to_csv([FileEntry(&#x27;a,b.txt&#x27;, 3)])</code>: <code>csv.reader</code> reads four fields under a three-column header</td></tr>
+        <tr><td>Duplicate</td><td><code>export.humanize_bytes</code> repeats <code>format.sizes</code> with binary units and different rounding, so <code>shelf report</code> and <code>shelf export</code> print different sizes for one file</td><td>read both and ran both on the same numbers; one caller, <code>to_csv</code></td></tr>
+        <tr><td>Unused</td><td><code>sorting.largest_first</code> has no caller and no test, and repeats the sort inside <code>report_rows</code></td><td><code>git grep -n -e largest_first -e sorting</code> outside the index finds only the definition; <code>pyproject.toml</code> has one entry point, <code>shelf.cli:main</code></td></tr>
+      </table></div>
+      <p class="caption">Three of the five suggestions in the report an agent wrote for this project in a trial run, word for word (the columns for location and size are left out). The first was not planted: the agent found it by reading the code. It repaired the index and changed no source file.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>Tried on real code.</strong> In trial runs on copies of two real projects, an agent built a complete index from nothing for a package of 298 files and 130,000 lines: 208 components and 8 end-to-end flows, every file assigned, using twelve reader agents and about three million tokens. Another reviewed one area of an existing index on a project of 1,266 files: 17 entries reread, 15 repaired, 14 code changes suggested. The trials also turned up 73 defects in the skill and its tool; most are fixed, and the rest are listed as known limits.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap narrow">
   <h2>What it changes in practice</h2>
   <div class="table-scroll"><table>
     <tr><th>Moment</th><th>Without the index</th><th>With it</th></tr>
@@ -98,6 +245,9 @@ no component: src/shelf/export.py (add it to the modules of an entry in docs/com
     <tr><td>Planning</td><td>"Add a helper to format sizes"</td><td>"Reuse <code>humanize_bytes</code> from the units component"</td></tr>
     <tr><td>Changing shared code</td><td>Callers found by search, some missed</td><td>The component's <em>used by</em> list is the set of callers to keep working</td></tr>
     <tr><td>Reaching for a library</td><td>A new dependency, or a hand-written copy</td><td>The index of installed libraries shows what is already available</td></tr>
+    <tr><td>Adopting it on existing code</td><td>Nobody has time to write the map, so there is none</td><td>The agent drafts it from the source and the code, in batches, and records what is left</td></tr>
+    <tr><td>Opening a pull request</td><td>The description of a component quietly goes out of date</td><td>The check names each component whose code changed and whose description did not</td></tr>
+    <tr><td>Months later</td><td>Two helpers for the same job, and code nobody calls</td><td>A review lists them as suggested changes, with evidence, for you to accept or reject</td></tr>
     <tr><td>Finishing</td><td>New files nobody will find again</td><td>Each new file must be given a component before the phase can close; the strict check names any that were missed</td></tr>
   </table></div>
   <div class="callout">

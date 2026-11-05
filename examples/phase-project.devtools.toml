@@ -46,10 +46,12 @@ dest = ".claude/agents"
 source = "skills/phase/pytest/phase_selection.py"
 dest = "conftest.py"
 
-# The component index: the skill and its script.
+# The component index: the skill (with its build and review guides) and its script. The
+# script is delivered once, to scripts/, by the entry after this one.
 [[sync]]
-source = "skills/components/SKILL.md"
-dest = ".claude/skills/components/SKILL.md"
+source = "skills/components"
+dest = ".claude/skills/components"
+exclude = ["scripts/components_index.py"]
 
 [[sync]]
 source = "skills/components/scripts/components_index.py"
@@ -61,3 +63,9 @@ import_prefix = "myapp"
 extra_source_dirs = []
 docs_dir = "docs/components"
 script_path = "scripts/components_index.py"
+# verb_list = "shared"   # for a large catalog: list only the verbs two or more entries use
+
+# Optional: a GitHub Actions job that runs the index check on every pull request.
+# [[sync]]
+# source = "examples/components-check.yml"
+# dest = ".github/workflows/components-check.yml"

@@ -8,6 +8,12 @@
     components_index.py --check --strict     also fail if a module has no component
     components_index.py search <words>       find components, modules and external names by capability
     components_index.py stats [--write-baseline]
+    components_index.py draft [--only PATH] [--by-importers]
+                                             stub entries for the modules no component covers
+    components_index.py list [AREA]          the component ids by area, each with its one-line description
+    components_index.py changed --base REF   check the index against the files changed since REF
+    components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
+    components_index.py show ID              one component: its entry, its modules, what they import and what imports them
 
 The catalog is ``<docs_dir>/COMPONENTS.md``, written by hand: one entry per component,
 
@@ -21,7 +27,8 @@ The catalog is ``<docs_dir>/COMPONENTS.md``, written by hand: one entry per comp
 ``write`` adds the ``uses`` / ``used_by`` lines and the verbs list. ``<docs_dir>/external.toml``
 is optional; it lists installed libraries to index (``[name]`` with ``modules = [...]``).
 Modules listed in ``<docs_dir>/unassigned-baseline.txt`` (``stats --write-baseline``) are
-tolerated by ``--check --strict``; the baseline can only shrink. Needs Python 3.11 or newer.
+tolerated by ``--check --strict``; the baseline can only shrink. ``changed`` and ``review``
+read the git history of the checkout. Needs Python 3.11 or newer.
 """
 from __future__ import annotations
 
@@ -30,7 +37,9 @@ import ast
 import json
 from importlib import metadata, util
 import re
+import subprocess
 import sys
+import time
 import tokenize
 from pathlib import Path
 
@@ -46,6 +55,9 @@ DEFAULT_SETTINGS = {
     'extra_source_dirs': [],
     'docs_dir': 'docs/components',
     'script_path': 'scripts/components_index.py',
+    # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
+    # (only those two or more entries use) or 'none'. A large catalog wants 'shared'.
+    'verb_list': 'all',
 }
 
 
@@ -57,6 +69,8 @@ def load_settings(path: Path) -> dict:
         if unknown:
             raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
         settings.update(loaded)
+    if settings['verb_list'] not in {'all', 'shared', 'none'}:
+        raise SystemExit(f'{path}: verb_list must be all, shared or none')
     return settings
 
 
@@ -69,6 +83,11 @@ LABEL = SETTINGS['script_path']
 ROOT = Path(__file__).resolve().parents[len(Path(LABEL).parts) - 1]
 BASE = SETTINGS['docs_dir'].strip('/') + '/'
 VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
+GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
+# Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
+CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
+                     'duplicates', 'external', 'distinct_from'})
+LARGE = 12  # `review` names a component that covers more modules than this
 STOPWORDS = frozenset('a an the to of for and or in on from with into by is it its end'.split())
 
 
@@ -115,7 +134,12 @@ def read_components(root: Path) -> list[dict]:
 def parse_components(text: str) -> list[dict]:
     entries = []
     for match in re.finditer(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', text, re.M | re.S):
-        entry = dict(re.findall(r'^- ([a-z_]+):[ \t]*(.*)$', match[2], re.M))
+        pairs = re.findall(r'^- ([a-z_]+):[ \t]*(.*)$', match[2], re.M)
+        entry = dict(pairs)
+        keys = [key for key, _ in pairs]
+        repeated = sorted({key for key in keys if keys.count(key) > 1} & CHECKED)
+        if repeated:
+            entry['_repeated'] = ', '.join(repeated)
         entry['id'] = match[1].strip()
         entries.append(entry)
     return entries
@@ -157,6 +181,11 @@ def validate(root: Path, entries: list[dict], external_names: set[str]) -> list[
         for key in required:
             if key not in entry or (not entry[key] and key != 'modules'):
                 errors.append(f'{name}: missing {key}')
+        for key in values(entry, '_repeated'):
+            errors.append(f'{name}: {key} appears twice')
+        for key in ('does', 'verbs'):
+            if 'TODO' in entry.get(key, ''):
+                errors.append(f'{name}: {key} is still a draft (TODO)')
         status = entry.get('status', '')
         if status.startswith('duplicate-of '):
             if status.removeprefix('duplicate-of ') not in ids:
@@ -175,6 +204,9 @@ def validate(root: Path, entries: list[dict], external_names: set[str]) -> list[
                 if (Path(path).is_absolute() or '..' in Path(path).parts
                         or not target.exists() or (path.endswith('/') and not target.is_dir())):
                     errors.append(f'{name}: {key} path missing or invalid: {path}')
+        for other in values(entry, 'distinct_from'):
+            if other not in ids:
+                errors.append(f'{name}: unknown distinct_from id: {other}')
         for dotted in values(entry, 'external'):
             if dotted not in external_names:
                 errors.append(f'{name}: external name missing: {dotted}')
@@ -358,8 +390,9 @@ def verb_block(entries: list[dict]) -> str:
     for entry in entries:
         for verb in values(entry, 'verbs'):
             verbs.setdefault(verb.lower(), set()).add(entry['id'])
+    least = {'all': 1, 'shared': 2, 'none': len(entries) + 1}[SETTINGS['verb_list']]
     lines = ['<!-- verbs:begin -->', '## Verbs', '']
-    lines.extend(f'- {verb}: {", ".join(sorted(ids))}' for verb, ids in sorted(verbs.items()))
+    lines.extend(f'- {verb}: {", ".join(sorted(ids))}' for verb, ids in sorted(verbs.items()) if len(ids) >= least)
     return '\n'.join([*lines, '<!-- verbs:end -->'])
 
 
@@ -513,8 +546,11 @@ def build_index(root: Path) -> tuple[dict[str, str], list[str]]:
 
 
 def tokens(text: str) -> set[str]:
-    return {word[:-1] if len(word) > 3 and word.endswith('s') else word
-            for word in re.findall(r'[a-z0-9]+', text.lower()) if word not in STOPWORDS}
+    def stem(word):
+        if len(word) > 4 and word.endswith('ies'):
+            return word[:-3] + 'y'
+        return word[:-1] if len(word) > 3 and word.endswith('s') else word
+    return {stem(word) for word in re.findall(r'[a-z0-9]+', text.lower()) if word not in STOPWORDS}
 
 
 def recorded_external(root: Path) -> tuple[list[dict], dict[str, str]]:
@@ -544,8 +580,9 @@ def search(root: Path, query: str, limit: int | None = 5, *,
     external = recorded_external(root)[0] if external is None else external
     modules = module_inventory(root, entries)[1] if modules is None else modules
     external = [dict(hit) for hit in external]
-    hits = [{'kind': 'subsystem' if subsystem(e) else 'component',
-             'id': e['id'], 'summary': e.get('does', ''), 'flow': e.get('flow', ''),
+    hits = [{'kind': 'subsystem' if subsystem(e) else 'component', 'retired': is_retired(e),
+             'id': e['id'] + (f' ({e["status"]})' if is_retired(e) else ''),
+             'summary': e.get('does', ''), 'flow': e.get('flow', ''),
              'text': ' '.join(e.get(k, '') for k in ('id', 'does', 'verbs'))} for e in entries]
     # Component context also makes dependency names discoverable by capability vocabulary.
     for hit in external:
@@ -554,11 +591,13 @@ def search(root: Path, query: str, limit: int | None = 5, *,
     words = tokens(query)
     ranked = []
     for hit in hits + external + modules:
-        overlap = len(words & tokens(hit['text']))
+        hit['matched'] = sorted(words & tokens(hit['text']))
+        overlap = len(hit['matched'])
         if overlap:
             ranked.append((overlap, hit))
     order = {'subsystem': 0, 'component': 1, 'external': 2, 'module': 3}
-    ranked.sort(key=lambda pair: (-pair[0], order[pair[1]['kind']], pair[1]['id']))
+    # On a tie a retired component comes after the others: the first hit is the one to call.
+    ranked.sort(key=lambda pair: (-pair[0], order[pair[1]['kind']], pair[1].get('retired', False), pair[1]['id']))
     return [h for _, h in ranked[:None if limit is None else max(0, limit)]]
 
 
@@ -630,6 +669,426 @@ def write_or_check(root: Path, check: bool, strict: bool = False) -> int:
     return 0
 
 
+def git(root: Path, *args: str, check: bool = True) -> str:
+    """Output of a git command run in `root`; '' when it fails and `check` is off."""
+    try:
+        done = subprocess.run(['git', '-C', str(root), '-c', 'core.quotepath=off', *args],
+                              capture_output=True, text=True)
+    except OSError as exc:
+        raise ValueError(f'git is not available: {exc}')
+    if done.returncode and check:
+        raise ValueError(f'git {" ".join(args)}: {done.stderr.strip() or "failed"}')
+    return '' if done.returncode else done.stdout
+
+
+def package_imports(root: Path) -> dict[str, set[str]]:
+    """Each package module -> the package modules it imports at run time."""
+    available = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
+    return {p: resolve_imports(parse(root / p), p, available) for p in sorted(available)}
+
+
+def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool = False) -> list[str]:
+    """Stub entries for the modules no component covers: a starting point, never a catalog."""
+    unassigned = [p for p in coverage(root, entries)[0] if p.startswith(only)]
+    imports = package_imports(root)
+    importers = {}
+    for path, targets in imports.items():
+        for target in targets:
+            importers.setdefault(target, set()).add(path)
+    if by_importers:
+        unassigned.sort(key=lambda p: (-len(importers.get(p, ())), p))
+    folder = root / 'tests'
+    tests = {}
+    for path in sorted(folder.rglob('test_*.py')) if folder.is_dir() else []:
+        tests.setdefault(path.name, path.relative_to(root).as_posix())
+    testers = outside_importers(root, sorted(imports))
+    lines = [f'# Draft entries for {len(unassigned)} module(s) that no component covers.',
+             '# One stub per module. Merge the stubs that are one capability (a path ending in /',
+             '# covers a whole folder), rewrite every TODO after reading the code, drop the',
+             f'# indented lines, then add the entries to {BASE}COMPONENTS.md.']
+    taken = {e['id'] for e in entries}
+    for path in unassigned:
+        tree = parse(root / path)
+        parts = [p for p in Path(path).relative_to(PACKAGE_DIR).with_suffix('').parts if p != '__init__']
+        words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
+        area = words[0] if len(words) > 1 else PACKAGE.lower()
+        name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
+        ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
+        while ident in taken:
+            ident += '_2'
+        taken.add(ident)
+        names = [row['label'] for row in symbols(tree, methods=False)]
+        private = [n.name for n in tree.body if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+                   and n.name.startswith('_')]
+        if names:
+            shown = '; '.join(names[:8]) + (f'; +{len(names) - 8} more' if len(names) > 8 else '')
+        elif private:
+            shown = f'(none public; {len(private)} private: {some(private, 6)})'
+        elif imports.get(path):
+            shown = '(defines nothing: it re-exports, or only imports)'
+        else:
+            shown = '(none)'
+        lines.extend(['', f'### {ident}', f'- does: TODO {summary(tree)}', '- verbs: TODO',
+                      '- status: canonical', f'- modules: {path}'])
+        test = tests.get('test_' + Path(path).name)
+        if test:
+            lines.append(f'- tests: {test}')
+        users = sorted(importers.get(path, ()))
+        outside = testers.get(path, [])
+        lines.append(f'  symbols: {shown}')
+        lines.append(f'  imports: {", ".join(sorted(imports.get(path, ()))) or "(nothing in the package)"}')
+        lines.append(f'  imported by ({len(users)}): {some(users, 8) or "nothing in the package"}')
+        lines.append(f'  imported from tests and scripts ({len(outside)}): {some(outside, 3) or "none"}')
+    return lines
+
+
+def changed(root: Path, base: str, strict: bool) -> int:
+    """Check the index against the files that differ from the merge base with `base`."""
+    def exists(ref):
+        return bool(git(root, 'rev-parse', '--verify', '--quiet', ref + '^{commit}', check=False).strip())
+
+    if not exists(base):
+        if not exists('origin/' + base):
+            raise ValueError(f'no branch or commit named {base}: pass --base <the branch this change will merge into>')
+        base = 'origin/' + base
+    anchor = git(root, 'merge-base', base, 'HEAD').strip()
+    status = {}
+    for line in git(root, 'diff', '--name-status', '--no-renames', '--relative', anchor).splitlines():
+        code, path = line.split('\t', 1)
+        status[path] = code
+    for path in git(root, 'ls-files', '--others', '--exclude-standard').splitlines():
+        status.setdefault(path, 'A')
+    entries = read_components(root)
+    files, fails = build_index(root)
+    fails = list(fails)
+    fails.extend(f'stale or missing: {name} (run `python3 {LABEL} write`)' for name in stale_files(root, files))
+    package = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
+    for path in sorted(status):
+        if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
+            fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
+
+    old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
+    overrides = {p: None if code == 'A' else git(root, 'show', f'{anchor}:./{p}')
+                 for p, code in status.items() if p.endswith('.py')}
+    old_edges = component_graph(root, old_entries, overrides)
+    retired = {e['id']: e['status'] for e in entries
+               if e.get('status') == 'deprecated' or e.get('status', '').startswith('duplicate-of ')}
+    known = {e['id'] for e in old_entries}  # a component first described in this change has no "before"
+    existed = {p.relative_to(root).as_posix() for p in (root / PACKAGE_DIR).rglob('*.py')}
+    existed |= {p for p, text in overrides.items() if text is not None}
+
+    def imported_before(path, target):
+        """Whether the file already imported the target at the base (so a regrouping of entries is not news)."""
+        if path not in status:
+            return True
+        text = overrides.get(path)
+        return bool(text) and target in resolve_imports(ast.parse(text, filename=path), path, existed)
+
+    warns = []
+    for (caller, callee), pairs in component_graph(root, entries).items():
+        added = sorted(pair for pair in set(pairs) - set(old_edges.get((caller, callee), []))
+                       if not imported_before(*pair))
+        if callee in retired and callee in known and added:
+            evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
+            warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
+
+    def authored(entry):
+        return {k: v for k, v in entry.items() if k not in GENERATED}
+
+    before = {e['id']: authored(e) for e in old_entries}
+    touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
+    rereads = []
+    for entry in entries:
+        name = entry['id']
+        if before.get(name) != authored(entry):
+            continue  # written or edited in this change
+        if subsystem(entry):
+            members = [m for m in values(entry, 'components') if touched.get(m)]
+            if members:
+                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
+        elif touched[name]:
+            paths = touched[name]
+            more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
+            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
+
+    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads)):
+        for row in rows:
+            print(f'{prefix}: {row}')
+    print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
+          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
+    return int(bool(fails or (strict and warns)))
+
+
+def entry_commits(root: Path) -> dict[str, tuple[str, int]]:
+    """Component id -> (commit, time) of the newest line of its description (does, verbs, flow)."""
+    blame = git(root, 'blame', '--line-porcelain', '--', BASE + 'COMPONENTS.md', check=False)
+    newest, commit, stamp, current = {}, '', 0, None
+    for line in blame.splitlines():
+        head = re.fullmatch(r'([0-9a-f]{40}) \d+ \d+(?: \d+)?', line)
+        if head:
+            commit = head[1]
+        elif line.startswith('committer-time '):
+            stamp = int(line.split()[1])
+        elif line.startswith('\t'):
+            text = line[1:]
+            if text.startswith('### '):
+                current = text[4:].strip()
+            field = re.match(r'- ([a-z_]+):', text)
+            if not current or not (field and field[1] in {'does', 'verbs', 'flow'}):
+                continue
+            if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
+                newest[current] = ('', float('inf'))
+            elif stamp > newest.get(current, ('', -1))[1]:
+                newest[current] = (commit, stamp)
+    return newest
+
+
+def is_retired(entry: dict) -> bool:
+    return entry.get('status') == 'deprecated' or entry.get('status', '').startswith('duplicate-of ')
+
+
+def outside_importers(root: Path, package: list[str]) -> dict[str, list[str]]:
+    """Package module -> the files in tests/ and the extra source directories that import it."""
+    available, found = set(package), {}
+    for folder in dict.fromkeys(('tests', *EXTRA_DIRS)):
+        base = root / folder
+        for path in sorted(base.rglob('*.py')) if base.is_dir() else []:
+            relative = path.relative_to(root).as_posix()
+            if relative in available:
+                continue
+            try:
+                targets = resolve_imports(parse(path), relative, available)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            for target in targets:
+                found.setdefault(target, []).append(relative)
+    return found
+
+
+def some(items, cap: int) -> str:
+    items = list(items)
+    return ', '.join(items[:cap]) + (f', +{len(items) - cap} more' if len(items) > cap else '')
+
+
+def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]:
+    """Leads for a review of the index. Each one is a place to look, not a finding.
+
+    Every group is a list of (component ids, text); `areas` keeps the leads that name a
+    component whose id starts with one of them.
+    """
+    entries = read_components(root)
+    components = [e for e in entries if not subsystem(e)]
+    edges = component_graph(root, entries)
+    links = relations(entries, edges)
+    package = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
+    owners = {p: sorted(e['id'] for e in components if covers(e, p)) for p in package}
+    groups = []
+
+    stale, dated = [], entry_commits(root)
+    for name, (commit, stamp) in dated.items():
+        entry = next((e for e in components if e['id'] == name), None)
+        paths = [p for p in values(entry, 'modules') if (root / p).exists()] if entry else []
+        if not commit or not paths:
+            continue
+        count = int(git(root, 'rev-list', '--count', f'{commit}..HEAD', '--', *paths, check=False) or 0)
+        if count:
+            day = time.strftime('%Y-%m-%d', time.gmtime(stamp))
+            stale.append((-count, [name], f'{name}: {count} commit(s) to its modules since {commit[:7]} ({day}), '
+                                          f'when its does and verbs were last edited'))
+    title = 'Descriptions older than their code'
+    if not dated:
+        title += ' (not computed: the catalog has no git history here)'
+    groups.append((title, [row[1:] for row in sorted(stale)]))
+
+    def callers(name):
+        return ', '.join(f'{caller} ({some(dict.fromkeys(a for a, _ in edges[caller, name]), 2)})'
+                         for caller in sorted(links[name]['used_by']))
+
+    groups.append(('Retired components that are still called', [
+        ([e['id'], *links[e['id']]['used_by']], f'{e["id"]} ({e["status"]}): used by {callers(e["id"])}')
+        for e in components if is_retired(e) and links[e['id']]['used_by']]))
+
+    # A package __init__ that re-exports its own modules is not a tangle.
+    direct = {edge: [pair for pair in pairs if not pair[0].endswith('/__init__.py')]
+              for edge, pairs in edges.items()}
+
+    def places(a, b):
+        pairs = direct[a, b]
+        return f'{a} imports {b} in {len(pairs)} place(s): ' + some((f'{x} -> {y}' for x, y in pairs), 3)
+
+    groups.append(('Components that import each other', [
+        ([a, b], f'{a} <-> {b}: {places(a, b)}; {places(b, a)}')
+        for a, b in sorted(direct) if a < b and direct[a, b] and direct.get((b, a))]))
+
+    names, undocumented, parsed, mains, entry_points = {}, [], {}, set(), set()
+    for path in package:
+        parsed[path] = tree = parse(root / path)
+        rows = list(symbols(tree, methods=False))
+        if rows and not ast.get_docstring(tree):
+            undocumented.append(path)
+        if path.endswith('/__main__.py') or any(row['id'] == 'main' for row in rows):
+            mains.update(owners[path])
+            entry_points.add(path)
+        for row in rows:
+            if row['id'] != 'main':
+                names.setdefault(row['id'], []).append((path, row['label']))
+
+    groups.append(('Retired components nothing calls (ready to remove?)', [
+        ([e['id']], f'{e["id"]} ({e["status"]})') for e in components
+        if is_retired(e) and e.get('modules') and not links[e['id']]['used_by']]))
+
+    groups.append(('Components nothing in the package imports (an entry point, or unused?)', [
+        ([e['id']], e['id'] + (' (defines main)' if e['id'] in mains else '')) for e in components
+        if e.get('status') in {'canonical', 'experimental'} and e.get('modules') and not links[e['id']]['used_by']]))
+
+    imports = package_imports(root)
+    imported = set().union(*imports.values()) if imports else set()
+    unused = {e['id'] for e in components if not links[e['id']]['used_by']}
+    groups.append(('Modules nothing in the package imports, inside a component that is used', [
+        (owners[p], f'{p} ({", ".join(owners[p])})') for p in package
+        if p not in imported and p not in entry_points and not p.endswith('/__init__.py')
+        and owners[p] and not set(owners[p]) & unused]))
+
+    # Two or three definitions of one name suggest a copy; more suggest a shared convention.
+    # Not news: a pair the catalog already records (retired, `duplicates:`, `distinct_from:`),
+    # and a definition whose module imports the other one (a wrapper).
+    retired = {e['id'] for e in components if is_retired(e)}
+    settled = set()
+    for entry in components:
+        for path in package:
+            if any(path == d or (d.endswith('/') and path.startswith(d)) for d in values(entry, 'duplicates')):
+                settled.update((entry['id'], other) for other in owners[path])
+        settled.update((entry['id'], other) for other in values(entry, 'distinct_from'))
+    settled |= {(b, a) for a, b in settled}
+    same, conventions = [], 0
+    for name, found in names.items():
+        found = [(p, label) for p, label in found if not set(owners[p]) & retired]
+        ids = sorted({i for p, _ in found for i in owners[p]})
+        if ids and all((a, b) in settled for a in ids for b in ids if a != b) and all(owners[p] for p, _ in found):
+            continue
+        if len({tuple(owners[p]) for p, _ in found}) < 2:
+            continue
+        if len(found) > 3:
+            conventions += 1
+            continue
+        paths = [p for p, _ in found]
+        if any(q in imports.get(p, ()) for p in paths for q in paths if p != q):
+            continue
+        alike = len({label for _, label in found}) == 1 and '(' in found[0][1]
+        where = ', '.join(f'{p} ({", ".join(owners[p]) or "no component"})' for p in paths)
+        same.append((not alike, name, ids, f'{name}{" (same signature)" if alike else ""}: {where}'))
+    title = 'The same public name in two or three components (a duplicate?)'
+    if conventions:
+        title += f'; {conventions} name(s) defined in four or more modules are left out'
+    groups.append((title, [row[2:] for row in sorted(same)]))
+
+    groups.append(('Modules listed under more than one component', [
+        (ids, f'{p}: {", ".join(ids)}') for p, ids in owners.items() if len(ids) > 1]))
+
+    large = []
+    for entry in components:
+        covered = [p for p in package if covers(entry, p)]
+        if len(covered) > LARGE:
+            count = sum(len(list(symbols(parsed[p], methods=False))) for p in covered)
+            large.append((-len(covered), [entry['id']],
+                          f'{entry["id"]}: {len(covered)} modules, {count} public classes and functions'))
+    groups.append((f'Components that cover more than {LARGE} modules (more than one capability?)',
+                   [row[1:] for row in sorted(large)]))
+
+    groups.append(('Components with no tests listed', [
+        ([e['id']], e['id']) for e in components if e.get('modules') and not values(e, 'tests')]))
+
+    unlisted = {}
+    by_test = {}
+    for target, files in outside_importers(root, package).items():
+        for name in files:
+            by_test.setdefault(name, set()).update(owners[target])
+    for relative, ids in sorted(by_test.items()):
+        name = Path(relative).name
+        if len(ids) != 1 or not relative.startswith('tests/') or not (name.startswith('test_') or name.endswith('_test.py')):
+            continue  # a test of several components belongs to none of them in particular
+        entry = next(e for e in components if e['id'] in ids)
+        if not any(relative == t or (t.endswith('/') and relative.startswith(t)) for t in values(entry, 'tests')):
+            unlisted.setdefault(entry['id'], []).append(relative)
+    groups.append(('Test files that import one component only and are not in its tests', [
+        ([name], f'{name}: {some(paths, 4)}') for name, paths in sorted(unlisted.items())]))
+    wrong = []
+    for entry in entries:
+        steps = [m.strip() for m in entry.get('flow', '').split('->') if m.strip()] if subsystem(entry) else []
+        for position, step in enumerate(steps[1:], 1):
+            if step not in steps[:position] and not any((earlier, step) in edges for earlier in steps[:position]):
+                wrong.append(([entry['id'], step],
+                              f'{entry["id"]}: no earlier step of the flow imports {step}'))
+    groups.append(('Flow steps that no earlier step imports (wrong order, or reached another way?)', wrong))
+    groups.append(('Entries marked as checked in part', [
+        ([e['id']], e['id']) for e in entries if e.get('checked', '').startswith('partial')]))
+    if components and len(components) == len(entries) and not areas:
+        groups.append(('No subsystem entries', [([], 'the main paths through the system are not described')]))
+    groups.append(('Modules with no docstring (the search cannot describe them)',
+                   [(owners[p], p) for p in undocumented]))
+    groups.append(('Modules with no component', [([], p) for p in package if not owners[p]]))
+
+    def wanted(ids):
+        return not areas or any(i.startswith(area) for i in ids for area in areas)
+
+    cap = None if everything or areas else 40
+    lines, total, filled = [], 0, 0
+    for title, rows in groups:
+        rows = [text for ids, text in rows if wanted(ids)]
+        total, filled = total + len(rows), filled + bool(rows)
+        lines.extend([f'## {title} ({len(rows)})', *rows[:cap]])
+        if cap and len(rows) > cap:
+            lines.append(f'… +{len(rows) - cap} more (review --all prints every lead; review <area> prints one area)')
+        lines.append('')
+    scope = f' for {", ".join(areas)}' if areas else ''
+    lines.append(f'review{scope}: {total} lead(s) in {filled} group(s), from {len(components)} component(s) and '
+                 f'{len(package)} module(s); each is a place to look in the code, not a finding')
+    return lines
+
+
+def show(root: Path, name: str) -> list[str]:
+    """One component as a reviewer needs it: the entry, then each module with its names and its imports."""
+    entries = read_components(root)
+    entry = next((e for e in entries if e['id'] == name), None)
+    if entry is None:
+        close = [e['id'] for e in entries if e['id'].startswith(name)]
+        raise ValueError(f'no component {name}' + (f'; did you mean: {", ".join(close[:8])}' if close else ''))
+    lines = [f'### {name}'] + [f'- {key}: {value}' for key, value in entry.items() if key not in {'id', '_repeated'}]
+    if subsystem(entry):
+        return lines
+    components = [e for e in entries if not subsystem(e)]
+    package = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
+    owners = {p: [e['id'] for e in components if covers(e, p)] for p in package}
+    imports = package_imports(root)
+    importers = {}
+    for path, targets in imports.items():
+        for target in targets:
+            importers.setdefault(target, []).append(path)
+    outside = outside_importers(root, package)
+
+    def owned(paths):
+        return ', '.join(f'{p} ({", ".join(owners.get(p, [])) or "no component"})' for p in sorted(paths))
+
+    for path in [p for p in package if covers(entry, p)]:
+        text = (root / path).read_text(encoding='utf-8', errors='replace')
+        tree = parse(root / path)
+        private = [n.name for n in tree.body
+                   if isinstance(n, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith('_')]
+        constants = [t.id for n in tree.body if isinstance(n, (ast.Assign, ast.AnnAssign))
+                     for t in (n.targets if isinstance(n, ast.Assign) else [n.target])
+                     if isinstance(t, ast.Name) and t.id.isupper()]
+        elsewhere = outside.get(path, [])
+        lines.extend(['', f'## {path} ({len(text.splitlines())} lines): {summary(tree)}'])
+        lines.extend(f'  {row["line"]}: {row["label"]}: {row["summary"]}' for row in symbols(tree, methods=False))
+        if private or constants:
+            lines.append(f'  also defines: {some(private + constants, 16)}')
+        lines.append(f'  imports: {owned(imports.get(path, ())) or "(nothing in the package)"}')
+        lines.append(f'  imported by: {owned(importers.get(path, ())) or "(nothing in the package)"}')
+        lines.append(f'  imported from tests and scripts: {len(elsewhere)} file(s)'
+                     + (f': {some(elsewhere, 6)}' if elsewhere else ''))
+    return lines
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=ROOT)
@@ -641,11 +1100,28 @@ def main(argv: list[str] | None = None) -> int:
     find = commands.add_parser('search')
     find.add_argument('words', nargs='+')
     find.add_argument('--limit', type=int, default=5)
+    find.add_argument('--explain', action='store_true', help='show the query words each hit matched')
     stats = commands.add_parser('stats')
     stats.add_argument('--write-baseline', action='store_true')
+    stubs = commands.add_parser('draft')
+    stubs.add_argument('--only', default='', help='only modules whose path starts with this')
+    stubs.add_argument('--by-importers', action='store_true', help='most-imported modules first')
+    diff = commands.add_parser('changed')
+    diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
+    diff.add_argument('--strict', dest='strict_changed', action='store_true',
+                      help='also fail on a new caller of a deprecated or duplicate component')
+    look = commands.add_parser('review')
+    look.add_argument('areas', nargs='*', help='only leads that name a component whose id starts with one of these')
+    look.add_argument('--all', action='store_true', help='print every lead instead of the first 40 of each group')
+    one = commands.add_parser('show')
+    one.add_argument('id')
+    names = commands.add_parser('list')
+    names.add_argument('area', nargs='?', default='')
     args = parser.parse_args(argv)
     if args.check and args.command:
         parser.error('--check cannot be combined with a subcommand')
+    if args.strict and not args.check:
+        parser.error('--strict goes with --check (for the changed command, write it after: changed --strict)')
     try:
         target = args.root / BASE / 'COMPONENTS.md'
         if args.command == 'init' and target.exists():
@@ -661,7 +1137,9 @@ def main(argv: list[str] | None = None) -> int:
             hits = search(args.root, ' '.join(args.words), None)
             budget = 7000
             for hit in hits[:max(0, args.limit)]:
-                line = f'{hit["kind"]} {hit["id"]}: {hit["summary"]}'
+                total = len(tokens(' '.join(args.words)))
+                why = f' [{len(hit["matched"])}/{total}: {", ".join(hit["matched"])}]' if args.explain else ''
+                line = f'{hit["kind"]} {hit["id"]}{why}: {hit["summary"]}'
                 if hit.get('flow'):
                     line += '\nflow: ' + hit['flow']
                 if len(line) > budget:
@@ -679,9 +1157,35 @@ def main(argv: list[str] | None = None) -> int:
             print('\n'.join(unassigned))
             if args.write_baseline:
                 target = args.root / BASE / 'unassigned-baseline.txt'
-                if target.is_file() and len(unassigned) > len(target.read_text().splitlines()):
-                    raise ValueError('unassigned baseline cannot grow; assign new modules to components')
+                known = set(target.read_text(encoding='utf-8').split()) if target.is_file() else None
+                added = [p for p in unassigned if known is not None and p not in known]
+                if added:
+                    raise ValueError('unassigned baseline cannot grow; assign new modules to components: '
+                                     + some(added, 5))
                 target.write_text(''.join(p + '\n' for p in unassigned), encoding='utf-8')
+            return 0
+        if args.command == 'draft':
+            found = read_components(args.root) if target.is_file() else []
+            print('\n'.join(draft(args.root, found, args.only, args.by_importers)))
+            return 0
+        if args.command == 'list':
+            areas = {}
+            for entry in read_components(args.root):
+                if entry['id'].startswith(args.area):
+                    areas.setdefault(entry['id'].split('.')[0], []).append(entry)
+            for area, members in areas.items():
+                print(f'## {area} ({len(members)})')
+                for entry in members:
+                    print(f'{entry["id"]}: {entry.get("does", "")}')
+                print()
+            return 0
+        if args.command == 'changed':
+            return changed(args.root, args.base, args.strict_changed)
+        if args.command == 'review':
+            print('\n'.join(review(args.root, tuple(args.areas), args.all)))
+            return 0
+        if args.command == 'show':
+            print('\n'.join(show(args.root, args.id)))
             return 0
         return write_or_check(args.root, args.check, args.strict)
     except (OSError, ValueError, SyntaxError) as exc:

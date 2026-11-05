@@ -171,7 +171,7 @@ Details: `references/verify.md`, `references/gates.md`; template:
 Close uses the completed verification results; it does not repeat tests or
 replays. Use `complete --phase NN`, record concise lessons and commit the
 bookkeeping, including the component index (assign new modules, update changed
-subsystem flows, regenerate, the project's component check clean of majors). Manifesto changes, merge to the base branch and release to main
+subsystem flows, regenerate, the strict check and the `changed` check clean). Manifesto changes, merge to the base branch and release to main
 retain their existing explicit human gates. Push/PR only when authorized.
 
 Details: `references/close.md`.

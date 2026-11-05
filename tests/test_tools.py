@@ -159,6 +159,169 @@ def test_component_check_is_strict_only_on_request(project):
     assert "component core.package" in tool(project, "search", "package", script=index)[1]
 
 
+INDEX = "scripts/components_index.py"
+
+
+def entry(name, does, modules, status="canonical"):
+    return "\n### %s\n- does: %s\n- verbs: %s\n- status: %s\n- modules: %s\n" % (
+        name, does, name.split(".")[1], status, modules)
+
+
+def catalog(project, *entries):
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text() + "".join(entries))
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+
+
+def test_draft_gives_a_stub_that_cannot_be_kept_as_it_is(project):
+    (project / "src/widget/sizes.py").write_text(
+        '"""Turn byte counts into text."""\nimport widget\n\n\ndef humanize(n):\n    """Format n."""\n')
+    (project / "tests").mkdir()
+    (project / "tests/test_sizes.py").write_text("")
+    code, out = tool(project, "draft", script=INDEX)
+    assert code == 0
+    stub = out[out.index("### widget.sizes"):]
+    assert "- does: TODO Turn byte counts into text." in stub and "- tests: tests/test_sizes.py" in stub
+    assert "symbols: humanize(n)" in stub and "imports: src/widget/__init__.py" in stub
+    path = project / "docs/components/COMPONENTS.md"
+    before = path.read_text()
+    path.write_text(before + "\n" + stub)
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 1 and "widget.sizes: does is still a draft (TODO)" in out
+    path.write_text(before)
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/"))
+    assert "0 module(s)" in tool(project, "draft", script=INDEX)[1]
+
+
+def test_changed_names_what_a_change_left_out_of_the_index(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef humanize(n):\n    """Format n."""\n')
+    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"),
+            entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "0 to fix, 0 warning(s), 0 to reread" in out
+
+    (project / "src/widget/export.py").write_text('"""Export."""\n')
+    with (project / "src/widget/sizes.py").open("a") as stream:
+        stream.write('\n\ndef parse(text):\n    """Read a size."""\n')
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 1
+    assert "fail: stale or missing: docs/components/modules/_root.md" in out
+    assert "fail: no component: src/widget/export.py" in out
+    assert "reread: core.sizes (entry not edited): src/widget/sizes.py" in out
+    assert "reread: core.package" not in out
+
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("Format a byte count", "Format and parse a byte count"))
+    catalog(project, entry("core.export", "Export a report", "src/widget/export.py"))
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "reread:" not in out and "0 to fix" in out
+
+
+def test_changed_warns_about_a_new_caller_of_a_retired_component(project):
+    for name, body in (("old", '"""Old."""\n'), ("cli", '"""Cli."""\nfrom widget import old\n'),
+                       ("report", '"""Report."""\n')):
+        (project / "src/widget" / (name + ".py")).write_text(body)
+    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"),
+            entry("core.old", "The old way", "src/widget/old.py", status="deprecated"),
+            entry("core.cli", "Run commands", "src/widget/cli.py"),
+            entry("core.report", "Build a report", "src/widget/report.py"))
+    commit(project)
+    (project / "src/widget/report.py").write_text('"""Report."""\nfrom widget.old import x\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0, out
+    assert "warn: new caller of core.old (deprecated): core.report: src/widget/report.py -> src/widget/old.py" in out
+    assert "core.cli:" not in out, "a caller that was already there is not new"
+    assert tool(project, "changed", "--base", "main", "--strict", script=INDEX)[0] == 1
+
+
+def test_review_lists_places_to_look(project):
+    (project / "src/widget/sizes.py").write_text(
+        '"""Sizes."""\nfrom widget import export\n\n\ndef humanize(n):\n    """Format n."""\n')
+    (project / "src/widget/export.py").write_text(
+        'from widget import sizes\n\n\ndef humanize(n):\n    """Call the other one."""\n\n\n'
+        'def render(n):\n    """Render n."""\n')
+    (project / "src/widget/loose.py").write_text('"""Loose."""\n\n\ndef render(n):\n    """Render n again."""\n')
+    (project / "tests").mkdir()
+    (project / "tests/test_sizes.py").write_text("from widget.sizes import humanize\n")
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"),
+            entry("core.export", "Export a report", "src/widget/export.py"))
+    commit(project)
+    with (project / "src/widget/sizes.py").open("a") as stream:
+        stream.write('\n\ndef parse(text):\n    """Read a size."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    code, out = tool(project, "review", script=INDEX)
+    assert code == 0
+    assert "core.sizes: 1 commit(s) to its modules since " in out and "when its does and verbs were last edited" in out
+    assert "core.export: 1 commit" not in out
+    assert ("core.export <-> core.sizes: core.export imports core.sizes in 1 place(s): "
+            "src/widget/export.py -> src/widget/sizes.py; core.sizes imports core.export in 1 place(s)") in out
+    assert "render (same signature): src/widget/export.py (core.export), src/widget/loose.py (no component)" in out
+    assert "humanize" not in out, "a definition whose module imports the other one is a wrapper, not a copy"
+    assert "core.sizes: tests/test_sizes.py" in out
+    assert "## Modules with no docstring (the search cannot describe them) (1)\nsrc/widget/export.py" in out
+    assert "## Modules with no component (2)" in out and "src/widget/loose.py" in out
+    assert "## Retired components that are still called (0)" in out, "an empty group is printed with its count"
+    assert out.rstrip().splitlines()[-1].startswith("review: ")
+
+    catalog(project, entry("core.loose", "Loose ends", "src/widget/loose.py") + "- distinct_from: core.export\n")
+    out = tool(project, "review", script=INDEX)[1]
+    assert "render" not in out, "a pair recorded as separate on purpose is not a lead"
+    area = tool(project, "review", "core.siz", script=INDEX)[1]
+    assert "core.export <-> core.sizes" in area and "## Modules with no docstring (the search cannot describe them) (0)" in area
+    assert area.rstrip().splitlines()[-1].startswith("review for core.siz: ")
+    assert "component core.sizes [2/2: byte, size]:" in tool(project, "search", "--explain", "byte", "sizes", script=INDEX)[1]
+
+    code, out = tool(project, "show", "core.sizes", script=INDEX)
+    assert code == 0 and "## src/widget/sizes.py (" in out
+    assert "imports: src/widget/export.py (core.export)" in out
+    assert "imported from tests and scripts: 1 file(s): tests/test_sizes.py" in out
+
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- does: Loose ends", "- does: Loose ends\n- does: And more"))
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 1 and "core.loose: does appears twice" in out
+
+
+def test_changed_does_not_call_a_regrouped_import_new(project):
+    for name, body in (("old", '"""Old."""\n'), ("report", '"""Report."""\nfrom widget import old\n'),
+                       ("rows", '"""Rows."""\nfrom widget import old\n')):
+        (project / "src/widget" / (name + ".py")).write_text(body)
+    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"),
+            entry("core.old", "The old way", "src/widget/old.py", status="deprecated"),
+            entry("core.report", "Build a report", "src/widget/report.py, src/widget/rows.py"))
+    commit(project)
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("src/widget/report.py, src/widget/rows.py", "src/widget/report.py"))
+    catalog(project, entry("core.rows", "Build rows", "src/widget/rows.py"))
+    code, out = tool(project, "changed", "--base", "main", "--strict", script=INDEX)
+    assert code == 0 and "warn:" not in out, out
+
+def test_the_baseline_cannot_take_a_new_module_in_exchange_for_an_old_one(project):
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"))
+    code, out = tool(project, "stats", "--write-baseline", script=INDEX)
+    assert code == 0 and (project / "docs/components/unassigned-baseline.txt").read_text().split() == [
+        "src/widget/a.py", "src/widget/b.py"]
+    (project / "src/widget/c.py").write_text('"""c."""\n')
+    catalog(project, entry("core.a", "Do a", "src/widget/a.py"))
+    code, out = tool(project, "stats", "--write-baseline", script=INDEX)
+    assert code == 1 and "unassigned baseline cannot grow" in out and "src/widget/c.py" in out
+    assert tool(project, "--check", "--strict", script=INDEX)[0] == 1
+    code, out = tool(project, "--strict", script=INDEX)
+    assert code == 2 and "--strict goes with --check" in out
+
+    out = tool(project, "draft", "--only", "src/widget/c", script=INDEX)[1]
+    assert "1 module(s)" in out and "### widget.c" in out and "widget.b" not in out
+    assert "imported by (0): nothing in the package" in out
+    out = tool(project, "list", script=INDEX)[1]
+    assert "## core (2)" in out and "core.a: Do a" in out
+
+
 def test_scope_check_ignores_the_supervisors_own_files(project):
     phase(project, "setup")
     commit(project)

@@ -50,6 +50,14 @@ Build an obligations table citing source path and section for each deliverable,
 constraint, dependency, cross-cutting gate and carried limitation. Distinguish
 observed evidence, inherited claims and proposed targets.
 
+In a project with a component index (the `components` skill), search it for
+each capability the milestone proposes to build, and carry what already exists
+into the table as observed evidence with the component id. Run
+`components_index.py review` once: if many entries are older than their code,
+say so and offer a review of the index (that skill's Review mode) before the
+plan relies on it. The offer is the owner's to accept; planning continues
+either way.
+
 Check readiness from records and evidence. Unresolved prerequisites may leave
 dependent phases blocked; name what unblocks them. Inspect a completed milestone
 as complete unless the user asks to reopen it. On resumption retain approvals,

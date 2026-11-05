@@ -17,7 +17,9 @@ Status: prototype.
 - **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
   independent review of each change, and numbered records that are never edited.
 - **Component index.** A searchable map of what the code already does, so existing code
-  is reused instead of written again.
+  is reused instead of written again. The agent can build it for a codebase that has
+  none, check it against every change, and review it from the top: repair the index and
+  list the code changes it would suggest.
 
 A project picks the workflow that fits it. Both use the component index.
 
@@ -43,7 +45,9 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
 Rules that belong to one project go in a file that project owns,
 `references/project.md` beside the synced skill. The sync never touches it.
 
-See `examples/phase-project.devtools.toml` for a complete project file. A new project follows
+See `examples/phase-project.devtools.toml` for a complete project file, and
+`examples/components-check.yml` for a GitHub Actions job that checks the index on every
+pull request. A new project follows
 the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
 
 The sync command and the component index need Python 3.11 or newer; the phase state tool
@@ -58,7 +62,7 @@ runs on 3.9.
 | `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
 | `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
-| `skills/components/` | The component index: the skill, and `scripts/components_index.py`, which generates, checks and searches it. |
+| `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, and lists leads for a review. |
 | `devtools/sync.py` | The sync command. |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
 | `tests/` | Tests for the sync command and for the scripts a project runs after a sync. |

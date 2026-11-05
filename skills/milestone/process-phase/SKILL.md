@@ -10,6 +10,13 @@ read it first. The project owns it; it names the project's review instrument,
 test and gate commands, standing design rules and any project-specific record
 fields, and it governs project-specific matters.
 
+**Component index.** A project that keeps one (the `components` skill is
+installed and `docs/components/COMPONENTS.md` exists, or `references/project.md`
+names another location) uses it in three steps: the spec records what was
+searched and reused (step 1), the index changes with the code (step 3), and its
+check against the phase's changed files is a gate in the record (step 6). A
+project with no index skips all three; nothing else in this skill depends on it.
+
 ## Summary
 
 **What:** one phase of a milestone, executed end to end under the plan's
@@ -114,6 +121,11 @@ rule list, and the test list with expected exits. Full contract in
 A draft that `start-milestone` already wrote at that path for the first phase
 is the starting point: complete it under the contract, step 0's obligations
 table included, and do not start a second file.
+In a project with a component index, the Design section opens with the reuse
+table the contract describes: for every capability the phase builds, the
+searches run under the `components` skill's Consult steps and the decision.
+A capability with no recorded search is an open item, the same as an
+unharvested obligation.
 The test list includes a verification-selection ledger under
 [`references/verification-selection.md`](references/verification-selection.md):
 plan-mandated gates, direct phase tests, impact closure, and an explicit
@@ -210,6 +222,9 @@ evidence never becomes evidence about changed bytes.
   **branch**, not per class: a finding class whose second half is unreachable
   with the chosen fixtures is half-covered, and closing it may mean editing the
   fixtures themselves rather than adding cases.
+- In a project with a component index, the index changes in the same commit as
+  the code: follow the `components` skill's Update rules for every module the
+  phase adds, moves or retires, and regenerate.
 - Record implementation findings **as they are found**, in the spec's own
   findings section, including the ones that refute the spec. A finding discovered
   and then quietly designed around is the same as one never found.
@@ -259,6 +274,21 @@ extensions to the base record format, and the commit grammar are in
 gate commands and exits **verbatim**, evidence bound by path + sha256, a
 mandatory boundary section, open questions, refuted premises when a belief died,
 and the refactoring-review section from step 5.
+
+In a project with a component index, run its check against the phase's base
+before writing the record, and list it among the record's gates with its
+command and exit verbatim:
+
+```bash
+python scripts/components_index.py changed --base <the phase's base commit> --strict
+```
+
+Fix every `fail:`. For a `warn:` (a new caller of a retired component), call the
+replacement or record the reason in the boundary section and rerun without
+`--strict`, saying so. For each `reread:` line, read the entry beside the diff
+and either edit it or state in the record that it is still accurate. Duplicates
+and tangles the phase exposed in code it did not touch go to the step 5 answer
+as deferred refactors, not into this phase.
 
 The commit uses the record contract's grammar with a phase scope token, an
 evidence-bearing body, `--` rather than em-dashes, **no backticks anywhere in

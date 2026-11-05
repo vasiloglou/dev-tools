@@ -1,0 +1,22 @@
+# Checks the component index on every pull request: the generated pages match the source,
+# every new module has a component, and no new code calls a retired component.
+# Copy to .github/workflows/ (or sync it; see phase-project.devtools.toml).
+name: component index
+
+on:
+  pull_request:
+
+jobs:
+  components:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the check compares with the merge base
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # A project that lists libraries in docs/components/external.toml installs itself
+      # here first (for example `pip install -e .`), so their versions can be read.
+      - name: Check the component index
+        run: python scripts/components_index.py changed --base "origin/${{ github.base_ref }}" --strict
