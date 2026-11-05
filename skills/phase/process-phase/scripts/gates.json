@@ -1,7 +1,7 @@
 {
   "PG1": {
     "name": "One final full regression run",
-    "check": "Run .venv/bin/python -m pytest -q -p no:cacheprovider once after focused fixes; reuse the result across checks. No Orient/Implement/fresh-verifier repeats.",
+    "check": "Run .venv/bin/python -m pytest -q -rfE -p no:cacheprovider once after focused fixes; reuse the result across checks. No Orient/Implement/fresh-verifier repeats.",
     "from_phase": 0
   },
   "PG2": {

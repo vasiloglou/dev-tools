@@ -444,13 +444,14 @@ def survey(source_root: Path, project: Path) -> dict:
             "links": sorted(relative(p) for p in links if p.parent.name == "skills")}
 
 
-def covered(project: Path) -> tuple[set[str], set[str]]:
-    """(paths the project's config delivers to, paths in the receipt); empty when there is neither."""
-    wanted = set()
+def covered(project: Path) -> tuple[set[str], set[str], set[str]]:
+    """(paths the config delivers to, paths in the receipt, old copies it names); empty without a config."""
+    wanted, old = set(), set()
     if (project / CONFIG).is_file():
         for entry in read_config(project).get("sync", []):
             wanted.add(str(entry.get("dest", "")).rstrip("/"))
-    return wanted, set(read_json(project / RECEIPT).get("files", {}))
+            old.add(str(entry.get("replaces", "")).rstrip("/"))
+    return wanted, set(read_json(project / RECEIPT).get("files", {})), old - {""}
 
 
 def tracked(project: Path, path: str) -> bool:
@@ -460,10 +461,12 @@ def tracked(project: Path, path: str) -> bool:
 
 
 def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
-    wanted, managed = covered(project)
+    wanted, managed, old = covered(project)
 
     def state(path: str) -> str:
         known = tracked(project, path)
+        if path in old:
+            return f"  [the old copy that {CONFIG} names under replaces]"
         if any(m == path or m.startswith(path + "/") for m in managed):
             return "  [synced]" if known else "  [synced; not added to git yet]"
         untracked = "" if known else "  [not tracked by git]"
@@ -509,6 +512,26 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
     if result["links"]:
         lines += ["", "## Symlinked skill folders: not read"]
         lines += [line.split(": ")[0] + f" {line.count(',') + 1} folder(s)" for line in by_folder(result["links"])]
+    if have:
+        # Names that point at the copies: the folder with its parent, each shipped script as a module
+        # name, each shipped data file with its folder.
+        names, folders = [], []
+        for unit in have:
+            source = source_root / unit["source"]
+            for hit in result["found"][unit["source"]]:
+                path = Path(hit["path"])
+                folders.append(hit["path"])
+                names.append(f"{path.parent.name}/{path.name}" if unit["kind"] != "file" else path.stem)
+            if unit["kind"] == "skill":
+                for shipped in shipped_files(source):
+                    if shipped.suffix == ".py":
+                        names.append(shipped.stem)
+                    elif shipped.suffix in (".json", ".toml", ".yaml", ".yml") and shipped.parent.name == "scripts":
+                        names.append(f"{shipped.parent.name}/{shipped.name}")
+        names = list(dict.fromkeys(names))
+        lines += ["", "## To find what reads these copies (tests, scripts, CI, other skills)",
+                  "git grep -l " + " ".join(f"-e '{name}'" for name in names) + " -- . "
+                  + " ".join(f"':!{folder}'" for folder in dict.fromkeys(folders))]
     return lines
 
 
@@ -575,7 +598,8 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
             return []
         current = read_json(project / Path(dest_script).with_suffix(".settings.json"))
         constants = literals(project / old_script)
-        block = [f"# Each {TODO} shows the shipped default; read {old_script} for what the project did.",
+        block = [f"# Each {TODO} shows the shipped default. Read what {old_script} did, and the comment on the",
+                 f"# setting in the shipped {script.relative_to(source_root).as_posix()}.",
                  f'[sync.settings."{name}"]']
         for key, default in defaults.items():
             if key in current:
@@ -592,6 +616,8 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
                 value, why = agents[0], "from the survey"
             else:
                 value, why = TODO, f"default {toml_value(default)}"
+                if value == TODO and not default:
+                    why += " (an empty value is valid)"
             block.append(f"{key} = {toml_value(value)}  # {why}")
         return block + [""]
 
@@ -626,6 +652,13 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
             moved = {inner: places for inner, places in moved.items() if places}
             if moved:
                 lines.append(f"exclude = {toml_value(sorted(moved))}")
+            data = [p.relative_to(source).as_posix() for p in shipped_files(source)
+                    if p.suffix in (".json", ".toml", ".yaml", ".yml")
+                    and (project / path / p.relative_to(source)).is_file()
+                    and (project / path / p.relative_to(source)).read_bytes() != p.read_bytes()]
+            if data:
+                lines.append(f"# Data files that differ from the shipped ones (add to exclude to keep the project's): "
+                             f"{', '.join(data)}")
             lines.append("")
             for script in (p for p in shipped_files(source) if p.suffix == ".py"):
                 inner = script.relative_to(source).as_posix()
@@ -639,6 +672,9 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
                         lines += ["[[sync]]", f'source = "{unit["source"]}/{inner}"', f'dest = "{place}"', ""]
                         lines += settings(source / inner, Path(place).with_suffix(".settings.json").name,
                                           place, place, dest)
+    if delivered or any(".settings.json" in line for line in lines):
+        lines[3:3] = ["", "# If a synced script generates files, run it after a sync (no shell: `env NAME=value command`):",
+                      '# after_apply = ["<interpreter> <script> write"]']
     missing = [unit["source"] for unit in result["units"] if not result["found"][unit["source"]]]
     if missing:
         lines.append("# Shipped, with no counterpart found here (add an entry to take one):")
@@ -674,9 +710,18 @@ def compare_rows(project: Path, source_root: Path, config: dict, wanted: dict) -
     exact = {line for item in wanted.values() for _, line in kept_lines(item["data"])}
     running = squeeze(" ".join(item["data"].decode("utf-8", errors="ignore") for item in wanted.values()))
 
-    def only_here(data: bytes) -> list[tuple[int, str]]:
-        return [(n, line) for n, line in kept_lines(data)
-                if line not in exact and not (len(line) >= 12 and squeeze(line) in running)]
+    def only_here(data: bytes, path: Path | None = None) -> list[tuple[int, str]]:
+        """The lines no delivered file has, alone or joined with a neighbour (a sentence wrapped elsewhere)."""
+        raw = [""] + data.decode("utf-8", errors="ignore").splitlines() + [""]
+        prose = path is None or path.suffix in PROSE
+        found = []
+        for n, line in kept_lines(data):
+            if line in exact or (len(line) >= 12 and squeeze(line) in running):
+                continue
+            joined = [squeeze(raw[n - 1] + " " + raw[n]), squeeze(raw[n] + " " + raw[n + 1])] if prose else []
+            if not any(len(text) > len(line) + 8 and text in running for text in joined):
+                found.append((n, line))
+        return found
 
     rows = []
     for action in actions:
@@ -686,7 +731,7 @@ def compare_rows(project: Path, source_root: Path, config: dict, wanted: dict) -
             row["label"] = {"create": "new", "keep": "same"}.get(action["do"], "remove")
         else:
             row["label"] = {"adopt": "replace", "force": "edited"}.get(action.get("needs"), "update")
-            row["lost"] = only_here(path.read_bytes())
+            row["lost"] = only_here(path.read_bytes(), path)
         rows.append(row)
     kept, beside = [], []
     for entry in config.get("sync", []):
@@ -695,21 +740,23 @@ def compare_rows(project: Path, source_root: Path, config: dict, wanted: dict) -
             if (project / dest / name).is_file():
                 kept.append(f"{dest}/{name}")
                 rows.append({"dest": f"{dest}/{name}", "label": "kept", "origin": f"{entry['source']}/{name}",
-                             "lost": only_here((project / dest / name).read_bytes())})
+                             "lost": only_here((project / dest / name).read_bytes(), project / dest / name)})
         old = project / inside(project, entry["replaces"]) if entry.get("replaces") else None
         if old and old.is_dir():
             for path in shipped_files(old):
                 rows.append({"dest": path.relative_to(project).as_posix(), "label": "old copy", "origin": "",
-                             "lost": only_here(path.read_bytes())})
+                             "against": f"{dest}/{path.relative_to(old).as_posix()}",
+                             "lost": only_here(path.read_bytes(), path)})
         if source.is_dir() and (project / dest).is_dir():
             beside += [p.relative_to(project).as_posix() for p in shipped_files(project / dest)
                        if p.relative_to(project).as_posix() not in wanted]
-    beside = sorted(set(beside))
+    beside = sorted(set(beside) - set(kept))
     # What the project owns and an apply leaves alone: where a carried rule would now be.
-    owned = [project / name for name in beside if name not in kept]
+    owned = [project / name for name in beside]
     owned += [project / name for name in ("CLAUDE.md", "AGENTS.md") if (project / name).is_file()]
     owned_text = {path.relative_to(project).as_posix(): squeeze(path.read_text(encoding="utf-8", errors="ignore"))
                   for path in owned}
+    owned_lines = {name: [line for _, line in kept_lines((project / name).read_bytes())] for name in owned_text}
     first: dict[tuple, str] = {}
     for row in rows:
         row["prose"] = Path(row["dest"]).suffix in PROSE
@@ -722,12 +769,15 @@ def compare_rows(project: Path, source_root: Path, config: dict, wanted: dict) -
         if row["lost"] and row["prose"] and not row["twin"]:
             for number, line in row["lost"]:
                 home = next((name for name, text in owned_text.items() if len(line) >= 12 and squeeze(line) in text), None)
+                home = home or next((name for name, lines in owned_lines.items()
+                                     if difflib.get_close_matches(line, lines, n=1, cutoff=0.8)), None)
                 if home:
                     row["carried"][number] = home
-            if row["dest"] in wanted:
-                shipped = [line for _, line in kept_lines(wanted[row["dest"]]["data"])]
+            against = row.get("against", row["dest"])
+            if against in wanted:
+                shipped = [line for _, line in kept_lines(wanted[against]["data"])]
                 for number, line in row["lost"]:
-                    near = difflib.get_close_matches(line, shipped, n=1, cutoff=0.8)
+                    near = difflib.get_close_matches(line, shipped, n=1, cutoff=0.65)
                     if near:
                         row["close"][number] = near[0]
     return rows, beside
@@ -742,6 +792,8 @@ def row_note(row: dict) -> str:
         return ""
     if not row["prose"]:
         return f"  script or data, {len(row['lost'])} line(s) differ: read it with --diff"
+    if not row["lost"]:
+        return "  every line is in a shipped file"
     note = f"  {len(row['lost'])} line(s) only the project's copy has"
     extra = [f"{len(row['close'])} close to a shipped line"] if row["close"] else []
     extra += [f"{len(row['carried'])} now in a file the project owns"] if row["carried"] else []
@@ -756,17 +808,19 @@ def cmd_compare(args) -> int:
     rows, beside = compare_rows(project, source_root, config, wanted)
     counted = [row for row in rows if row["label"] in ("replace", "edited", "old copy") and not row["twin"]]
     chosen = [p.rstrip("/") for p in args.paths]
-    if args.diff and not chosen:
-        raise SyncError("--diff needs the path of a file or folder the sync delivers")
+    if (args.diff or args.added) and not chosen:
+        raise SyncError("--diff and --added need the path of a file or folder the sync delivers")
     picked = [row for row in rows if any(row["dest"] == p or row["dest"].startswith(p + "/") for p in chosen)]
     if chosen and not picked:
         raise SyncError(f"no file the sync delivers, keeps or replaces is at or under: {', '.join(chosen)}")
     if args.record:
         print("| File | Lines only here | Stated | Carried | Kept file | Changed | Gap | Candidate | Dropped |")
         print("|---|---|---|---|---|---|---|---|---|")
-        for row in picked or counted + [row for row in rows if row["label"] == "kept"]:
-            if row["lost"] and not row["twin"]:
-                print(f"| `{row['dest']}` | {len(row['lost'])} | | | | | | | |")
+        listed = [row for row in picked or counted + [row for row in rows if row["label"] == "kept"]
+                  if row["lost"] and not row["twin"]]
+        for row in listed:
+            print(f"| `{row['dest']}` | {len(row['lost'])} | | | | | | | |")
+        print(f"| Total | {sum(len(row['lost']) for row in listed)} | | | | | | | |")
         return 0
     if chosen:
         for row in picked:
@@ -775,13 +829,32 @@ def cmd_compare(args) -> int:
                 print(f"{label:8} {dest}: the same file as {row['twin']}, listed there")
                 continue
             if label == "new":
+                size = len(wanted[dest]["data"].decode("utf-8", errors="replace").splitlines())
                 print(f"{label:8} {dest}: nothing of the project's is replaced. Read the shipped file, "
-                      f"{row['origin']}, against how the project works today")
+                      f"{row['origin']} ({size} lines), against how the project works today")
                 continue
             if label not in ("replace", "edited", "update", "old copy", "kept"):
                 print(f"{label:8} {dest}")
                 continue
             old = (project / dest).read_text(encoding="utf-8", errors="replace")
+            if args.added:
+                against = row.get("against", dest)
+                if against not in wanted:
+                    continue
+                have = {line for _, line in kept_lines(old.encode("utf-8"))}
+                flat = squeeze(old)
+                new = wanted[against]["data"].decode("utf-8", errors="replace")
+                arrives = [(n, line) for n, line in kept_lines(new.encode("utf-8"))
+                           if line not in have and not (len(line) >= 12 and squeeze(line) in flat)]
+                print(f"{label:8} {dest}: {len(arrives)} line(s) only the shipped file has")
+                under, last, raw = (headings(new) if against.endswith(".md") else {}), None, new.splitlines()
+                for number, line in arrives:
+                    heading = under.get(number, "")
+                    if under and heading != last and heading != line:
+                        print(f"  under: {heading or '(no heading)'}")
+                    last = heading
+                    print(f"  {number:>5}: {line if row['prose'] else raw[number - 1].rstrip()}")
+                continue
             if args.diff and dest in wanted:
                 new = wanted[dest]["data"].decode("utf-8", errors="replace")
                 sys.stdout.writelines(difflib.unified_diff(
@@ -794,13 +867,9 @@ def cmd_compare(args) -> int:
             last = None
             for number, line in row["lost"]:
                 heading = under.get(number, "")
-                if heading == line:
-                    print(f"  under: {heading}  (line {number}: this heading is only in the project's copy)")
-                    last = heading
-                    continue
-                if under and heading != last:
+                if under and heading != last and heading != line:
                     print(f"  under: {heading or '(no heading)'}")
-                    last = heading
+                last = heading
                 mark = f"   [in {row['carried'][number]}]" if number in row["carried"] else ""
                 print(f"  {number:>5}: {line if row['prose'] else raw[number - 1].rstrip()}{mark}")
                 if number in row["close"]:
@@ -852,6 +921,8 @@ def main(argv=None) -> int:
     compare.add_argument("--source", type=Path, default=SOURCE_ROOT, help="dev-tools checkout (default: this one)")
     compare.add_argument("paths", nargs="*", help="synced files or folders: list the lines only the project has")
     compare.add_argument("--diff", action="store_true", help="with paths: print the full difference instead")
+    compare.add_argument("--added", action="store_true",
+                         help="with paths: print the lines only the shipped file has (what arrives)")
     compare.add_argument("--record", action="store_true",
                          help="print one table row per file with lines of its own, for the migration record")
     compare.set_defaults(run=cmd_compare)

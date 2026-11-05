@@ -32,7 +32,7 @@ This skill is how you write those tests. `/process-phase` Step 2 calls it, and t
 
 | Item | Convention |
 |---|---|
-| Directory | `tests/acceptance/pNN_<slug_with_underscores>/`, e.g. `tests/acceptance/p02_reports/` |
+| Directory | `tests/acceptance/pNN_<slug_with_underscores>/` (phase 2 with slug `reports` gives `p02_reports`) |
 | Test files | `test_<capability>.py`, e.g. `test_report_totals.py` |
 | Unique basenames | `tests/` has no `__init__.py`, so pytest's default import mode needs every test module basename to be unique across `tests/`. Check with `find tests -name test_<capability>.py` before naming |
 | Helpers | `pNN_helpers.py` in the phase directory (never `helpers.py` or `utils.py`, which would clash between phases) |

@@ -287,6 +287,7 @@ def test_survey_finds_copies_renamed_copies_and_the_projects_own_skills(shipped,
     assert run("survey", "--project", grown, "--source", shipped) == 0
     out = capsys.readouterr().out
     counterparts, rest = out.split("## The project's own skills")
+    rest, search = rest.split("## To find what reads these copies")
     assert ".claude/skills/process  (80% of the shipped SKILL.md lines; 0 of 1 other shipped files present, " \
            "not here: scripts/tool.py)" in counterparts
     assert ".codex/skills/process  (80%" in counterparts
@@ -294,6 +295,8 @@ def test_survey_finds_copies_renamed_copies_and_the_projects_own_skills(shipped,
     assert ".claude/agents  (1 of 1 shipped files present)" in counterparts
     assert "skills/flow/process/scripts/tool.py\n  tools/tool.py" in counterparts
     assert "deploy" in rest and "acme-index" not in rest
+    assert "git grep -l -e 'skills/process' -e 'tool' -e 'skills/acme-index' -e '.claude/agents' -- . " \
+           "':!.claude/skills/process'" in search
     assert "adopt-devtools" not in out and "node_modules" not in out
     assert not (grown / ".devtools.toml").exists(), "the survey writes nothing"
 
@@ -321,17 +324,17 @@ def test_compare_shows_the_lines_a_replacement_would_drop(shipped, grown, capsys
     # The re-wrapped sentence and the token line are not reported; the rule and the reworded line are.
     assert "replace  .claude/skills/process/SKILL.md  3 line(s) only the project's copy has (1 close to a shipped line)" in out
     assert "replace  .codex/skills/process/SKILL.md  same as .claude/skills/process/SKILL.md: counted there" in out
-    assert "old copy .claude/skills/acme-index/SKILL.md  2 line(s) only the project's copy has" in out
+    assert "old copy .claude/skills/acme-index/SKILL.md  2 line(s) only the project's copy has (1 close" in out
     assert "replace  tools/tool.py  script or data, 2 line(s) differ: read it with --diff" in out
     assert "new      .claude/skills/index/SKILL.md" in out
     assert ".claude/agents/reviewer.md" not in out, "an identical file is not listed"
     assert "only in the project, inside a synced folder" in out and ".claude/skills/process/OLD.md" in out
-    assert "5 line(s) of the project's text are in no file the sync delivers (1 close to a shipped line, " \
+    assert "5 line(s) of the project's text are in no file the sync delivers (2 close to a shipped line, " \
            "0 now in a file the project owns); 2 line(s) differ in scripts and data files" in out
 
     assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/process") == 0
     out = capsys.readouterr().out
-    assert "under: ## Acme rules  (line 10: this heading is only in the project's copy)" in out
+    assert "     10: ## Acme rules\n     11: Never call the billing service in a test." in out
     assert "   11: Never call the billing service in a test." in out and "Orient before" not in out
     assert "   12: Write the tests before any code.\n       ~ shipped: Write the tests before the code." in out
     assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/acme-index") == 0
@@ -340,8 +343,14 @@ def test_compare_shows_the_lines_a_replacement_would_drop(shipped, grown, capsys
     assert "Read the shipped file, skills/index/SKILL.md" in capsys.readouterr().out
     assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/process/SKILL.md", "--diff") == 0
     assert "+Records go in plans/records." not in capsys.readouterr().out, "the filled token matches the project's line"
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/process/SKILL.md", "--added") == 0
+    out = capsys.readouterr().out
+    assert "0 line(s) only the shipped file has" in out, "what arrives: here nothing but a reworded line"
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/acme-index", "--added") == 0
+    assert "Regenerate after a change." in capsys.readouterr().out
     assert run("compare", "--project", grown, "--source", shipped, "--record") == 0
-    assert "| `.claude/skills/process/SKILL.md` | 3 | | | | | | | |" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "| `.claude/skills/process/SKILL.md` | 3 | | | | | | | |" in out and "| Total | 7 |" in out
     assert run("compare", "--project", grown, "--source", shipped, "no/such/path") == 2
     assert run("compare", "--project", grown, "--source", shipped, "--diff") == 2
 
@@ -358,7 +367,7 @@ def test_compare_shows_the_lines_a_replacement_would_drop(shipped, grown, capsys
     run("survey", "--project", grown, "--source", shipped)
     out = capsys.readouterr().out
     assert ".claude/skills/index  (100% of the shipped SKILL.md lines; 0 of 0 other shipped files present)  [synced" in out
-    assert ".claude/skills/acme-index" in out and "[not in .devtools.toml]" in out
+    assert "[the old copy that .devtools.toml names under replaces]" in out
     run("compare", "--project", grown, "--source", shipped)
     out = capsys.readouterr().out
     assert "replace" not in out and "old copy .claude/skills/acme-index/SKILL.md" in out
