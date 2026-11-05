@@ -6,7 +6,7 @@ sentence is still true, whether two components are one, or whether the code the 
 describes should exist. A review does that, from the top, and produces two things:
 
 1. **A repaired index**, committed on its own.
-2. **A list of suggested code changes**, in `docs/components/REVIEW.md`, for the user to
+2. **A list of suggested code changes**, in `REVIEW.md` in `docs/components/`, for the user to
    accept, defer or reject. The review makes none of them.
 
 Run it when asked; when searches keep missing things that exist; before planning a large
@@ -131,8 +131,8 @@ Rules for a suggestion:
 
 ## 5. Write the report
 
-`docs/components/REVIEW.md` is replaced at each full review. A review of one area
-writes `docs/components/REVIEW-<area>.md` and leaves the full report alone. Keep it
+`REVIEW.md` in `docs/components/` is replaced at each full review. A review of one area
+writes `REVIEW-<area>.md` beside it and leaves the full report alone. Keep it
 short enough to read in one sitting:
 
 ```markdown

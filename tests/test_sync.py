@@ -227,3 +227,147 @@ def test_token_without_a_value_is_an_error(source, project):
 def test_value_that_matches_no_token_is_an_error(source, project):
     (project / ".devtools.toml").write_text(TOKENS)
     assert apply(source, project) == 2
+
+
+# --------------------------------------------------------------------------- a project that has its own copies
+
+@pytest.fixture
+def shipped(tmp_path):
+    """A dev-tools source with one skill that ships a script, one more skill, and agents."""
+    root = tmp_path / "devtools-source"
+    (root / "skills/flow/process/scripts").mkdir(parents=True)
+    (root / "skills/flow/process/SKILL.md").write_text(
+        "---\nname: process\n---\n# Process\nOrient before anything else.\nWrite the tests before the code.\n"
+        "Ask for approval at every gate, and never skip one because the change is small.\n"
+        "Records go in {{devtools:planning_dir}}/records.\n")
+    (root / "skills/flow/process/scripts/tool.py").write_text(
+        'DEFAULT_SETTINGS = {"package": "", "script_path": "x", "limit": 3}\n')
+    (root / "skills/index").mkdir(parents=True)
+    (root / "skills/index/SKILL.md").write_text(
+        "---\nname: index\n---\nSearch the index first.\nRecord the reuse decision.\nRegenerate after a change.\n")
+    (root / "skills/adopt-devtools").mkdir()
+    (root / "skills/adopt-devtools/SKILL.md").write_text("read here, never copied\n")
+    (root / "agents").mkdir()
+    (root / "agents/reviewer.md").write_text("Review the change.\n")
+    return root
+
+
+@pytest.fixture
+def grown(tmp_path):
+    """A project that grew its own copies: one under its name in two runtime folders, one renamed, plus a skill of its own."""
+    root = tmp_path / "grown"
+    for runtime in (".claude", ".codex"):
+        (root / runtime / "skills/process").mkdir(parents=True)
+        (root / runtime / "skills/process/SKILL.md").write_text(
+            "---\nname: process\n---\n# Process\nOrient before anything else.\nWrite the tests before the code.\n"
+            "Ask for approval at every gate, and never skip one\nbecause the change is small.\n"
+            "Records go in plans/records.\n## Acme rules\nNever call the billing service in a test.\n"
+            "Write the tests before any code.\n")
+    (root / ".claude/skills/process/OLD.md").write_text("a file dev-tools does not ship\n")
+    (root / ".claude/skills/acme-index").mkdir()
+    (root / ".claude/skills/acme-index/SKILL.md").write_text(
+        "---\nname: acme-index\n---\nSearch the index first.\nRecord the reuse decision.\nAcme names follow the ledger.\n")
+    (root / ".claude/skills/deploy").mkdir()
+    (root / ".claude/skills/deploy/SKILL.md").write_text("How Acme deploys.\n")
+    (root / "tools").mkdir()
+    (root / "tools/tool.py").write_text('PACKAGE = "acme"\nprint("the project\'s own copy of the script")\n')
+    (root / ".claude/agents").mkdir()
+    (root / ".claude/agents/reviewer.md").write_text("Review the change.\n")
+    (root / "node_modules/x/skills/process").mkdir(parents=True)
+    (root / "node_modules/x/skills/process/SKILL.md").write_text("Orient before anything else.\n")
+    return root
+
+
+def starter(shipped, grown, capsys):
+    run("survey", "--project", grown, "--source", shipped, "--toml")
+    return capsys.readouterr().out
+
+
+def test_survey_finds_copies_renamed_copies_and_the_projects_own_skills(shipped, grown, capsys):
+    assert run("survey", "--project", grown, "--source", shipped) == 0
+    out = capsys.readouterr().out
+    counterparts, rest = out.split("## The project's own skills")
+    assert ".claude/skills/process  (80% of the shipped SKILL.md lines; 0 of 1 other shipped files present, " \
+           "not here: scripts/tool.py)" in counterparts
+    assert ".codex/skills/process  (80%" in counterparts
+    assert ".claude/skills/acme-index" in counterparts and "dev-tools names it `index`" in counterparts
+    assert ".claude/agents  (1 of 1 shipped files present)" in counterparts
+    assert "skills/flow/process/scripts/tool.py\n  tools/tool.py" in counterparts
+    assert "deploy" in rest and "acme-index" not in rest
+    assert "adopt-devtools" not in out and "node_modules" not in out
+    assert not (grown / ".devtools.toml").exists(), "the survey writes nothing"
+
+
+def test_the_starter_config_keeps_the_projects_paths_and_cannot_run_with_a_todo(shipped, grown, capsys):
+    text = starter(shipped, grown, capsys)
+    assert 'dest = ".claude/skills/index"\nreplaces = ".claude/skills/acme-index"' in text
+    assert text.count('exclude = ["scripts/tool.py"]') == 2 and text.count('dest = "tools/tool.py"') == 1
+    # What the project's copies show is read; what they do not show must be decided.
+    assert text.count('values = { planning_dir = "plans" }') == 2 and "read from SKILL.md line 9" in text
+    assert 'package = "acme"  # read from PACKAGE in tools/tool.py' in text
+    assert 'script_path = "tools/tool.py"  # from the survey' in text
+    assert 'limit = "TODO"  # default 3\n' in text
+    (grown / ".devtools.toml").write_text(text)
+    assert run("compare", "--project", grown, "--source", shipped) == 2
+    assert "still TODO" in capsys.readouterr().err
+    assert apply(shipped, grown, "--adopt") == 2
+    assert "own copy of the script" in (grown / "tools/tool.py").read_text()
+
+
+def test_compare_shows_the_lines_a_replacement_would_drop(shipped, grown, capsys):
+    (grown / ".devtools.toml").write_text(starter(shipped, grown, capsys).replace('"TODO"', "5"))
+    assert run("compare", "--project", grown, "--source", shipped) == 0
+    out = capsys.readouterr().out
+    # The re-wrapped sentence and the token line are not reported; the rule and the reworded line are.
+    assert "replace  .claude/skills/process/SKILL.md  3 line(s) only the project's copy has (1 close to a shipped line)" in out
+    assert "replace  .codex/skills/process/SKILL.md  same as .claude/skills/process/SKILL.md: counted there" in out
+    assert "old copy .claude/skills/acme-index/SKILL.md  2 line(s) only the project's copy has" in out
+    assert "replace  tools/tool.py  script or data, 2 line(s) differ: read it with --diff" in out
+    assert "new      .claude/skills/index/SKILL.md" in out
+    assert ".claude/agents/reviewer.md" not in out, "an identical file is not listed"
+    assert "only in the project, inside a synced folder" in out and ".claude/skills/process/OLD.md" in out
+    assert "5 line(s) of the project's text are in no file the sync delivers (1 close to a shipped line, " \
+           "0 now in a file the project owns); 2 line(s) differ in scripts and data files" in out
+
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/process") == 0
+    out = capsys.readouterr().out
+    assert "under: ## Acme rules  (line 10: this heading is only in the project's copy)" in out
+    assert "   11: Never call the billing service in a test." in out and "Orient before" not in out
+    assert "   12: Write the tests before any code.\n       ~ shipped: Write the tests before the code." in out
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/acme-index") == 0
+    assert "Acme names follow the ledger." in capsys.readouterr().out
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/index/SKILL.md") == 0
+    assert "Read the shipped file, skills/index/SKILL.md" in capsys.readouterr().out
+    assert run("compare", "--project", grown, "--source", shipped, ".claude/skills/process/SKILL.md", "--diff") == 0
+    assert "+Records go in plans/records." not in capsys.readouterr().out, "the filled token matches the project's line"
+    assert run("compare", "--project", grown, "--source", shipped, "--record") == 0
+    assert "| `.claude/skills/process/SKILL.md` | 3 | | | | | | | |" in capsys.readouterr().out
+    assert run("compare", "--project", grown, "--source", shipped, "no/such/path") == 2
+    assert run("compare", "--project", grown, "--source", shipped, "--diff") == 2
+
+    # A rule moved to a file the project owns is counted as carried.
+    (grown / ".claude/skills/process/project.md").write_text("## Rules\nNever call the billing service in a test.\n")
+    run("compare", "--project", grown, "--source", shipped)
+    capsys.readouterr()
+    run("compare", "--project", grown, "--source", shipped, ".claude/skills/process/SKILL.md")
+    assert "Never call the billing service in a test.   [in .claude/skills/process/project.md]" in capsys.readouterr().out
+
+    # After the apply the old copy under its own name is what the survey still points at.
+    assert apply(shipped, grown, "--adopt") == 0
+    capsys.readouterr()
+    run("survey", "--project", grown, "--source", shipped)
+    out = capsys.readouterr().out
+    assert ".claude/skills/index  (100% of the shipped SKILL.md lines; 0 of 0 other shipped files present)  [synced" in out
+    assert ".claude/skills/acme-index" in out and "[not in .devtools.toml]" in out
+    run("compare", "--project", grown, "--source", shipped)
+    out = capsys.readouterr().out
+    assert "replace" not in out and "old copy .claude/skills/acme-index/SKILL.md" in out
+
+
+def test_an_excluded_file_is_listed_as_kept(shipped, grown, capsys):
+    text = starter(shipped, grown, capsys).replace('"TODO"', "5")
+    text = text.replace('exclude = ["scripts/tool.py"]', 'exclude = ["scripts/tool.py", "SKILL.md"]', 1)
+    text = text.replace('values = { planning_dir = "plans" }\n', '', 1)  # no token is left in that entry
+    (grown / ".devtools.toml").write_text(text)
+    assert run("compare", "--project", grown, "--source", shipped) == 0
+    assert "kept     .claude/skills/process/SKILL.md  excluded: stays as it is" in capsys.readouterr().out

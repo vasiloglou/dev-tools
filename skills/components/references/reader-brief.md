@@ -9,7 +9,7 @@ catalog: one writer merges every reader's proposal.
 - Modules: [paths or folders, about 10,000 lines]
 - Their stubs, with what each imports and what imports it: [scratch file from
   `draft --only <path>`]
-- The generated inventory page: `docs/components/modules/[group].md`
+- The generated inventory page: `docs/components/modules/<group>.md`
 - Read-only: change no file of the project. Write only your proposal file.
 
 ## What to read

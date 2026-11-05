@@ -45,6 +45,25 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
 Rules that belong to one project go in a file that project owns,
 `references/project.md` beside the synced skill. The sync never touches it.
 
+A project that already has its own copies of these skills moves to the shared ones with
+the `adopt-devtools` skill (`skills/adopt-devtools/SKILL.md`, read from this checkout). Two
+commands that write nothing do the looking:
+
+```bash
+python3 path/to/dev-tools/devtools/sync.py survey --project .
+```
+
+```bash
+python3 path/to/dev-tools/devtools/sync.py compare --project .
+```
+
+- `survey` finds the project's copies of what is shipped here, including copies under
+  another name, and `survey --toml` prints a starter `.devtools.toml` that keeps the
+  project's paths.
+- `compare` lists every file an apply would replace and how many of the project's lines
+  are in no shipped file; `compare <path>` prints those lines. The skill decides what
+  happens to each one before anything is overwritten.
+
 See `examples/phase-project.devtools.toml` for a complete project file, and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
 pull request. A new project follows
@@ -63,7 +82,8 @@ runs on 3.9.
 | `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
 | `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, and lists leads for a review. |
-| `devtools/sync.py` | The sync command. |
+| `skills/adopt-devtools/` | How an agent moves an existing project from its own process skills to these, without losing the project's rules. Read from this checkout; never copied into a project. |
+| `devtools/sync.py` | The sync command: `apply`, `check`, and for an existing project `survey` and `compare`. |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
 | `tests/` | Tests for the sync command and for the scripts a project runs after a sync. |
 

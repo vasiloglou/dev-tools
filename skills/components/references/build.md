@@ -11,7 +11,7 @@ them is separate work.
 ## 1. Set up and generate what can be generated
 
 1. Check the settings in `components_index.settings.json` beside the script:
-   `package_dir` is the folder that holds the package (for example `src/myapp`), and
+   `package_dir` is the folder that holds the package (for example `src/<package>`), and
    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`
    is published as a site or scanned by documentation tests, put the index outside it or
@@ -163,7 +163,7 @@ is wrong or the step is reached through a component the flow leaves out.
 
 1. `python3 scripts/components_index.py write`, then
    `python3 scripts/components_index.py --check --strict`: both clean.
-2. Write what you noticed in the code to `docs/components/REVIEW.md`, in the form
+2. Write what you noticed in the code to `REVIEW.md` in `docs/components/`, in the form
    [`review.md`](review.md) step 5 gives: capabilities written twice, modules nothing
    imports, files worth splitting, code with no tests. The groups that
    `python3 scripts/components_index.py review` prints are the starting list. These are

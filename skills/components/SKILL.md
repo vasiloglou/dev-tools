@@ -43,7 +43,7 @@ the main checkout's), because writing and checking read their installed versions
 | no command, or `write` | Validates the catalog, then writes `modules/`, `external/`, `graph.md` and the generated parts of `COMPONENTS.md`, and deletes generated pages it no longer produces. An invalid entry prints the errors, writes nothing and exits 1 |
 | `init` | Writes a starter `COMPONENTS.md` with the entry format; never overwrites one. `write` does the same on its first run in a project that has no catalog |
 | `--check` | Writes nothing. Prints `stale or missing: <path>` for each generated file that differs, plus every validation error; exits 1 if there is any. With `--strict` it also prints `no component: <path>` for each package module that no entry covers and is not in `unassigned-baseline.txt`, and exits 1; use `--check --strict` when closing a phase. Cannot be combined with a command |
-| `search <words> [--limit N] [--explain]` | Ranks subsystems, components, recorded dependency names and modules by the number of query words they share (5 hits by default). Prints `<kind> <id>: <summary>` (a retired component shows its status after the id and, on a tie, comes after the others), a `flow:` line under a subsystem, `no component matched: …` when no component or subsystem matched, and the coverage line. `--explain` adds the matched words after the id (`component fs.scan [file, hidden]: …`), which shows a hit that matched on one common word only |
+| `search <words> [--limit N] [--explain] [--no-cache]` | Ranks subsystems, components, recorded dependency names and modules by the number of query words they share (5 hits by default). Prints `<kind> <id>: <summary>` (a retired component shows its status after the id and, on a tie, comes after the others), a `flow:` line under a subsystem, `no component matched: …` when no component or subsystem matched, and the coverage line. `--explain` adds the matched words after the id (`component fs.scan [file, hidden]: …`), which shows a hit that matched on one common word only |
 | `stats [--write-baseline]` | Prints the coverage line, then each package module no component covers. `--write-baseline` records that list in `unassigned-baseline.txt` and refuses when it holds a module the recorded list did not. Files under a `tests` or `fixtures` folder and files named `fake_*` are not counted as package modules |
 | `list [<area>]` | Prints the ids by area, each with its `does` |
 | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
@@ -56,6 +56,11 @@ The search compares whole words (lower case, stop words dropped, a final "s" rem
 a final "ies" read as "y"), not meanings. A component is matched on its id, `does` and `verbs`; a module on its name,
 docstring summaries and symbol names; a dependency name on its own summary plus the
 `does` and `verbs` of any component that lists it under `external:`.
+
+`search` keeps what it read from each source file in a cache outside the checkout
+(`$XDG_CACHE_HOME/components-index/`, by default under `~/.cache`), and reads a file
+again only when its size or time changed. `--no-cache` reads everything again; the
+result is the same. `write` and `--check` never use the cache.
 
 ## Entry format
 
@@ -234,7 +239,7 @@ index only; it changes no code.
 
 Follow [`references/review.md`](references/review.md). In short: run `review` for the
 leads, reread every entry against its modules, repair the index, and write the code
-changes you would suggest to `docs/components/REVIEW.md`. The review changes no code;
+changes you would suggest to `REVIEW.md` in `docs/components/`. The review changes no code;
 the user decides which suggestions become work.
 
 ## Rules

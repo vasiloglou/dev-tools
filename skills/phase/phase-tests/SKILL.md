@@ -37,7 +37,7 @@ This skill is how you write those tests. `/process-phase` Step 2 calls it, and t
 | Unique basenames | `tests/` has no `__init__.py`, so pytest's default import mode needs every test module basename to be unique across `tests/`. Check with `find tests -name test_<capability>.py` before naming |
 | Helpers | `pNN_helpers.py` in the phase directory (never `helpers.py` or `utils.py`, which would clash between phases) |
 | Fixtures | Define them in `pNN_helpers.py`, re-export from a 1–3 line `conftest.py` (`from p02_helpers import sample_orders  # noqa: F401`) |
-| Test data | `tests/fixtures/` (for example data in `tests/fixtures/data/`, golds in `tests/fixtures/golds/`, cassettes in `tests/fixtures/replay/`) |
+| Test data | `tests/fixtures/` (for example folders named `data/`, `golds/` and `replay/` inside it) |
 | Test names | Behaviour sentences: `test_removing_one_order_changes_the_total` |
 
 ## Rule 3 — Test the public contract

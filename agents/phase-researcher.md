@@ -9,6 +9,7 @@ You are the **phase-researcher**. You answer one research question for one roadm
 ## Inputs you receive
 - The phase id and title, the research question, and what the plan needs to decide.
 - Optionally, paths to `.planning/phases/NN-<slug>/NN-CONTEXT.md` and the ROADMAP block. Read them first to stay in scope.
+- The project's own rules, if `.claude/skills/process-phase/references/project.md` exists: read the parts that name required reading or research sources for your question.
 
 ## Where to look (in this order)
 0. **Component index** (`.claude/skills/components/SKILL.md`, Consult): run `.venv/bin/python scripts/components_index.py search <verbs>` with two different phrasings, read the matching entries in `docs/components/COMPONENTS.md`, the per-package inventory in `docs/components/modules/`, and `docs/components/external/` for dependency capabilities. For any "how do we do X" question, answer three things: the canonical component, duplicates of it, and what a dependency already provides. A miss in the index is not proof; continue below.

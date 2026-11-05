@@ -2,6 +2,7 @@
 index and the phase-selection plugin. Each test works in a new project made by the sync."""
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,7 +63,8 @@ def project(tmp_path):
 
 
 def tool(project, *args, script=".claude/skills/process-phase/scripts/phase_tool.py"):
-    proc = subprocess.run([sys.executable, script, *args], cwd=project, capture_output=True, text=True)
+    env = {**os.environ, "XDG_CACHE_HOME": str(project.parent / "cache")}  # the index search keeps a cache there
+    proc = subprocess.run([sys.executable, script, *args], cwd=project, capture_output=True, text=True, env=env)
     return proc.returncode, proc.stdout + proc.stderr
 
 
@@ -320,6 +322,23 @@ def test_the_baseline_cannot_take_a_new_module_in_exchange_for_an_old_one(projec
     assert "imported by (0): nothing in the package" in out
     out = tool(project, "list", script=INDEX)[1]
     assert "## core (2)" in out and "core.a: Do a" in out
+
+
+def test_search_reads_a_file_again_only_when_it_changed(project):
+    (project / "src/widget/scan.py").write_text('"""Walk a folder."""\ndef walk_folder(path):\n    """List files."""\n')
+    catalog(project, entry("core.scan", "Walk a folder and list its files.", "src/widget/scan.py"))
+    first = tool(project, "search", "walk", "folder", script=INDEX)
+    assert "component core.scan" in first[1] and "module src/widget/scan.py" in first[1]
+    assert list((project.parent / "cache/components-index").glob("*.json")), "the first search saves what it parsed"
+    assert tool(project, "search", "walk", "folder", script=INDEX) == first
+    assert tool(project, "search", "walk", "folder", "--no-cache", script=INDEX) == first
+    # A changed file is read again: the new name is found, and the saved copy is not trusted.
+    (project / "src/widget/scan.py").write_text('"""Walk a folder."""\ndef checksum_everything(path):\n    """Hash."""\n')
+    assert "module src/widget/scan.py" in tool(project, "search", "checksum", "everything", script=INDEX)[1]
+    # A damaged cache file only costs time.
+    for saved in (project.parent / "cache/components-index").glob("*.json"):
+        saved.write_text("not json")
+    assert "module src/widget/scan.py" in tool(project, "search", "checksum", "everything", script=INDEX)[1]
 
 
 def test_scope_check_ignores_the_supervisors_own_files(project):
