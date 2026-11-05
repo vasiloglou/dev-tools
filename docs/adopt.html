@@ -152,7 +152,151 @@ after_apply: python3 scripts/components_index.py write
   </div>
 </div></section>
 
-<section class="band"><div class="wrap narrow">
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>Already have your own process skills?</h2>
+    <p>A project that grew its own process holds two things in one text: the process, which is now shared, and its own rules, which nobody else knows. Overwriting the files would lose the second. So the agent looks first, and decides what happens to every line before anything is replaced.</p>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Look</span>
+      <h3>Find what the project already has</h3>
+      <p>One command reads the project and matches it against what is shared: your copy of a skill, a copy you renamed, a script you keep somewhere else. Your own skills are listed and left alone.</p>
+      <p>It can also write the starting file for you, with every shared piece delivered to the path where you keep yours. Values it cannot know are marked, and nothing runs until they are filled in.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · had it kept its own copies of the skills</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync survey --project .</span>
+dev-tools ships 8 unit(s); 2 have a counterpart in this project.
+
+## Counterparts: the project&#x27;s copy of something dev-tools ships
+skills/components
+  .claude/skills/shelf-index
+      dev-tools names it `components`
+      59% of the shipped SKILL.md lines; 0 of 4 other shipped files present
+      not here: references/build.md, references/reader-brief.md, references/review.md and 1 more
+skills/phase/process-phase
+  .claude/skills/process-phase
+      95% of the shipped SKILL.md lines; 25 of 36 other shipped files present
+      not here: templates/planning/DECISIONS.md, templates/planning/GLOSSARY.md, templates/planning/MANIFESTO.m…
+
+## Shipped files the project keeps outside its copy of the skill
+skills/components/scripts/components_index.py
+  scripts/components_index.py
+
+…
+## The project&#x27;s own skills: no counterpart, the sync never touches them
+.claude/skills/: release-notes
+
+…</pre></div>
+      <p class="caption">Two of its skills are copies of shared ones, one of them under its own name. The script lives in <code>scripts/</code>, and <code>release-notes</code> is its own. The list of shared pieces it does not have is cut.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">Compare</span>
+      <h3>See every line a replacement would drop</h3>
+      <p>Before anything is written, the agent gets the list of files that would be replaced and, for each, the lines that appear in no shared file. Those lines are the whole risk of moving.</p>
+      <p>It reads each one and gives it an outcome:</p>
+      <ul>
+        <li><strong>Stated:</strong> the shared text says the same thing in other words.</li>
+        <li><strong>Carried:</strong> a rule of yours. It moves to <code>project.md</code>, the file you own.</li>
+        <li><strong>Kept file:</strong> a whole file of yours stays, and is left out of the sync.</li>
+        <li><strong>Changed:</strong> the shared text says something different on the same point. Both are written down, and you decide.</li>
+        <li><strong>Gap:</strong> your copy does something the shared one cannot. It is kept and reported.</li>
+        <li><strong>Dropped:</strong> it refers to something that no longer exists. Written down with the reason.</li>
+      </ul>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · before anything is replaced</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync survey --project . --toml &gt; .devtools.toml</span>
+
+<span class="p">$</span> <span class="cmd">grep -n &#x27;= &quot;TODO&quot;&#x27; .devtools.toml</span>
+26:verb_list = &quot;TODO&quot;  # default &quot;all&quot;
+
+<span class="p">$</span> <span class="cmd">devtools-sync compare --project .</span>
+error: skills/components/scripts/components_index.py: still TODO in .devtools.toml: components_index.settings.json: verb_li…
+<span class="dim">exit code 2</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync compare --project .</span>
+…
+replace  .claude/skills/process-phase/SKILL.md  2 line(s) only the project&#x27;s copy has (2 close to a shipped line)
+…
+replace  .claude/skills/process-phase/references/verify.md  5 line(s) only the project&#x27;s copy has
+…
+replace  .claude/skills/process-phase/scripts/phase_tool.py  script or data, 14 line(s) differ: read it with --diff
+…
+old copy .claude/skills/shelf-index/SKILL.md  29 line(s) only the project&#x27;s copy has (13 close to a shipped line)
+
+20 replace, 1 old copy, 15 new, 9 same
+54 line(s) of the project&#x27;s text are in no file the sync delivers (22 close to a shipped line, 0 now in a file the project …
+
+<span class="p">$</span> <span class="cmd">devtools-sync compare --project . .claude/skills/process-phase/references/verify.md</span>
+replace  .claude/skills/process-phase/references/verify.md: 5 line(s) only the project&#x27;s copy has
+  under: # Step 5 — Verify
+     42: and no unapproved blocker remains; otherwise report `gaps_found` or
+     43: `human_needed`. A delegated verifier reports the result to the supervisor and
+     46: ## Shelf rules
+     48: - Time `shelf scan` on the 10,000-file fixture before approving.
+     49: - A changed column order needs a line in `CHANGELOG.md`.</pre></div>
+      <p class="caption">One value could not be read from the project, and nothing runs until it is decided. Then the list: most rows are cut here. In <code>verify.md</code>, two lines are older wording; the heading and the two rules under it exist nowhere else.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Replace</span>
+      <h3>Then replace, clean up, and prove nothing broke</h3>
+      <p>With the rules carried over, the agent applies the sync on a branch, removes the old copies that are left under other names, and runs again everything that passed before it started.</p>
+      <p>You get one change to review, with a record of what happened to each line: what was carried, what was dropped and why, and anything the shared skills cannot do yet.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · after the two rules moved to project.md</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync compare --project . .claude/skills/process-phase/references/verify.md</span>
+replace  .claude/skills/process-phase/references/verify.md: 5 line(s) only the project&#x27;s copy has (2 now in a file the project owns)
+  under: # Step 5 — Verify
+     42: and no unapproved blocker remains; otherwise report `gaps_found` or
+     43: `human_needed`. A delegated verifier reports the result to the supervisor and
+     46: ## Shelf rules
+     48: - Time `shelf scan` on the 10,000-file fixture before approving.   [in .claude/skills/process-phase/references/project.md]
+     49: - A changed column order needs a line in `CHANGELOG.md`.   [in .claude/skills/process-phase/references/project.md]
+
+<span class="p">$</span> <span class="cmd">devtools-sync apply --project . --adopt</span>
+<span class="ok">applied: {&quot;create&quot;: 15, &quot;keep&quot;: 9, &quot;update&quot;: 20}</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+<span class="ok">44 managed file(s), 0 problem(s)</span>
+
+<span class="p">$</span> <span class="cmd">git rm -rq .claude/skills/shelf-index &amp;&amp; git add -A &amp;&amp; devtools-sync survey --project .</span>
+dev-tools ships 8 unit(s); 2 have a counterpart in this project.
+
+## Counterparts: the project&#x27;s copy of something dev-tools ships
+skills/components
+  .claude/skills/components  [synced]
+      100% of the shipped SKILL.md lines; 3 of 4 other shipped files present
+      not here: scripts/components_index.py
+skills/phase/process-phase
+  .claude/skills/process-phase  [synced]
+      100% of the shipped SKILL.md lines; 36 of 36 other shipped files present
+
+## Shipped files the project keeps outside its copy of the skill
+skills/components/scripts/components_index.py
+  scripts/components_index.py  [synced]
+
+…</pre></div>
+      <p class="caption">The comparison now shows where each rule went. The files are replaced, the old copy under its own name is removed, and the survey reports both skills as synced.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>Tried on real code.</strong> Agents moved two real projects in throwaway copies: one that works in phases (three skills, five helper agents and a script), twice, and one that works in milestones and keeps every skill in two agent folders.</p>
+    <p>Each had 450 to 700 lines of its own in the files to be replaced. About 200 of them were project rules and were carried into <code>project.md</code>; whole files of the project&#39;s own were kept; differences that needed a decision were put to the owner as questions.</p>
+    <p>The first run broke seven of the project&#39;s tests. The causes were in the shared files and are fixed. In the other two runs the same tests passed before and after. The three runs also logged 63 defects in the guide and its commands; most are fixed.</p>
+  </div>
+</div></section>
+
+<section><div class="wrap narrow">
   <h2>For a project already in flight</h2>
   <p>Nothing has to be migrated at once.</p>
   <ul>
