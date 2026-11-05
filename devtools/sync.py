@@ -482,19 +482,22 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
         lines.append(unit["source"])
         name = Path(unit["source"]).name
         for hit in result["found"][unit["source"]]:
-            if unit["kind"] == "skill":
-                note = f"{round(100 * hit['share'])}% of the shipped SKILL.md lines; {hit['present']} of {hit['of']} other shipped files present"
-                if hit["missing"]:
-                    more = f" and {len(hit['missing']) - 4} more" if len(hit["missing"]) > 4 else ""
-                    note += f", not here: {', '.join(hit['missing'][:4])}{more}"
-                if not hit["same_name"]:
-                    note += f"; dev-tools names it `{name}`"
-            elif unit["kind"] == "agents":
-                note = f"{hit['present']} of {hit['of']} shipped files present"
-            else:
-                same = (project / hit["path"]).read_bytes() == (source_root / unit["source"]).read_bytes()
-                note = "identical" if same else "differs"
-            lines.append(f"  {hit['path']}  ({note}){state(hit['path'])}")
+            if unit["kind"] != "skill":
+                if unit["kind"] == "agents":
+                    note = f"{hit['present']} of {hit['of']} shipped files present"
+                else:
+                    same = (project / hit["path"]).read_bytes() == (source_root / unit["source"]).read_bytes()
+                    note = "identical" if same else "differs"
+                lines.append(f"  {hit['path']}  ({note}){state(hit['path'])}")
+                continue
+            lines.append(f"  {hit['path']}{state(hit['path'])}")
+            if not hit["same_name"]:
+                lines.append(f"      dev-tools names it `{name}`")
+            lines.append(f"      {round(100 * hit['share'])}% of the shipped SKILL.md lines; "
+                         f"{hit['present']} of {hit['of']} other shipped files present")
+            if hit["missing"]:
+                more = f" and {len(hit['missing']) - 3} more" if len(hit["missing"]) > 3 else ""
+                lines.append(f"      not here: {', '.join(hit['missing'][:3])}{more}")
     if not have:
         lines.append("(none)")
     if result["apart"]:

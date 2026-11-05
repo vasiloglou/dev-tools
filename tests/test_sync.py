@@ -288,10 +288,10 @@ def test_survey_finds_copies_renamed_copies_and_the_projects_own_skills(shipped,
     out = capsys.readouterr().out
     counterparts, rest = out.split("## The project's own skills")
     rest, search = rest.split("## To find what reads these copies")
-    assert ".claude/skills/process  (80% of the shipped SKILL.md lines; 0 of 1 other shipped files present, " \
-           "not here: scripts/tool.py)" in counterparts
-    assert ".codex/skills/process  (80%" in counterparts
-    assert ".claude/skills/acme-index" in counterparts and "dev-tools names it `index`" in counterparts
+    assert "  .claude/skills/process\n      80% of the shipped SKILL.md lines; 0 of 1 other shipped files present\n" \
+           "      not here: scripts/tool.py" in counterparts
+    assert "  .codex/skills/process\n      80%" in counterparts
+    assert "  .claude/skills/acme-index\n      dev-tools names it `index`" in counterparts
     assert ".claude/agents  (1 of 1 shipped files present)" in counterparts
     assert "skills/flow/process/scripts/tool.py\n  tools/tool.py" in counterparts
     assert "deploy" in rest and "acme-index" not in rest
@@ -366,7 +366,7 @@ def test_compare_shows_the_lines_a_replacement_would_drop(shipped, grown, capsys
     capsys.readouterr()
     run("survey", "--project", grown, "--source", shipped)
     out = capsys.readouterr().out
-    assert ".claude/skills/index  (100% of the shipped SKILL.md lines; 0 of 0 other shipped files present)  [synced" in out
+    assert "  .claude/skills/index  [synced" in out
     assert "[the old copy that .devtools.toml names under replaces]" in out
     run("compare", "--project", grown, "--source", shipped)
     out = capsys.readouterr().out
