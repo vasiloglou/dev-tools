@@ -186,3 +186,37 @@ def test_failing_after_apply_is_reported(source, project):
 def test_unknown_top_level_key_is_an_error(source, project):
     (project / ".devtools.toml").write_text('surprise = 1\n' + CONFIG)
     assert apply(source, project) == 2
+
+
+TOKENS = """
+[[sync]]
+source = "skills/demo"
+dest = ".claude/skills/demo"
+values = { planning_dir = ".plans" }
+
+[[sync]]
+source = "skills/demo"
+dest = ".codex/skills/demo"
+values = { planning_dir = ".plans" }
+"""
+
+
+def test_values_fill_tokens_and_one_source_can_land_in_two_places(source, project):
+    (source / "skills/demo/SKILL.md").write_text("records go in {{devtools:planning_dir}}/milestones\n")
+    (project / ".devtools.toml").write_text(TOKENS)
+    assert apply(source, project) == 0
+    for runtime in (".claude", ".codex"):
+        assert (project / runtime / "skills/demo/SKILL.md").read_text() == "records go in .plans/milestones\n"
+    assert run("check", "--project", project) == 0
+    assert apply(source, project) == 0
+
+
+def test_token_without_a_value_is_an_error(source, project):
+    (source / "skills/demo/SKILL.md").write_text("records go in {{devtools:planning_dir}}\n")
+    assert apply(source, project) == 2
+    assert not (project / ".claude").exists()
+
+
+def test_value_that_matches_no_token_is_an_error(source, project):
+    (project / ".devtools.toml").write_text(TOKENS)
+    assert apply(source, project) == 2

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Start Milestone"
+  short_description: "Plan milestones with phases and measurable gates"
+  default_prompt: "Use $start-milestone to prepare or resume the <milestone> milestone plan."

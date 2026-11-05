@@ -1,0 +1,4 @@
+interface:
+  display_name: "Process Milestone"
+  short_description: "Execute milestones with optional delegated approval"
+  default_prompt: "Use $process-milestone to execute <milestone> auto=true through its required gates."

@@ -7,6 +7,7 @@ Prototype. The project lists what it takes in ``.devtools.toml``::
     source = "skills/phase/process-phase"          # path in this repository (file or directory)
     dest = ".claude/skills/process-phase"          # path in the project
     exclude = ["scripts/gates.json"]               # optional: files in a directory the project keeps as its own
+    values = { planning_dir = ".planning" }        # optional: fills {{devtools:planning_dir}} in shipped text
     [sync.settings."scripts/phase_tool.settings.json"]   # written inside dest (beside dest for a file)
     planning_dir = ".planning"
 
@@ -26,6 +27,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shlex
 import stat
 import subprocess
@@ -39,6 +41,7 @@ CONFIG = ".devtools.toml"
 RECEIPT = ".devtools-receipt.json"
 JOURNAL = ".devtools-sync.journal"
 SKIP_DIRS = {"__pycache__"}
+TOKEN = re.compile(r"\{\{devtools:([a-z_]+)\}\}")
 
 
 class SyncError(Exception):
@@ -56,6 +59,20 @@ def inside(root: Path, relative: str) -> Path:
     if Path(relative).is_absolute() or ".." in Path(relative).parts:
         raise SyncError(f"path must be relative and stay inside {root}: {relative!r}")
     return root / relative
+
+
+def fill_tokens(data: bytes, values: dict, origin: str, used: set) -> bytes:
+    """Replace ``{{devtools:<key>}}`` in text files with the project's value; a missing value is an error."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data
+    keys = set(TOKEN.findall(text))
+    missing = sorted(keys - set(values))
+    if missing:
+        raise SyncError(f"{origin} needs values for: {', '.join(missing)}")
+    used |= keys
+    return TOKEN.sub(lambda match: str(values[match.group(1)]), text).encode("utf-8") if keys else data
 
 
 def read_config(project: Path) -> dict:
@@ -80,16 +97,18 @@ def desired_files(source_root: Path, config: dict, project: Path) -> dict[str, d
         files[dest] = {"data": data, "mode": mode, "origin": origin}
 
     for entry in config.get("sync", []):
-        unknown = sorted(set(entry) - {"source", "dest", "settings", "exclude"})
+        unknown = sorted(set(entry) - {"source", "dest", "settings", "exclude", "values"})
         if unknown or "source" not in entry or "dest" not in entry:
             raise SyncError(f"[[sync]] needs source and dest; unknown keys: {unknown}")
         source = inside(source_root, entry["source"])
         dest = entry["dest"].rstrip("/")
         exclude = set(entry.get("exclude", []))
+        values, used = entry.get("values", {}), set()
         if source.is_file():
             if exclude:
                 raise SyncError(f"exclude applies to a directory source, not {entry['source']}")
-            add(dest, source.read_bytes(), stat.S_IMODE(source.stat().st_mode), entry["source"])
+            add(dest, fill_tokens(source.read_bytes(), values, entry["source"], used),
+                stat.S_IMODE(source.stat().st_mode), entry["source"])
             settings_base = Path(dest).parent
         elif source.is_dir():
             for path in sorted(p for p in source.rglob("*") if p.is_file() and not SKIP_DIRS & set(p.parts)):
@@ -97,13 +116,15 @@ def desired_files(source_root: Path, config: dict, project: Path) -> dict[str, d
                 if relative in exclude:
                     exclude.discard(relative)
                     continue
-                add(f"{dest}/{relative}", path.read_bytes(), stat.S_IMODE(path.stat().st_mode),
-                    f"{entry['source']}/{relative}")
+                add(f"{dest}/{relative}", fill_tokens(path.read_bytes(), values, f"{entry['source']}/{relative}", used),
+                    stat.S_IMODE(path.stat().st_mode), f"{entry['source']}/{relative}")
             settings_base = Path(dest)
             if exclude:
                 raise SyncError(f"exclude names files that {entry['source']} does not ship: {sorted(exclude)}")
         else:
             raise SyncError(f"source not found in dev-tools: {entry['source']}")
+        if set(values) - used:
+            raise SyncError(f"{entry['source']} has no token for values: {sorted(set(values) - used)}")
         for name, values in entry.get("settings", {}).items():
             data = (json.dumps(values, indent=2, sort_keys=True) + "\n").encode("utf-8")
             add((settings_base / name).as_posix(), data, 0o644, "settings")
