@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Add it to your project · dev-tools</title>
+<meta name="description" content="How a project takes the shared skills: one small file, one command, and nothing to install.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html" aria-current="page">Add it to your project</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Add it to your project</p>
+  <h1>One small file, one command, nothing to install.</h1>
+  <p class="lede">The skills live in one place. Each project that uses them holds its own copy, checked in beside its code. You choose what to take, the copy is made for you, and a later update never silently overwrites something you changed.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Why a copy, and not a package</h2>
+    <p>Skills are instructions an agent reads from your repository. A copy that is checked in means every teammate, every agent and every automated run sees exactly the same process, with no install step and no version to resolve. A contributor who cannot reach this repository can still work on yours.</p>
+  </div>
+  <div class="grid">
+    <div class="card"><h3>Nothing to install</h3><p>The skills are text files and a few small scripts. They run with what the project already has.</p></div>
+    <div class="card"><h3>Your layout stays</h3><p>Files land at the paths your project already uses. A project in mid-flight keeps its folders, its branch names and its history.</p></div>
+    <div class="card"><h3>Changes are visible</h3><p>An update to the process arrives as an ordinary change you can read and review before it is merged.</p></div>
+    <div class="card"><h3>Both agents, one source</h3><p>The same skill is copied for Claude Code and for Codex, byte for byte, so the two never drift apart.</p></div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head"><h2>Three steps</h2></div>
+  <ol class="steps from1">
+    <li>
+      <h3>Say what you want</h3>
+      <div class="two">
+        <div>
+          <p>Add a file named <code>.devtools.toml</code> to the root of your project. Each entry names one thing to take and where it goes. The settings underneath are your project's own values: where planning files live, where tests live, how branches are named.</p>
+          <p>To serve both agents, list the same skill twice with two destinations.</p>
+        </div>
+        <div>
+<pre class="code"><span class="dim"># .devtools.toml</span>
+<span class="k">[[sync]]</span>
+source = "skills/phase/process-phase"
+dest   = ".claude/skills/process-phase"
+
+<span class="k">[sync.settings."scripts/phase_tool.settings.json"]</span>
+planning_dir   = ".planning"
+acceptance_dir = "tests/acceptance"
+package_prefix = "shelf"
+branch_prefix  = "phase/"
+
+<span class="k">[[sync]]</span>
+source = "skills/components/scripts/components_index.py"
+dest   = "scripts/components_index.py"</pre>
+          <p class="caption">Shortened. The repository has a complete example file.</p>
+        </div>
+      </div>
+    </li>
+    <li>
+      <h3>Run the sync</h3>
+      <div class="two">
+        <div>
+          <p>One command copies the files and writes a receipt that lists every file it manages, with a fingerprint of each. Nothing is written unless everything can be written.</p>
+          <p>A second command checks, at any time, that the copies are still what was delivered. It needs only your project, so it can run in your automated checks.</p>
+        </div>
+        <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · first sync</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+<span class="ok">applied: {&quot;create&quot;: 29}</span>
+after_apply: python3 scripts/components_index.py write
+
+<span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+<span class="ok">29 managed file(s), 0 problem(s)</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+<span class="ok">applied: {&quot;keep&quot;: 29}</span></pre></div>
+      <p class="caption">29 files copied, then checked. Running it again changes nothing.</p>
+        </div>
+      </div>
+    </li>
+    <li>
+      <h3>Add your own rules, then commit</h3>
+      <div class="two">
+        <div>
+          <p>The shared skills are written to know nothing about your product. What is specific to you goes in one file that you own and the sync never touches: <code>references/project.md</code>, beside the skill.</p>
+          <p>Typical contents: the command that runs your tests, the rules that must never be broken, extra checks before a release, the reviewer you use. The agent reads it first, and it wins on anything project-specific.</p>
+        </div>
+        <div>
+<pre class="code"><span class="dim"># .claude/skills/process-phase/references/project.md</span>
+
+## Commands
+- Tests for one phase: `pytest tests --phase NN`
+- Full suite: `pytest -q`
+
+## Rules that must never break
+- The export format is frozen; a change needs a decision record.
+- No network access in tests.
+
+## Before a release
+- Run the packaging check.</pre>
+          <p class="caption">An example of a project-owned rules file.</p>
+        </div>
+      </div>
+    </li>
+  </ol>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Updates that respect your changes</h2>
+    <p>When the shared skills improve, run the sync again. Files you have not touched are updated. A file you edited by hand is reported, and the whole update stops until you decide.</p>
+  </div>
+  <div class="two">
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a synced file was edited by hand</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">echo &#x27;Skip the full run when in a hurry.&#x27; &gt;&gt; .claude/skills/process-phase/references/verify.md</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+<span class="bad">.claude/skills/process-phase/references/verify.md: differs from the receipt</span>
+<span class="bad">29 managed file(s), 1 problem(s)</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+<span class="bad">refused: .claude/skills/process-phase/references/verify.md (needs --force)</span>
+<span class="bad">nothing written; 1 file(s) refused</span>
+<span class="dim">exit code 3</span></pre></div>
+      <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it.</p>
+    </div>
+    <div>
+      <div class="table-scroll"><table>
+        <tr><th>Situation</th><th>What the sync does</th></tr>
+        <tr><td>File unchanged since last sync</td><td>Updates it</td></tr>
+        <tr><td>You edited a synced file</td><td>Stops and names the file. Nothing is written until you choose to overwrite</td></tr>
+        <tr><td>A file already exists that it does not manage</td><td>Stops. You confirm before it takes the file over</td></tr>
+        <tr><td>You want to keep your own version of one file</td><td>List it under <code>exclude</code>; it stays yours</td></tr>
+        <tr><td>You added files beside the synced ones</td><td>Leaves them alone</td></tr>
+        <tr><td>A file was removed upstream</td><td>Removes your copy only if you had not changed it</td></tr>
+        <tr><td>Something must be rebuilt after an update</td><td>Runs the commands you listed, only when a file actually changed</td></tr>
+      </table></div>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap narrow">
+  <h2>For a project already in flight</h2>
+  <p>Nothing has to be migrated at once.</p>
+  <ul>
+    <li><strong>Keep your paths.</strong> The destination and the settings are yours; the skills adapt to your folders, not the other way round.</li>
+    <li><strong>Take one piece.</strong> Start with the component index alone, or one workflow, and add the rest later.</li>
+    <li><strong>Keep what you have customised.</strong> Exclude the files you want to stay yours and move your project-specific rules into <code>project.md</code> over time.</li>
+    <li><strong>Stay with your workflow.</strong> A project built around phases keeps phases; one built around milestones keeps milestones.</li>
+  </ul>
+  <h2>What is not packaged yet</h2>
+  <p>Honest limits of the prototype:</p>
+  <ul>
+    <li><strong>Starting from an empty project.</strong> The phase workflow expects a planning folder with a roadmap, a state file and a handful of companion files. Nothing creates them for you yet; the demo project wrote them by hand from the format reference that ships with the skill.</li>
+    <li><strong>The component index</strong> needs its catalog file to exist before the first run.</li>
+    <li><strong>Selecting one phase's tests</strong> uses a small test-runner hook that each project currently supplies itself.</li>
+  </ul>
+  <div class="next">
+    <a class="btn primary" href="phase.html">See the phase workflow</a>
+    <a class="btn" href="milestone.html">See the milestone workflow</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>

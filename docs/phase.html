@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The phase workflow · dev-tools</title>
+<meta name="description" content="How a roadmap phase runs with dev-tools: seven steps, tests locked before code, and your approval at the points that matter.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="phase.html" aria-current="page">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Phase workflow</p>
+  <h1>One command runs a phase. Seven steps keep it honest.</h1>
+  <p class="lede">You keep a roadmap of phases. You tell the agent which one to run. It works through the same seven steps every time, stops for your approval at four of them, and cannot move on until the step before is really done.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="two">
+    <div>
+      <h2>What you type</h2>
+      <div class="chat">
+        <div class="turn you"><div class="who">You</div><div><p class="say">/process-phase 3</p></div></div>
+        <div class="turn"><div class="who">Agent</div><div>
+          <p>Phase 3, <em>Size report</em>, has not started. It depends on phase 1, which is complete. Phase 2 is independent of it, so starting 3 first is fine.</p>
+          <p>The component index already has <code>humanize_bytes</code> in <code>shelf.units</code>, so the report can reuse it. I have three questions about scope before I write anything.</p>
+          <p><span class="stop">waits for you</span></p>
+        </div></div>
+      </div>
+      <p class="caption">Illustration of a session's opening, using the demo project from the captures on this site.</p>
+    </div>
+    <div>
+      <h2>Other ways to start</h2>
+      <div class="table-scroll"><table>
+        <tr><th>You type</th><th>What happens</th></tr>
+        <tr><td><code>/process-phase next</code></td><td>The agent reads the project state and picks up where the last session stopped.</td></tr>
+        <tr><td><code>/process-phase 3 --step plan</code></td><td>Jumps to one step of a phase, if the earlier steps are done.</td></tr>
+        <tr><td><code>/process-phase 3 --mode fast</code></td><td>Asks all its scope questions in one batch instead of several.</td></tr>
+        <tr><td><code>/process-phase 2.1</code></td><td>Runs a phase that was inserted between 2 and 3 later on.</td></tr>
+      </table></div>
+      <p class="caption">The skill only runs when you invoke it. It never starts a phase because a conversation happened to mention one.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>The seven steps</h2>
+    <p>Each step needs the one before it and leaves a named file behind. A marked step ends with a stop: the agent shows you what it produced and waits.</p>
+  </div>
+  <ol class="steps narrow">
+    <li>
+      <h3>Orient</h3>
+      <p>The agent reads where the project stands: the roadmap entry for this phase, the decisions and lessons recorded so far, and your project's own rules. It switches to the phase's branch and resumes unfinished work instead of starting over.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> nothing. It only reads.</p>
+    </li>
+    <li>
+      <h3>Discuss <span class="gate">you approve</span></h3>
+      <p>The agent finds the choices the roadmap left open and asks you about them in small batches, each with a recommendation. Then it tries the idea by hand before anyone commits to it: it sets a measurable target, takes a baseline on real data, runs a prototype with a time limit (two hours by default), and gives each goal a verdict of <strong>Go</strong>, <strong>Pivot</strong> or <strong>Kill</strong>.</p>
+      <p>A goal that did not hold up is dropped here, before tests or code exist for it.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> the phase context (your decisions, each marked locked, deferred or left to the implementer) and the prototype report with its verdicts.</p>
+    </li>
+    <li>
+      <h3>Specify <span class="gate">you approve</span></h3>
+      <p>The agent writes acceptance tests for the targets that held, and runs them to confirm they fail for the right reason. Then the tests are <strong>locked</strong>: a fingerprint of every test file is recorded. From here on, a change to a locked test is detected, and only your recorded decision can re-lock it.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> the acceptance tests, the record of their failing run, and the lock file.</p>
+    </li>
+    <li>
+      <h3>Plan <span class="gate">you approve</span></h3>
+      <p>Before planning new code, the agent searches the <a href="components.html">component index</a> for every capability the phase needs and writes down what it found. Each task in the plan names the tests it turns green and the files it may touch.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> one or more plans, each with a Reuse section.</p>
+    </li>
+    <li>
+      <h3>Implement</h3>
+      <p>The agent supervises; a separate coding agent writes the code, one failing test at a time. Each round is checked before it is accepted: a round that touched a file outside its list, or changed a locked test, is rejected whole. Independent tasks can run side by side in separate working copies.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> the code, one commit per task, and a short summary of what was done and what deviated from the plan.</p>
+    </li>
+    <li>
+      <h3>Verify</h3>
+      <p>The full test suite runs <strong>once</strong>, on the finished code. Results from earlier focused runs are reused, not repeated. A gap is a real failing test or an unmet exit criterion, and it sends the phase back to planning for that gap only.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> the verification report and the log of the full run.</p>
+    </li>
+    <li>
+      <h3>Close <span class="gate">you approve</span></h3>
+      <p>The agent records the lessons, updates the component index with any new code, and marks the phase complete. Merging to your base branch and releasing stay your decisions.</p>
+      <p class="leaves"><strong>Leaves behind:</strong> an updated roadmap and project state, ready for the next session, which may be a different agent on a different day.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>A real phase, start to finish</h2>
+    <p>Phase 3 of the demo project: make <code>shelf report</code> print each file with a readable size, largest first. These four pieces are taken from the files and runs that phase produced.</p>
+  </div>
+  <div class="two">
+    <div>
+      <h3 style="margin-top:0">Discuss: try it before committing to it</h3>
+<pre class="code"><span class="dim"># 03-EVIDENCE/prove.md (excerpts)</span>
+
+<span class="k">## 2. Baseline on the real asset</span>
+  - G1: 57 of 57 files wrong (raw byte counts, no unit)
+  - G2: 27 pairs out of order (sorted by path, not by size)
+
+<span class="k">## 3. Timeboxed prototype</span>
+- Timebox 2 hours; used a few minutes: two throwaway scripts and one run.
+  - G1: 0 of 57 files wrong — **Go**
+  - G2: 0 pairs out of order — **Go**</pre>
+      <p class="caption">Two goals, each with a number. Measured before, measured again with a 13-line throwaway script, and given a verdict.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Specify: tests that fail for the right reason</h3>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the acceptance tests before any code</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">.venv/bin/pytest --phase 03 -q -p no:cacheprovider --tb=no</span>
+FFFFFF.                                                                  [100%]
+=========================== short test summary info ============================
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_every_file_is_printed_once_with_a_human_readable_size</span>
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_largest_file_first_and_equal_sizes_by_path</span>
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_a_file_line_is_size_tab_path</span>
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_last_line_is_the_total</span>
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_an_empty_folder_prints_only_the_total</span>
+<span class="bad">FAILED tests/acceptance/p03_size_report/test_report_cli.py::test_a_missing_folder_exits_1</span>
+<span class="bad">6 failed, 1 passed, 15 deselected in 0.03s</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool testlock --phase 03 --write</span>
+<span class="ok">phase_tool.testlock: ok</span>
+phase: 03
+…
+lock: .planning/phases/03-size-report/03-TESTLOCK.json
+fixtures: {}
+relock: None</pre></div>
+      <p class="caption">Six tests fail because the command does not exist yet. Then the three test files are locked.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Plan: what already exists</h3>
+<pre class="code"><span class="dim"># 03-01-PLAN.md (excerpt, search phrases shortened)</span>
+
+<span class="k">## Reuse</span>
+
+searched: "human readable size", "walk a folder", "sort rows largest first", "build report rows", "add a sub-command"
+reuse: fs.scan, format.sizes, cli.commands (adapt: one more sub-command)
+new_component: report.rows because no component orders file entries by size or pairs each with its formatted size</pre>
+      <p class="caption">Three existing components reused, one new one justified. This is in front of you when you approve the plan.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">The result</h3>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the new command</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">.venv/bin/shelf report sample</span>
+2.5 MB	photos/holiday.raw
+48.2 kB	photos/thumb.jpg
+1.5 kB	notes/todo.txt
+5 B	notes/shopping.txt
+0 B	empty.log
+5 files, 2.5 MB
+
+<span class="p">$</span> <span class="cmd">.venv/bin/shelf report no-such-folder</span>
+shelf: not a folder: no-such-folder
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">What phase 3 delivered, run on a small sample folder.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>What stops an agent from cutting corners</h2>
+    <p>The steps are enforced by a small state tool that ships with the skill. The agent calls it for every transition; it refuses when the work is not there. These are captures from the demo project.</p>
+  </div>
+
+  <div class="feature">
+    <div>
+      <h3>It cannot skip ahead</h3>
+      <p>A phase that has not been discussed cannot be marked implemented, and it cannot be closed before it is verified. The tool names the only move that is allowed.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · trying to skip ahead</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool status --brief</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 03
+phase_status: not_started
+active_step: None
+next_step: discuss
+
+<span class="p">$</span> <span class="cmd">phase-tool advance --to implemented</span>
+<span class="bad">phase_tool.advance: FAILED</span>
+<span class="bad">error INVALID_TRANSITION: not_started -&gt; implemented is not allowed</span>
+<span class="warn">hint: allowed: context_approved</span>
+phase: 03
+from: not_started
+to: implemented
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool complete --phase 03</span>
+<span class="bad">phase_tool.complete: FAILED</span>
+<span class="bad">error NOT_VERIFIED: phase 03 must be the current phase with status verified</span>
+<span class="warn">hint: run the Verify step and advance --to verified first</span>
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">The phase has not started. Marking it implemented, or closing it, is refused.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <h3>It cannot bend a test to pass</h3>
+      <p>Once tests are approved, their contents are fingerprinted. Here one assertion is weakened from an exact value to "ends with MB". The check names the file, and the plan cannot be approved until it is put back. Changing a locked test takes a decision you approve, recorded with an id, in its own commit.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a locked test is changed</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git diff -U0 tests/acceptance/p03_size_report/test_report_cli.py | tail -3</span>
+@@ -32 +32 @@ def test_last_line_is_the_total(sample_tree, capsys):
+<span class="bad">-    assert total == &quot;5 files, 12.0 MB&quot;</span>
++    assert total.endswith(&quot;MB&quot;)
+
+<span class="p">$</span> <span class="cmd">phase-tool check --testlock 03</span>
+<span class="bad">phase_tool.check: FAILED</span>
+<span class="bad">error CHECK_FAILED: 1 issue(s) found</span>
+<span class="warn">hint: fix the listed issues</span>
+checks: [&quot;testlock&quot;]
+<span class="bad">- tests/acceptance/p03_size_report/test_report_cli.py:0 [testlock] locked test modified</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">git checkout -- tests/acceptance/p03_size_report/test_report_cli.py</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool check --testlock 03</span>
+<span class="ok">phase_tool.check: ok</span>
+checks: [&quot;testlock&quot;]</pre></div>
+      <p class="caption">An assertion is weakened, the check fails and names the file; the file is restored and the check passes.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <h3>It always knows where it is</h3>
+      <p>The current phase, the current step and the files still missing live in the repository, not in the agent's memory. A new session, or a different agent, reads the same state and continues. Here the plan is approved and the tool lists what must exist before the work can be called implemented.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · where the phase stands</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool status --phase 03</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 03
+phase_status: plan_approved
+active_step: implement
+next_step: implement
+completed_phases: [&quot;00&quot;, &quot;01&quot;]
+…
+phase_title: Size report
+…
+branch: phase/03-size-report
+…
+
+<span class="p">$</span> <span class="cmd">phase-tool advance --to implemented</span>
+<span class="bad">phase_tool.advance: FAILED</span>
+<span class="bad">error GATE_BLOCKED: plan_approved -&gt; implemented blocked by 2 unmet prerequisite(s)</span>
+<span class="warn">hint: produce the artifacts in the right step; missing artifacts (only) may be waived with --override DEC-NNN after a human-approved DEC</span>
+phase: 03
+from: plan_approved
+to: implemented
+problems: [&quot;parity: missing 03-EVIDENCE/parity/G1.md&quot;, &quot;missing artifact: 03-MM-SUMMARY.md&quot;]
+hard: [&quot;parity: missing 03-EVIDENCE/parity/G1.md&quot;]
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">The state names the phase, its status and the step in progress. Moving on is blocked until two named files exist.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <h3>A coding round that strays is rejected</h3>
+      <p>During Implement, each round of the coding agent gets a list of files it may touch and a size limit. A check runs after every round. Here the first round is too large and leaves files outside its list; later, a round that edits a locked test is caught the same way. A rejected round is thrown away, not patched up.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · checking a coding round</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">scope-check --allow src/shelf/report.py --allow &#x27;tests/unit/shelf/*&#x27; --max-added 60</span>
+outside allowlist: .planning/phases/03-size-report/03-EVIDENCE/briefs/03-01-T1-1.md
+outside allowlist: .planning/phases/03-size-report/03-EVIDENCE/runs/03-01-T1-green.txt
+outside allowlist: .planning/phases/03-size-report/03-EVIDENCE/runs/03-01-T1-red.txt
+added 76 lines exceeds max-added 60
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">scope-check --allow src/shelf/report.py --allow &#x27;tests/unit/shelf/*&#x27; --allow &#x27;.planning/phases/03-size-report/03-EVIDENCE/*&#x27; --max-added 100</span>
+outside allowlist: tests/acceptance/p03_size_report/test_report_cli.py
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">First: files outside the allowed list, and 76 added lines against a limit of 60. Second: a locked test was edited.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Phases do not have to run in order</h2>
+    <p>The roadmap numbers phases, but only the <em>depends on</em> line of each phase decides what can start. Two phases that depend on the same finished phase are independent, and either can go first. Starting out of numeric order takes a one-line decision on record, so the choice is visible later.</p>
+  </div>
+  <div class="two">
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · starting phase 3 before phase 2</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool activate --phase 3 --dec DEC-002</span>
+<span class="bad">phase_tool.activate: FAILED</span>
+<span class="bad">error UNKNOWN_DEC: DEC-002 is not a row in .planning/DECISIONS.md</span>
+<span class="warn">hint: write the DEC row (reason, human approval) before using it</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool activate --phase 4 --dec DEC-002</span>
+<span class="bad">phase_tool.activate: FAILED</span>
+<span class="bad">error NOT_ACTIVATABLE: phase 04 has incomplete dependencies</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool activate --phase 3 --dec DEC-002</span>
+<span class="ok">phase_tool.activate: ok</span>
+phase: 03
+dec: DEC-002
+phase_status: not_started</pre></div>
+      <p class="caption">First try: the decision is not on record yet. Phase 4 is refused because it depends on unfinished work. Phase 3 starts once the decision is written down.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · after phase 3 closed</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool status --phase 03</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 03
+phase_status: complete
+active_step: None
+next_step: orient
+completed_phases: [&quot;00&quot;, &quot;01&quot;, &quot;03&quot;]
+…
+phase_title: Size report
+…
+branch: develop
+…
+
+<span class="p">$</span> <span class="cmd">phase-tool status --phase next --brief</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 02
+phase_status: not_started
+active_step: None
+next_step: discuss</pre></div>
+      <p class="caption">Phases 0, 1 and 3 are complete; phase 2 was never started. Asked what comes next, the tool answers phase 2.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>What a finished phase leaves in your repository</h2>
+    <p>Everything is a plain file under version control. Six months later you can read why a decision was made, which tests were agreed, and what the full run printed.</p>
+  </div>
+  <div class="two">
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · files left by phase 3</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">find .planning/phases/03-size-report tests/acceptance/p03_size_report -type f -not -path &#x27;*/__pycache__/*&#x27; | sort</span>
+.planning/phases/03-size-report/03-01-PLAN.md
+.planning/phases/03-size-report/03-01-SUMMARY.md
+.planning/phases/03-size-report/03-CONTEXT.md
+.planning/phases/03-size-report/03-DEFERRED.md
+.planning/phases/03-size-report/03-DISCUSSION-LOG.md
+…
+.planning/phases/03-size-report/03-EVIDENCE/prove.md
+.planning/phases/03-size-report/03-EVIDENCE/red.txt
+…
+.planning/phases/03-size-report/03-EVIDENCE/runs/pytest.txt
+.planning/phases/03-size-report/03-EVIDENCE/runs/reuse-search.txt
+.planning/phases/03-size-report/03-TESTLOCK.json
+.planning/phases/03-size-report/03-TESTS.md
+.planning/phases/03-size-report/03-VERIFICATION.md
+tests/acceptance/p03_size_report/conftest.py
+tests/acceptance/p03_size_report/p03_helpers.py
+tests/acceptance/p03_size_report/test_report_cli.py</pre></div>
+      <p class="caption">The decisions, the prototype report, the locked tests and their failing run, the plan, the summary and the verification. The saved run outputs are shortened here to four of 28.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · git log, phase 3</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git log --oneline</span>
+9c918d7 docs(03): complete phase — shelf report prints human-readable sizes
+8b4d694 docs(03): verification (verified)
+032f88b docs(03-01): summary
+cef29fa feat(03-01): report sub-command
+fbf96b3 feat(03-01): report rows
+ace2f59 docs(03): plan phase (1 plans)
+13a1ccf test(03): acceptance tests (red)
+0b6f0e9 docs(03): capture phase context
+…</pre></div>
+      <p class="caption">One phase as the repository recorded it. Read from the bottom: decisions, failing tests, plan, code, verification, close.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap narrow">
+  <h2>Testing without ceremony</h2>
+  <p>A process that reruns everything at every step gets abandoned. This one has a written policy against that:</p>
+  <ul>
+    <li><strong>Focused tests while working.</strong> One failing test, the smallest fix, then that test and its neighbours.</li>
+    <li><strong>Results are reused.</strong> A handoff, a status change or a documentation commit does not invalidate a result for the same code.</li>
+    <li><strong>One full run per phase.</strong> It happens in Verify, on the finished code.</li>
+    <li><strong>No review loops by default.</strong> Code review is optional. A failed test leads to a fix, not to a round of reports about the failure.</li>
+  </ul>
+  <h2>Your project's own rules</h2>
+  <p>The shared skill knows nothing about your product. Rules that only make sense in your project (an invariant that must never break, an extra check before release, the command that runs your tests) go in one file your project owns, <code>references/project.md</code>, beside the skill. The agent reads it in Orient, and it wins over the shared text on anything project-specific. Updating the shared skill never touches it.</p>
+  <div class="next">
+    <a class="btn primary" href="adopt.html">Add it to your project</a>
+    <a class="btn" href="milestone.html">Compare with the milestone workflow</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>

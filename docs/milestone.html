@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The milestone workflow · dev-tools</title>
+<meta name="description" content="How a milestone runs with dev-tools: a reviewed plan, a spec you approve before any code, an adversarial review of the result, and a permanent record.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html" aria-current="page">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Milestone workflow</p>
+  <h1>Plan the milestone once. Let the agent walk it, with a record of every step.</h1>
+  <p class="lede">For work that is specified up front and has to be defensible afterwards. You approve a spec before any code exists, an independent reviewer attacks the result, and every finished phase leaves a record that is never edited again.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Three skills, three jobs</h2>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3><code>start-milestone</code></h3>
+      <p>Turns requirements and leftovers from earlier work into a plan: phases with stable ids, what each must deliver, and how each will be proven. Drafts the spec for the first phase. Writes no code.</p>
+    </div>
+    <div class="card">
+      <h3><code>process-phase</code></h3>
+      <p>Runs one phase of the plan: collects everything that binds it, writes the spec, stops for your decision, implements, has the result reviewed, and records it.</p>
+    </div>
+    <div class="card">
+      <h3><code>process-milestone</code></h3>
+      <p>Walks the whole milestone: picks the next phase whose prerequisites are met, runs it, and at the end sweeps every open question and writes the closing record.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="two">
+    <div>
+      <h2>What you type</h2>
+      <div class="chat">
+        <div class="turn you"><div class="who">You</div><div><p class="say">start-milestone v2-search</p></div></div>
+        <div class="turn"><div class="who">Agent</div><div>
+          <p>Plan written with four phases. Phase 1 has a draft spec. Two clauses in the requirements conflict; I recorded both with a proposed resolution and need your ruling on one of them.</p>
+          <p><span class="stop">waits for you</span></p>
+        </div></div>
+        <div class="turn you"><div class="who">You</div><div><p class="say">process-milestone v2-search</p></div></div>
+        <div class="turn"><div class="who">Agent</div><div>
+          <p>Phase 1 spec is ready: nine named tests with expected results, three decisions for you. No implementation file has been created.</p>
+          <p><span class="stop">waits for you</span></p>
+        </div></div>
+      </div>
+      <p class="caption">Illustration of how a milestone starts.</p>
+    </div>
+    <div>
+      <h2>Hands-off, when you say so</h2>
+      <p>Add <code>auto=true</code> and the agent records your approvals itself and keeps going through the phases of this one milestone:</p>
+      <pre class="code">process-milestone v2-search auto=true</pre>
+      <p>That delegation is narrow on purpose.</p>
+      <ul>
+        <li>Each approval is recorded as <strong>delegated</strong>, with the date and a fingerprint of the exact text approved. It is never written up as if you had read it.</li>
+        <li>It does not skip a required review, invent a result, authorize paid calls, publish, or merge.</li>
+        <li>It covers this milestone only and ends when you revoke it.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>One phase, start to finish</h2>
+    <p>The order is fixed. The one hard rule: nothing is implemented before the spec is approved.</p>
+  </div>
+  <ol class="steps narrow">
+    <li>
+      <h3>Harvest</h3>
+      <p>What binds a phase is spread over the plan: its own deliverables, the verification promised for it, design rules earlier phases paid for, open questions assigned to it, risks, and what earlier records left unresolved. The agent collects all of it into one table at the top of the spec, so nothing binding is left as "see the plan".</p>
+    </li>
+    <li>
+      <h3>Spec <span class="gate">stops</span></h3>
+      <p>Exact formats, exact signatures, the list of rules, and the list of tests with their expected results. Before showing it to you, the agent checks that every requirement <em>can</em> be satisfied as written.</p>
+    </li>
+    <li>
+      <h3>Your decision <span class="gate">stops</span></h3>
+      <p>You approve or amend. You also decide how you want to approve: by reading the spec, or by reading a set of worked example cases written first. Each open question assigned to this phase gets your ruling, dated, in the spec.</p>
+    </li>
+    <li>
+      <h3>Implement and verify</h3>
+      <p>Built in slices that each end with passing tests. The tests run are the ones the change can affect, chosen by what changed and who depends on it, not the whole history of the project. One rule has no exception: <strong>a declared behaviour with no test that can fail it does not ship.</strong></p>
+    </li>
+    <li>
+      <h3>Adversarial review</h3>
+      <p>A separate reviewer, in a different tool, tries to break the change. Each finding is reproduced before it is believed, and each fix comes with a test shown to fail on the old code. Findings are sorted into blocking, hardening and completeness before anything is fixed; completeness is deferred by default.</p>
+    </li>
+    <li>
+      <h3>Refactoring review</h3>
+      <p>One question, answered in writing: what did this work reveal about the existing structure that should change? The answer is either the refactors that were done, or "none needed" with the argument. A refactor seen and postponed becomes an open question with a target, never silent debt.</p>
+    </li>
+    <li>
+      <h3>Record and commit</h3>
+      <p>The phase is finished when its record exists: the commands that were run and their exit codes, word for word; a fingerprint of each file the claim rests on; what the result does <em>not</em> establish; and what is still open.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>Records that cannot be quietly rewritten</h2>
+    <p>Records are numbered and append-only. A correction is a new record that cites the one it corrects. What a milestone claimed, and on which exact files, stays readable long after the session that produced it.</p>
+    <p>These two excerpts come from a trial run of the three skills on an existing project, with a deliberately tiny milestone: one function that formats a byte count. The project's name is replaced with <code>app</code> and the planning folder is shown as <code>.planning</code>; nothing else is changed.</p>
+  </div>
+  <div class="two">
+    <div>
+<pre class="code"><span class="dim">.planning/milestones/devtools-trial/</span>
+  <span class="k">001</span>-plan-gate.md
+  <span class="k">002</span>-phase-DT1.md
+  <span class="k">003</span>-milestone-close.md
+  README.md
+  notes/
+    devtools-trial-plan.md
+    phase-DT1-spec.md
+    phase-DT1-codex-review.md
+  evidence/DT1/
+    negative-control.txt
+    v2-known-red.txt</pre>
+      <p class="caption">What one small milestone left behind: three numbered records, the plan, the spec, the reviewer's findings word for word, and the saved output the records point to.</p>
+    </div>
+    <div>
+<pre class="code"><span class="dim"># 002-phase-DT1.md (start of the file)</span>
+milestone: devtools-trial
+scope: phase-DT1
+date: 2026-11-05
+<span class="k">gate:</span>
+  command: "uv run pytest -q tests/test_humanize.py"
+  exit: 0
+  output: "29 passed in 0.13s"
+<span class="k">evidence:</span>
+  - path: src/app/humanize.py
+    sha256: cfce6ac52f1d5d40d6b0c86ad975926ada4fd1e6…
+  - path: tests/test_humanize.py
+    sha256: bd2cd5f1d01383da958f537772150e3ea5c6ff23…
+  - path: …/notes/phase-DT1-codex-review.md
+    sha256: 02c4a69b443e61e234a081dc960ca180ba5fa377…</pre>
+      <p class="caption">A record states the command, its exit code, and a fingerprint of every file the claim rests on. Shortened; four more files are listed in the original.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>What the independent review is for</h2>
+    <p>In that same trial, the function passed all 25 of its own tests. A second agent, in a different tool, was then asked one thing: find where a claim about this change is false.</p>
+  </div>
+  <div class="feature">
+    <div>
+      <h3>It found one</h3>
+      <p>The plan claimed the function works for a whole number of any size. The reviewer tried one more than 4,300 digits long, and the function crashed.</p>
+      <p>The workflow then did what it always does with a finding: <strong>reproduce it first</strong>, write tests that fail on the old code, fix, and run again. The reviewer's words are kept exactly as written, beside a note that the fix itself has not been reviewed.</p>
+    </div>
+    <div>
+<pre class="code"><span class="dim"># notes/phase-DT1-codex-review.md (excerpts)</span>
+
+<span class="k">DT1-R1 — C5 is false. Severity: medium.</span>
+humanize_bytes(10**4313) raises
+ValueError: Exceeds the limit (4300 digits)
+for integer string conversion
+
+<span class="k">Reproduced:</span> yes
+<span class="k">Class:</span> blocking
+
+Red before the fix, observed: 2 failed, 27 passed
+After the fix, the same command: 29 passed
+
+Counts: 1 finding, 1 blocking, 0 hardening,
+0 completeness, 0 self-inflicted.</pre>
+      <p class="caption">Lines taken from the review note of the trial run. Line breaks added to fit.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>Knowing when to stop reviewing</h2>
+    <p>Repeated review of the same document does not keep improving it. Each round of repairs creates new text, and the next review finds problems in that new text. The workflow measures this and stops.</p>
+  </div>
+  <div class="two">
+    <div class="prose">
+      <p>Across review rounds on one document, two numbers are computed:</p>
+      <ul>
+        <li>the share of findings that attack text the <em>previous repair</em> wrote;</li>
+        <li>one reviewer's count of findings from round to round.</li>
+      </ul>
+      <p>When more than half of the findings are about the previous repair, or when the count stays flat for two rounds while the findings get less serious, review stops. The next step is to build it: an implementation answers in seconds the questions that reading argues about for days.</p>
+      <p>The number of rounds allowed is written down before round two, so the stopping point is not chosen after seeing the results.</p>
+    </div>
+    <div>
+      <div class="callout">
+        <p><strong>Two lanes.</strong> Not everything earns this weight. Routine, reversible work goes in the fast lane: edit, run the focused tests, done, no record. The evidence lane, with its reviews and records, is for a finished phase, a changed contract, or a decision that is hard to undo.</p>
+      </div>
+      <div class="callout">
+        <p><strong>One reviewer is one reviewer.</strong> A record never calls a single review a panel, and never claims a review over text that changed after the reviewer read it.</p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap narrow">
+  <h2>Phase workflow or milestone workflow?</h2>
+  <p>They answer different needs, and a project picks one. Both come from the same place and are installed the same way.</p>
+  <div class="table-scroll"><table>
+    <tr><th></th><th>Phase workflow</th><th>Milestone workflow</th></tr>
+    <tr><td>Fits</td><td>A product growing along a roadmap, where each phase is discovered partly by trying it</td><td>Work specified up front, where the result must be defended later</td></tr>
+    <tr><td>Before code</td><td>A timeboxed prototype, then locked tests</td><td>A full spec you approve</td></tr>
+    <tr><td>Protection</td><td>Tests fingerprinted; steps enforced by a state tool</td><td>Adversarial review; append-only records with file fingerprints</td></tr>
+    <tr><td>State lives in</td><td>One state file plus a folder per phase</td><td>Numbered records per milestone</td></tr>
+    <tr><td>Review</td><td>Optional</td><td>Required for the plan, each phase's change, and the close</td></tr>
+    <tr><td>Hands-off mode</td><td>No. Four approvals per phase</td><td>Yes, <code>auto=true</code>, per milestone</td></tr>
+  </table></div>
+  <div class="next">
+    <a class="btn primary" href="adopt.html">Add it to your project</a>
+    <a class="btn" href="phase.html">See the phase workflow</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>

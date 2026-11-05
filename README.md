@@ -1,22 +1,37 @@
 # dev-tools
 
-Development-process skills for agentic coding (Claude Code and Codex), kept in one place
-and copied into each project that uses them.
+A development process for coding agents (Claude Code and Codex), kept in one place and
+copied into each project that uses it.
+
+**Documentation: <https://vasiloglou.github.io/dev-tools/>**
+
+![The dev-tools documentation site](docs/assets/shots/home.png)
 
 Status: prototype.
 
-## How it works
+## What it gives an agent
+
+- **Phase workflow.** One roadmap phase at a time, in seven steps: Orient, Discuss (with
+  a timeboxed prototype), Specify (acceptance tests, locked before code is written),
+  Plan, Implement, Verify, Close. You approve at four of them.
+- **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
+  independent review of each change, and numbered records that are never edited.
+- **Component index.** A searchable map of what the code already does, so existing code
+  is reused instead of written again.
+
+A project picks the workflow that fits it. Both use the component index.
+
+## How a project takes it
 
 This repository is the canonical source. A project lists what it wants in a
-`.devtools.toml` file, and `devtools/sync.py` copies those skills and scripts into the
-project, where they are committed. The project takes no dependency on this repository:
-the scripts are ordinary files, run with the project's own Python.
-
-Each script reads its project-specific values (directories, package name, branch prefix)
-from a settings file beside it, which the sync writes from `.devtools.toml`.
+`.devtools.toml` file, and the sync command copies those skills and scripts into the
+project, where they are committed. The project takes no dependency on this repository.
 
 ```bash
 python3 path/to/dev-tools/devtools/sync.py apply --project .
+```
+
+```bash
 python3 path/to/dev-tools/devtools/sync.py check --project .
 ```
 
@@ -25,15 +40,20 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
   `--force`, and an existing file it does not manage yet needs `--adopt`.
 - `check` compares the managed files with the receipt. It needs only the project.
 
+Rules that belong to one project go in a file that project owns,
+`references/project.md` beside the synced skill. The sync never touches it.
+
 See `examples/phase-project.devtools.toml` for a complete project file.
 
 ## What is here
 
 | Path | What |
 |---|---|
-| `skills/phase/process-phase/` | Run one roadmap phase test-first: Orient, Discuss (with a timeboxed prototype), Specify (locked acceptance tests), Plan, Implement, Verify, Close. `scripts/phase_tool.py` owns the status transitions and checks. |
-| `skills/components/scripts/components_index.py` | Generate and search an index of a project's code by capability, so existing code is found before new code is written. |
+| `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks. |
+| `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
+| `skills/components/scripts/components_index.py` | Generates and searches the component index. |
 | `devtools/sync.py` | The sync command. |
+| `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
 | `tests/` | Tests for the sync command. |
 
 ## Tests

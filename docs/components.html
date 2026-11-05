@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The component index · dev-tools</title>
+<meta name="description" content="A searchable map of what your code already does, so an agent reuses it instead of writing it again.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html" aria-current="page">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Component index</p>
+  <h1>A map of what your code already does, that an agent reads before it writes.</h1>
+  <p class="lede">An agent starts every session knowing nothing about your codebase. Without a map it writes a second date parser, a third retry helper, a fourth way to format a file size. The component index is that map: searchable by what the code <em>does</em>, and kept honest by a check.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="feature">
+    <div>
+      <span class="num">Search by capability</span>
+      <h3>"Is there already something that does this?"</h3>
+      <p>The agent asks in plain words before it plans new code. The answer names the component, the file, and the function to call.</p>
+      <p>In the phase workflow this is not optional: each plan has a <strong>Reuse</strong> section that records what was searched for and what was found, and you see it when you approve the plan.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · asking what already exists</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">components search human readable size</span>
+component format.sizes: Format a byte count as a short human-readable size such as 1.5 kB (humanize_bytes)
+module src/shelf/units.py: Turn byte counts into short text a person can read.
+component fs.scan: Walk a folder tree and list every regular file with its size in bytes
+module src/shelf/scan.py: Walk a folder and list the regular files in it.
+coverage: 4/4 src/shelf modules assigned to components; external: none
+
+<span class="p">$</span> <span class="cmd">components search checksum</span>
+no component matched: this is not proof that nothing exists; search modules/ and git grep
+coverage: 4/4 src/shelf modules assigned to components; external: none</pre></div>
+      <p class="caption">A match names the component and the file. No match says so plainly, and says it is not proof that nothing exists.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">Two layers</span>
+      <h3>People write the meaning. The tool writes the details.</h3>
+      <p>The catalog has one short entry per component, written by hand: what it is for, the verbs it covers, which files belong to it.</p>
+      <p>Everything else is generated from the source: every function with its signature and one-line summary, and which component uses which. The same search can also cover the libraries the project has installed. Generated pages are never edited by hand, so they cannot drift from the code.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · one entry in the catalog</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">grep -A8 &#x27;### report.rows&#x27; docs/components/COMPONENTS.md</span>
+### report.rows
+<span class="bad">- does: Order file entries largest first and pair each path with its human-readable size, as rows for a size report</span>
+<span class="bad">- verbs: sort by size, largest files first, build report rows</span>
+<span class="bad">- status: canonical</span>
+<span class="bad">- modules: src/shelf/report.py</span>
+<span class="bad">- uses: format.sizes, fs.scan</span>
+<span class="bad">- used_by: (none)</span>
+<span class="bad">- tests: tests/unit/shelf/test_report.py</span></pre></div>
+      <p class="caption">The purpose, verbs, files and tests were written by hand. The two lines saying what it uses and what uses it were generated.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Kept honest</span>
+      <h3>It notices when the code moves on</h3>
+      <p>Add a file and the check fails, because the index no longer matches the source. The coverage line then names every file that no component has claimed. Closing a phase includes giving each new file a home, so the map is complete at the start of the next phase.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a new file appears</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git status --short src</span>
+?? src/shelf/report.py
+
+<span class="p">$</span> <span class="cmd">components --check</span>
+stale or missing: docs/components/modules/_root.md
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">components stats</span>
+coverage: 4/5 src/shelf modules assigned to components; external: none
+src/shelf/report.py
+
+<span class="p">$</span> <span class="cmd">components stats</span>
+coverage: 5/5 src/shelf modules assigned to components; external: none</pre></div>
+      <p class="caption">The new file makes the index stale, and coverage drops to 4 of 5 with the file named. After it is given a component: 5 of 5.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap narrow">
+  <h2>What it changes in practice</h2>
+  <div class="table-scroll"><table>
+    <tr><th>Moment</th><th>Without the index</th><th>With it</th></tr>
+    <tr><td>Scoping a phase</td><td>The agent greps for a few names it guesses</td><td>It lists the capabilities needed and looks each one up; you see a table of what exists</td></tr>
+    <tr><td>Planning</td><td>"Add a helper to format sizes"</td><td>"Reuse <code>humanize_bytes</code> from the units component"</td></tr>
+    <tr><td>Changing shared code</td><td>Callers found by search, some missed</td><td>The component's <em>used by</em> list is the set of callers to keep working</td></tr>
+    <tr><td>Reaching for a library</td><td>A new dependency, or a hand-written copy</td><td>The index of installed libraries shows what is already available</td></tr>
+    <tr><td>Finishing</td><td>New files nobody will find again</td><td>Each new file is given a component when the phase closes, and the coverage line shows any that were missed</td></tr>
+  </table></div>
+  <div class="callout">
+    <p><strong>It reads source text only.</strong> The index is built by parsing files, never by importing or running your code, so it works on a project that does not currently start.</p>
+  </div>
+  <div class="next">
+    <a class="btn primary" href="adopt.html">Add it to your project</a>
+    <a class="btn" href="phase.html">See where the phase workflow uses it</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>

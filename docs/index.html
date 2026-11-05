@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dev-tools · a development process for coding agents</title>
+<meta name="description" content="Skills for Claude Code and Codex that make a coding agent agree on the goal, write the tests first, reuse what exists, stop for your approval, and leave a record.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="hero"><div class="wrap">
+  <div>
+    <p class="eyebrow">For Claude Code and Codex</p>
+    <h1>A coding agent that works like your most careful engineer.</h1>
+    <p class="lede">dev-tools is a set of skills that give an agent a development process: agree on the goal, write the tests first, reuse what already exists, stop for your approval, and leave a record the next session can pick up.</p>
+    <div class="cta">
+      <a class="btn primary" href="phase.html">See a phase run</a>
+      <a class="btn" href="adopt.html">Add it to your project</a>
+    </div>
+  </div>
+  <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · git log, phase 3</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git log --oneline</span>
+9c918d7 docs(03): complete phase — shelf report prints human-readable sizes
+8b4d694 docs(03): verification (verified)
+032f88b docs(03-01): summary
+cef29fa feat(03-01): report sub-command
+fbf96b3 feat(03-01): report rows
+ace2f59 docs(03): plan phase (1 plans)
+13a1ccf test(03): acceptance tests (red)
+0b6f0e9 docs(03): capture phase context
+…</pre></div>
+      <p class="caption">One phase as the repository recorded it. Read from the bottom: decisions, failing tests, plan, code, verification, close.</p>
+  </div>
+</div></div>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>Agents are fast. Left alone, they are also careless in four familiar ways.</h2>
+    <p>Each one has a specific remedy here, and each remedy is enforced by a check, not by asking the agent nicely.</p>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <span class="without">Without a process</span>
+      <h3>The test gets changed until it passes</h3>
+      <span class="with">With dev-tools</span>
+      <p>Tests are agreed and locked before any code is written. A changed test is detected.</p>
+    </div>
+    <div class="card">
+      <span class="without">Without a process</span>
+      <h3>Code that already exists is written again</h3>
+      <span class="with">With dev-tools</span>
+      <p>The agent searches a map of the codebase first, and the plan you approve shows what it found.</p>
+    </div>
+    <div class="card">
+      <span class="without">Without a process</span>
+      <h3>Every session starts from zero</h3>
+      <span class="with">With dev-tools</span>
+      <p>Where the work stands is written in the repository. Any session, any agent, continues from it.</p>
+    </div>
+    <div class="card">
+      <span class="without">Without a process</span>
+      <h3>"Done" means the agent said so</h3>
+      <span class="with">With dev-tools</span>
+      <p>Done means the agreed tests pass, one full run is on file, and you approved the steps that are yours.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>What it looks like</h2>
+    <p>The terminal frames on this site are real output, captured from a small demo project called <code>shelf</code> (a command-line tool that lists the files in a folder) that was taken through the process. The output is untouched. Only the long paths of the three helper scripts are shortened in the command lines, to <code>phase-tool</code>, <code>components</code> and <code>devtools-sync</code>.</p>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">01</span>
+      <h3>Tests are locked before code exists</h3>
+      <p>You approve the acceptance tests, and a fingerprint of each one is recorded. If a test is later weakened to get a passing run, the check fails and names the file.</p>
+      <p><a href="phase.html">How a phase runs →</a></p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a locked test is changed</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git diff -U0 tests/acceptance/p03_size_report/test_report_cli.py | tail -3</span>
+@@ -32 +32 @@ def test_last_line_is_the_total(sample_tree, capsys):
+<span class="bad">-    assert total == &quot;5 files, 12.0 MB&quot;</span>
++    assert total.endswith(&quot;MB&quot;)
+
+<span class="p">$</span> <span class="cmd">phase-tool check --testlock 03</span>
+<span class="bad">phase_tool.check: FAILED</span>
+<span class="bad">error CHECK_FAILED: 1 issue(s) found</span>
+<span class="warn">hint: fix the listed issues</span>
+checks: [&quot;testlock&quot;]
+<span class="bad">- tests/acceptance/p03_size_report/test_report_cli.py:0 [testlock] locked test modified</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">git checkout -- tests/acceptance/p03_size_report/test_report_cli.py</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool check --testlock 03</span>
+<span class="ok">phase_tool.check: ok</span>
+checks: [&quot;testlock&quot;]</pre></div>
+      <p class="caption">An assertion is weakened, the check fails and names the file; the file is restored and the check passes.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">02</span>
+      <h3>Steps cannot be skipped</h3>
+      <p>Every move from one step to the next goes through a small state tool. It refuses to jump over a step, and it will not let a plan be approved or work be marked done while the files the earlier steps should have produced are missing.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · trying to skip ahead</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool status --brief</span>
+<span class="ok">phase_tool.status: ok</span>
+current_phase: 03
+phase_status: not_started
+active_step: None
+next_step: discuss
+
+<span class="p">$</span> <span class="cmd">phase-tool advance --to implemented</span>
+<span class="bad">phase_tool.advance: FAILED</span>
+<span class="bad">error INVALID_TRANSITION: not_started -&gt; implemented is not allowed</span>
+<span class="warn">hint: allowed: context_approved</span>
+phase: 03
+from: not_started
+to: implemented
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool complete --phase 03</span>
+<span class="bad">phase_tool.complete: FAILED</span>
+<span class="bad">error NOT_VERIFIED: phase 03 must be the current phase with status verified</span>
+<span class="warn">hint: run the Verify step and advance --to verified first</span>
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">The phase has not started. Marking it implemented, or closing it, is refused.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">03</span>
+      <h3>Existing code is found first</h3>
+      <p>Before planning anything new, the agent asks the component index what the project can already do. The answer is a file and a function to call.</p>
+      <p><a href="components.html">How the index works →</a></p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · asking what already exists</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">components search human readable size</span>
+component format.sizes: Format a byte count as a short human-readable size such as 1.5 kB (humanize_bytes)
+module src/shelf/units.py: Turn byte counts into short text a person can read.
+component fs.scan: Walk a folder tree and list every regular file with its size in bytes
+module src/shelf/scan.py: Walk a folder and list the regular files in it.
+coverage: 4/4 src/shelf modules assigned to components; external: none
+
+<span class="p">$</span> <span class="cmd">components search checksum</span>
+no component matched: this is not proof that nothing exists; search modules/ and git grep
+coverage: 4/4 src/shelf modules assigned to components; external: none</pre></div>
+      <p class="caption">A match names the component and the file. No match says so plainly, and says it is not proof that nothing exists.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">04</span>
+      <h3>Work in the order that suits you</h3>
+      <p>Phases are numbered, but only their stated dependencies decide what may start. Here phase 3 is started before phase 2, with the decision on record, while phase 4 is refused because it depends on work that is not finished.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · starting phase 3 before phase 2</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">phase-tool activate --phase 3 --dec DEC-002</span>
+<span class="bad">phase_tool.activate: FAILED</span>
+<span class="bad">error UNKNOWN_DEC: DEC-002 is not a row in .planning/DECISIONS.md</span>
+<span class="warn">hint: write the DEC row (reason, human approval) before using it</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool activate --phase 4 --dec DEC-002</span>
+<span class="bad">phase_tool.activate: FAILED</span>
+<span class="bad">error NOT_ACTIVATABLE: phase 04 has incomplete dependencies</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">phase-tool activate --phase 3 --dec DEC-002</span>
+<span class="ok">phase_tool.activate: ok</span>
+phase: 03
+dec: DEC-002
+phase_status: not_started</pre></div>
+      <p class="caption">First try: the decision is not on record yet. Phase 4 is refused because it depends on unfinished work. Phase 3 starts once the decision is written down.</p>
+    </div>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">05</span>
+      <h3>One process for every project, and for both agents</h3>
+      <p>The skills are kept in one place and copied into each project. An update never overwrites a file you changed without telling you.</p>
+      <p><a href="adopt.html">How a project takes it →</a></p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a synced file was edited by hand</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">echo &#x27;Skip the full run when in a hurry.&#x27; &gt;&gt; .claude/skills/process-phase/references/verify.md</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+<span class="bad">.claude/skills/process-phase/references/verify.md: differs from the receipt</span>
+<span class="bad">29 managed file(s), 1 problem(s)</span>
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+<span class="bad">refused: .claude/skills/process-phase/references/verify.md (needs --force)</span>
+<span class="bad">nothing written; 1 file(s) refused</span>
+<span class="dim">exit code 3</span></pre></div>
+      <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>You stay in charge at the points that matter</h2>
+    <p>A phase has seven steps. The agent does the work in all of them and stops for your decision at four.</p>
+  </div>
+  <ol class="strip">
+    <li><b>Orient</b><span>reads where things stand</span></li>
+    <li class="stop"><b>Discuss</b><span>settles scope, tries a prototype</span></li>
+    <li class="stop"><b>Specify</b><span>writes and locks the tests</span></li>
+    <li class="stop"><b>Plan</b><span>finds what to reuse</span></li>
+    <li><b>Implement</b><span>one failing test at a time</span></li>
+    <li><b>Verify</b><span>one full run</span></li>
+    <li class="stop"><b>Close</b><span>records, hands back</span></li>
+  </ol>
+  <p class="legend"><i></i>ends with your approval</p>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Two workflows. A project picks the one that fits.</h2>
+    <p>Both are installed the same way and both use the same component index.</p>
+  </div>
+  <div class="grid">
+    <a class="card" href="phase.html">
+      <h3>Phase workflow</h3>
+      <p>For a product growing along a roadmap. Each phase starts with a short prototype to see whether the idea holds, then locks its tests, then builds. You approve four times per phase.</p>
+      <span class="more">Read about phases →</span>
+    </a>
+    <a class="card" href="milestone.html">
+      <h3>Milestone workflow</h3>
+      <p>For work specified up front that must be defensible later. A spec you approve before any code, an independent reviewer who attacks the result, and numbered records that are never edited. Can run hands-off when you delegate.</p>
+      <span class="more">Read about milestones →</span>
+    </a>
+    <a class="card" href="components.html">
+      <h3>Component index</h3>
+      <p>A searchable map of what the code already does, part written by people and part generated from the source, with a check that keeps it current.</p>
+      <span class="more">Read about the index →</span>
+    </a>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap narrow">
+  <h2>Where it stands</h2>
+  <p>dev-tools is a working prototype. What has been done, and what has not:</p>
+  <ul>
+    <li><strong>Run end to end.</strong> The phase workflow built one real feature in the demo project shown on this site. Each workflow was also tried inside an existing project in mid-flight, by swapping in the shared skills and carrying a small mock piece of work from start to finish.</li>
+    <li><strong>Approvals were simulated</strong> in all of those runs. No person sat at the gates.</li>
+    <li><strong>A brand-new project</strong> still has to write its first planning files by hand. A setup step is the next thing to build.</li>
+    <li><strong>Planned:</strong> running independent phases as parallel tracks with their own state, and a skill that finds what agentic work leaves on your disk (old working copies, caches, downloaded models).</li>
+  </ul>
+  <div class="next">
+    <a class="btn primary" href="adopt.html">Add it to your project</a>
+    <a class="btn" href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>

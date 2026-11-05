@@ -4,7 +4,7 @@
 
 # Commands the project runs after a sync that changed a file (for example, regenerating
 # an index that lists the synced scripts).
-after_apply = ["python scripts/components_index.py"]
+after_apply = ["python3 scripts/components_index.py write"]
 
 [[sync]]
 source = "skills/phase/process-phase"
