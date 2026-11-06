@@ -12,6 +12,8 @@
                                              stub entries for the modules no component covers
     components_index.py list [AREA]          the component ids by area, each with its one-line description
     components_index.py changed --base REF   check the index against the files changed since REF
+    components_index.py facts [--base REF] [--out FILE]
+                                             the catalog and the import graph as JSON rows, for a rule checker
     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
     components_index.py show ID              one component: its entry, its modules, what they import and what imports them
 
@@ -26,6 +28,7 @@ The catalog is ``<docs_dir>/COMPONENTS.md``, written by hand: one entry per comp
 
 ``write`` adds the ``uses`` / ``used_by`` lines and the verbs list. ``<docs_dir>/external.toml``
 is optional; it lists installed libraries to index (``[name]`` with ``modules = [...]``).
+``<docs_dir>/layers.toml`` is optional too; ``facts`` reads the area ranks and forbidden pairs in it.
 Modules listed in ``<docs_dir>/unassigned-baseline.txt`` (``stats --write-baseline``) are
 tolerated by ``--check --strict``; the baseline can only shrink. ``changed`` and ``review``
 read the git history of the checkout. Needs Python 3.11 or newer.
@@ -133,6 +136,32 @@ def external_config(root: Path) -> dict:
     """Libraries to index, from the optional external.toml."""
     path = root / BASE / 'external.toml'
     return tomllib.loads(path.read_text(encoding='utf-8')) if path.is_file() else {}
+
+
+def layers_config(root: Path, areas: set[str]) -> tuple[dict[str, int], list[tuple[str, str]]]:
+    """Area ranks and forbidden (from, to) area pairs, from the optional layers.toml.
+
+    An area is the first part of a component id; `areas` are the ones the catalog has.
+    """
+    path = root / BASE / 'layers.toml'
+    if not path.is_file():
+        return {}, []
+    loaded = tomllib.loads(path.read_text(encoding='utf-8'))
+    ranks, rows = loaded.get('rank', {}), loaded.get('forbid', [])
+    problems = [f'unknown key: {key}' for key in sorted(set(loaded) - {'rank', 'forbid'})]
+    if not isinstance(ranks, dict) or any(type(rank) is not int for rank in ranks.values()):
+        problems.append('[rank] must give each area a whole number')
+        ranks = {}
+    if not isinstance(rows, list) or any(not isinstance(row, dict) or set(row) != {'from', 'to'} or
+                                         not all(isinstance(v, str) for v in row.values()) for row in rows):
+        problems.append('each [[forbid]] needs from = "<area>" and to = "<area>"')
+        rows = []
+    pairs = [(row['from'], row['to']) for row in rows]
+    named = set(ranks) | {area for pair in pairs for area in pair}
+    problems.extend(f'no component is in area {area}' for area in sorted(named - areas))
+    if problems:
+        raise ValueError(f'{BASE}layers.toml: ' + '; '.join(problems))
+    return ranks, pairs
 
 
 def read_components(root: Path) -> list[dict]:
@@ -621,6 +650,46 @@ def relations(entries: list[dict], edges: dict) -> dict:
     return result
 
 
+def direct_edges(edges: dict) -> dict:
+    """The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle."""
+    return {edge: [pair for pair in pairs if not pair[0].endswith('/__init__.py')] for edge, pairs in edges.items()}
+
+
+def cycle_groups(pairs) -> list[list[str]]:
+    """The groups of two or more names that reach each other along (caller, callee) pairs, largest first."""
+    targets = {}
+    for caller, callee in pairs:
+        targets.setdefault(caller, set()).add(callee)
+        targets.setdefault(callee, set())
+    order, low, stack, groups = {}, {}, [], []
+
+    def enter(name):
+        order[name] = low[name] = len(order)
+        stack.append(name)
+        return name, iter(sorted(targets[name]))
+
+    for start in sorted(targets):
+        work = [] if start in order else [enter(start)]
+        while work:
+            name, rest = work[-1]
+            for target in rest:
+                if target not in order:
+                    work.append(enter(target))
+                    break
+                if target in stack:
+                    low[name] = min(low[name], order[target])
+            else:
+                work.pop()
+                if work:
+                    low[work[-1][0]] = min(low[work[-1][0]], low[name])
+                if low[name] == order[name]:
+                    at = stack.index(name)
+                    if len(stack) - at > 1:
+                        groups.append(sorted(stack[at:]))
+                    del stack[at:]
+    return sorted(groups, key=lambda group: (-len(group), group))
+
+
 def listing(ids, cap=None) -> str:
     names = sorted(ids)
     if cap and len(names) > cap:
@@ -908,8 +977,13 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool = 
     return lines
 
 
-def changed(root: Path, base: str, strict: bool) -> int:
-    """Check the index against the files that differ from the merge base with `base`."""
+def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], dict]:
+    """The checkout as it was at the merge base with `base`.
+
+    Returns the name `base` resolved to, the merge-base commit, {path that differs: its git
+    status letter}, the catalog entries there, and for each .py file that differs its text
+    there (None when it did not exist): the `overrides` of `component_graph`.
+    """
     def exists(ref):
         return bool(git(root, 'rev-parse', '--verify', '--quiet', ref + '^{commit}', check=False).strip())
 
@@ -924,6 +998,15 @@ def changed(root: Path, base: str, strict: bool) -> int:
         status[path] = code
     for path in git(root, 'ls-files', '--others', '--exclude-standard').splitlines():
         status.setdefault(path, 'A')
+    old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
+    overrides = {p: None for p, code in status.items() if p.endswith('.py')}
+    overrides.update(files_at(root, anchor, [p for p in overrides if status[p] != 'A']))
+    return base, anchor, status, old_entries, overrides
+
+
+def changed(root: Path, base: str, strict: bool) -> int:
+    """Check the index against the files that differ from the merge base with `base`."""
+    base, anchor, status, old_entries, overrides = base_snapshot(root, base)
     entries = read_components(root)
     files, fails = build_index(root)
     fails = list(fails)
@@ -933,9 +1016,6 @@ def changed(root: Path, base: str, strict: bool) -> int:
         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
             fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
 
-    old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
-    overrides = {p: None for p, code in status.items() if p.endswith('.py')}
-    overrides.update(files_at(root, anchor, [p for p in overrides if status[p] != 'A']))
     old_edges = component_graph(root, old_entries, overrides)
     retired = {e['id']: e['status'] for e in entries
                if e.get('status') == 'deprecated' or e.get('status', '').startswith('duplicate-of ')}
@@ -983,6 +1063,75 @@ def changed(root: Path, base: str, strict: bool) -> int:
     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
           f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
     return int(bool(fails or (strict and warns)))
+
+
+# What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
+VALUE_TYPES = {'component': 'String', 'status': 'String', 'area': 'String', 'path': 'String',
+               'subsystem': 'String', 'rank': 'Integer'}
+FACT_TYPES = {
+    'component_is_listed': ('{Component} is listed', (('component', 'component'),)),
+    'component_has_status': ('{Component} has {Status}', (('component', 'component'), ('status', 'status'))),
+    'component_in_area': ('{Component} is in {Area}', (('component', 'component'), ('area', 'area'))),
+    'component_uses': ('{Component} uses {Component}', (('caller', 'component'), ('callee', 'component'))),
+    'component_uses_in_cycle': ('{Component} uses {Component} inside a loop of imports',
+                                (('caller', 'component'), ('callee', 'component'))),
+    'component_has_test': ('{Component} is tested in {Path}', (('component', 'component'), ('path', 'path'))),
+    'subsystem_has_member': ('{Subsystem} includes {Component}', (('subsystem', 'subsystem'), ('component', 'component'))),
+    'area_has_rank': ('{Area} has {Rank}', (('area', 'area'), ('rank', 'rank'))),
+    'area_must_not_use': ('{Area} must not use {Area}', (('source', 'area'), ('target', 'area'))),
+}
+
+
+def facts(root: Path, base: str = '') -> dict:
+    """The catalog and the import graph as rows of facts, for a rule checker.
+
+    With `base`, the catalog and the code are those of the merge base with it; the ranks
+    and forbidden pairs are always today's, so one set of rules judges both revisions.
+    Module paths stay out of the facts (a renamed file is not a new fact); the imports
+    behind each edge are under `evidence`, for printing.
+    """
+    entries = read_components(root)
+    ranks, forbidden = layers_config(root, {e['id'].split('.')[0] for e in entries if not subsystem(e)})
+    if base:
+        _, revision, _, entries, overrides = base_snapshot(root, base)
+        edges = component_graph(root, entries, overrides)
+    else:
+        try:
+            revision = git(root, 'rev-parse', 'HEAD', check=False).strip()
+        except ValueError:  # no git here
+            revision = ''
+        edges = component_graph(root, entries)
+    components = [e for e in entries if not subsystem(e)]
+    direct = [edge for edge, pairs in direct_edges(edges).items() if pairs]  # a loop is judged without __init__ imports
+    groups = cycle_groups(direct)
+    group_of = {name: number for number, group in enumerate(groups) for name in group}
+    found = {
+        'component_is_listed': [(e['id'],) for e in components],
+        'component_has_status': [(e['id'], e['status'].split()[0]) for e in components if e.get('status')],
+        'component_in_area': [(e['id'], e['id'].split('.')[0]) for e in components],
+        'component_uses': list(edges),
+        'component_uses_in_cycle': [(a, b) for a, b in direct if a in group_of and group_of[a] == group_of.get(b)],
+        'component_has_test': [(e['id'], path) for e in components for path in values(e, 'tests')],
+        'subsystem_has_member': [(e['id'], member) for e in entries if subsystem(e)
+                                 for member in values(e, 'components')],
+        'area_has_rank': list(ranks.items()),
+        'area_must_not_use': forbidden,
+    }
+    return {
+        'format': 'devtools-facts/1',
+        'revision': revision,
+        'types': {'values': VALUE_TYPES,
+                  'facts': {name: {'reading': reading, 'roles': [list(role) for role in roles]}
+                            for name, (reading, roles) in FACT_TYPES.items()}},
+        'facts': {name: [dict(zip((role for role, _ in FACT_TYPES[name][1]), row)) for row in sorted(set(rows))]
+                  for name, rows in found.items()},
+        # Every import behind an edge, those a package __init__ makes last.
+        'evidence': {'component_uses': [
+            {'caller': a, 'callee': b,
+             'imports': [list(pair) for pair in sorted(pairs, key=lambda pair: pair[0].endswith('/__init__.py'))]}
+            for (a, b), pairs in edges.items()],
+                     'cycle_groups': groups},
+    }
 
 
 def entry_commits(root: Path) -> dict[str, tuple[str, int]]:
@@ -1077,9 +1226,7 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
         ([e['id'], *links[e['id']]['used_by']], f'{e["id"]} ({e["status"]}): used by {callers(e["id"])}')
         for e in components if is_retired(e) and links[e['id']]['used_by']]))
 
-    # A package __init__ that re-exports its own modules is not a tangle.
-    direct = {edge: [pair for pair in pairs if not pair[0].endswith('/__init__.py')]
-              for edge, pairs in edges.items()}
+    direct = direct_edges(edges)
 
     def places(a, b):
         pairs = direct[a, b]
@@ -1088,6 +1235,9 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
     groups.append(('Components that import each other', [
         ([a, b], f'{a} <-> {b}: {places(a, b)}; {places(b, a)}')
         for a, b in sorted(direct) if a < b and direct[a, b] and direct.get((b, a))]))
+    groups.append(('Loops of imports through three or more components', [
+        (group, f'{len(group)} components: {some(group, 8)}')
+        for group in cycle_groups(edge for edge, pairs in direct.items() if pairs) if len(group) > 2]))
 
     names, undocumented, public, mains, entry_points = {}, [], {}, set(), set()
     for path in package:
@@ -1282,6 +1432,9 @@ def main(argv: list[str] | None = None) -> int:
     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
     diff.add_argument('--strict', dest='strict_changed', action='store_true',
                       help='also fail on a new caller of a deprecated or duplicate component')
+    rows = commands.add_parser('facts')
+    rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
+    rows.add_argument('--out', type=Path, help='write to this file instead of printing')
     look = commands.add_parser('review')
     look.add_argument('areas', nargs='*', help='only leads that name a component whose id starts with one of these')
     look.add_argument('--all', action='store_true', help='print every lead instead of the first 40 of each group')
@@ -1355,6 +1508,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == 'changed':
             return changed(args.root, args.base, args.strict_changed)
+        if args.command == 'facts':
+            text = json.dumps(facts(args.root, args.base), indent=1, sort_keys=True) + '\n'
+            if args.out:
+                args.out.write_text(text, encoding='utf-8')
+            else:
+                sys.stdout.write(text)
+            return 0
         if args.command == 'review':
             print('\n'.join(review(args.root, tuple(args.areas), args.all)))
             return 0

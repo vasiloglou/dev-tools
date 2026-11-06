@@ -24,6 +24,18 @@ supersedes older repeat-run requirements in plans and decisions.
 5. Run the lightweight `evidence-check --phase NN` and `check --ignored` once.
    They check paths/tracking, not test correctness, and do not start a new review.
 
+An advisory check, not a step: `check --scope NN` compares what the phase branch
+changed with what the plans declared. It has not yet been run on real projects and
+nothing requires it; run it when you write the summaries' Deviations tables, and treat
+each line as a place to look.
+- A `warning:` names a changed file that is in no task's `files` or `unit_tests` and
+  in no row of a summary's Deviations table. If the change belongs to the phase, add
+  the row; if it does not, take it out of the branch.
+- An issue names a component that is new in the catalog and on no plan's
+  `new_component:` line. Confirm it with the user as a deviation.
+- Not judged: planning files, this phase's acceptance tests and locked fixtures
+  (written before the plans), and the files of the component index.
+
 If final regression fails, reproduce/fix through focused tests and report the
 result honestly. Do not automatically start another full run. If code changes
 invalidate that run, state the limitation; a second full run requires the user's

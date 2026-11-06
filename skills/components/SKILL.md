@@ -15,6 +15,7 @@ does; this skill is how you use and maintain it. The entry format is defined in
 | **Consult** | Before planning or writing code | "Consult" below |
 | **Update** | With every change that adds, moves or retires code, and before a PR | "Update" below |
 | **Build** | The project has no catalog, or most modules have no component | [`references/build.md`](references/build.md) |
+| **Project rules** (optional) | The project has rules of its own about what may use what | [`references/rules.md`](references/rules.md) |
 | **Review** | Asked to audit the index; searches keep missing; before planning a large piece of work; after a large merge | [`references/review.md`](references/review.md) |
 
 Paths below assume the default settings (`docs_dir` = `docs/components`, script at
@@ -28,6 +29,7 @@ Paths below assume the default settings (`docs_dir` = `docs/components`, script 
 | `docs/components/modules/<group>.md` | Every module, public class, function and method, with signature, line, first docstring line and the component ids that own the module. One page per top-level folder of the package (`_root.md` for modules directly in it) and one per extra source directory | Never; generated |
 | `docs/components/external/<distribution>.md` | Public top-level classes and functions of the selected dependency modules, with the installed version | Never; generated from `external.toml` |
 | `docs/components/external.toml` | Which dependency modules are listed. Optional: without it no dependency is indexed | By hand |
+| `docs/components/layers.toml` | Which areas may use which: a rank for each area and forbidden pairs. Optional; `facts` reads it (see "Project rules" below) | By hand |
 | `docs/components/unassigned-baseline.txt` | The package modules no component covers | Only with `stats --write-baseline` |
 
 Commands are written `python3 scripts/components_index.py …`. Any Python 3.11 or newer
@@ -48,8 +50,9 @@ the main checkout's), because writing and checking read their installed versions
 | `list [<area>]` | Prints the ids by area, each with its `does` |
 | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
 | `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while its hand-written fields did not, and each subsystem with such a member; then a summary line. Exits 1 on any `fail`, and with `--strict` on any `warn`. Needs git |
+| `facts [--base <ref>] [--out <file>]` | Prints the catalog and the import graph as one JSON document of facts, for a rule checker (see "Project rules" below): which components are listed, their status, area and tests, which component uses which, which of those imports lie inside a loop, the members of each subsystem, and the ranks and forbidden pairs of `layers.toml`. With `--base` the catalog and the code are those of the merge base with `<ref>`; the layers are always today's. Needs no checker installed |
 | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
-| `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does` and `verbs` last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
+| `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does` and `verbs` last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, loops of imports through three or more components, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
 | `--root <dir>` | Runs against another checkout |
 | `--no-cache` | Before the command: parses every source file and ignores what earlier runs kept. After `search` it means the same |
 
@@ -245,6 +248,24 @@ Follow [`references/review.md`](references/review.md). In short: run `review` fo
 leads, reread every entry against its modules, repair the index, and write the code
 changes you would suggest to `REVIEW.md` in `docs/components/`. The review changes no code;
 the user decides which suggestions become work.
+
+## Project rules: an optional check
+
+Follow [`references/rules.md`](references/rules.md). In short: a project that wants rules
+the index script cannot state ("the core must not import the command line", "nothing new
+joins a loop of imports") writes them in `docs/components/rules.json`, with the ranks and
+forbidden pairs of its areas in `docs/components/layers.toml`. Where the project has a
+`rules.json`, run this before a PR, after `changed`:
+
+```bash
+python3 .claude/skills/components/scripts/rules_check.py check --base <base branch>
+```
+
+It reports only what the change added: fix each `fail:`, and fix or justify each `warn:`.
+Exit 2 means the check did not run, which is not a pass. The checker is GND, which the
+project installs separately; without it the command prints `skip:` and exits 0. Never
+edit a rule to make a line go away. This check is a trial: use it where the user asked
+for it.
 
 ## Rules
 

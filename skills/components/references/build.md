@@ -179,7 +179,10 @@ is wrong or the step is reached through a component the flow leaves out.
    check in the project's CI or pre-PR routine (`SKILL.md`, "Before a PR"); and a line
    naming the index in the project's agent instructions (`CLAUDE.md`, `AGENTS.md`) so
    every session knows to search it first. These are the project's own files and may
-   have rules of their own.
+   have rules of their own. If the user wants to state which areas may use which, or
+   other rules about the components, offer the optional rule check
+   ([`rules.md`](rules.md)): it needs GND installed, and an existing project starts with
+   standing violations that only stop growing.
 
 ## Large codebases
 

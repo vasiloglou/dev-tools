@@ -55,7 +55,9 @@ Each task in `<tasks>` has:
 | `acceptance` | Checkable statements (grep-able or test-backed) |
 | `type` | `auto`, `checkpoint:decision` or `checkpoint:human-verify` |
 
-**Coverage rule.** Every test id in NN-TESTS.md appears in the `turns_green` of at least one task. `check --plan` catches the mechanical failures: unfilled `{{…}}` placeholders, a stub plan (under 200 characters) and a plan that names no test (`tests/…` or `test_…`). The coverage rule and non-empty `verify` / `requirements` are checked by you and by the plan review.
+**Coverage rule.** Every contract test id in NN-TESTS.md appears in the `turns_green` of at least one task; a `guard` row is green from the start and needs no task. `check --plan` catches the mechanical failures: unfilled `{{…}}` placeholders, a stub plan (under 200 characters) and a plan that names no test (`tests/…` or `test_…`). The coverage rule and non-empty `verify` / `requirements` are checked by you and by the plan review.
+
+**An advisory check.** `phase_tool.py check --plans NN` looks at the plans of a phase together and lists what it finds: a contract test id in the Traceability table of NN-TESTS.md that no task claims, a plan with no task, a plan whose `requirements` names no REQ id, a task with an empty `verify`, a requirement a plan names that is not the phase's, and a requirement of the phase that no plan names. It is not a gate: it has not yet been run on the plans of real projects, and no step requires it. Run it when you check coverage, read each line against the plan, and treat a line as a place to look, not as a block; if a line is wrong about a plan that is right, say so to the user and go on. What it reads: the test ids of the Traceability table (not the locked files, so a test missing from the table is not seen); only what tasks claim, not the frontmatter list; a test id with a bare file name as being in the `test_dir` of NN-TESTS.md, so `test_scan.py::test_x` and `tests/acceptance/p01_scan/test_scan.py::test_x` are the same test; a task field written `- **name:** value`, with paths and test ids in backticks, which may run on over indented lines.
 
 ### 3.1 Parallel tracks
 
@@ -88,7 +90,7 @@ Every touched legacy module (see **Reuses**) needs a MIGRATION row and a strateg
 Plan only tasks that serve the MVP direction.
 
 1. Run `phase_tool.py check --plan <file>` for every plan (deterministic).
-2. Check coverage and scope once in the current session: every test is claimed; no task contradicts a LOCKED CX; plans list in `files` every existing test file their change affects. A separate reviewer or review round is optional, not a gate. Verification commands must follow focused TDD and one final full regression, with no replay/evidence-review loops.
+2. Check coverage and scope once in the current session (`phase_tool.py check --plans NN` lists what it can see of this; it is advisory): every test is claimed; no task contradicts a LOCKED CX; plans list in `files` every existing test file their change affects. A separate reviewer or review round is optional, not a gate. Verification commands must follow focused TDD and one final full regression, with no replay/evidence-review loops.
 3. **Gap closure** (`gap_closure: true`): the plan lists every open G-id from NN-VERIFICATION.md with a disposition `fix | DEC | logged`. No code changes while `phase_status` is `gaps_found` until this plan is approved.
 4. Show the user waves, tasks, `turns_green` coverage and the prototype verdicts per goal. After approval:
 

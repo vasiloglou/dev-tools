@@ -66,7 +66,7 @@ python3 path/to/dev-tools/devtools/sync.py compare --project .
 
 See `examples/phase-project.devtools.toml` for a complete project file, and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
-pull request. A new project follows
+pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project follows
 the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
 
 The sync command and the component index need Python 3.11 or newer; the phase state tool
@@ -81,7 +81,7 @@ runs on 3.9.
 | `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
 | `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
-| `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, and lists leads for a review. |
+| `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, lists leads for a review, and writes the index as facts. `scripts/rules_check.py` is optional and a trial: it checks a project's own rules about its components (layers, and rules it writes) with GND, and reports only what a change added. |
 | `skills/adopt-devtools/` | How an agent moves an existing project from its own process skills to these, without losing the project's rules. Read from this checkout; never copied into a project. |
 | `devtools/sync.py` | The sync command: `apply`, `check`, and for an existing project `survey` and `compare`. |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |

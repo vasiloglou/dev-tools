@@ -60,6 +60,12 @@ source = "skills/components"
 dest = ".claude/skills/components"
 exclude = ["scripts/components_index.py"]
 
+# Optional: the project's own rules about its components (references/rules.md in the
+# skill). The check needs GND; without it the check prints `skip:` and passes.
+# [sync.settings."scripts/rules_check.settings.json"]
+# index_script = "scripts/components_index.py"
+# gnd_command = "uvx --from get-nick-done==0.1.0 gnd"
+
 [[sync]]
 source = "skills/components/scripts/components_index.py"
 dest = "scripts/components_index.py"
@@ -76,3 +82,8 @@ script_path = "scripts/components_index.py"
 # [[sync]]
 # source = "examples/components-check.yml"
 # dest = ".github/workflows/components-check.yml"
+
+# Optional: a GitHub Actions job that checks the project's own rules on every pull request.
+# [[sync]]
+# source = "examples/rules-check.yml"
+# dest = ".github/workflows/rules-check.yml"

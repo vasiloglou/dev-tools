@@ -1,0 +1,26 @@
+# Checks the project's own rules about its components on every pull request: only what
+# the pull request adds is reported (see references/rules.md in the components skill).
+# Copy to .github/workflows/ (or sync it; see phase-project.devtools.toml). Run it beside
+# components-check.yml: this job does not check the index itself.
+name: component rules
+
+on:
+  pull_request:
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # the check compares with the merge base
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GND
+        run: pip install get-nick-done==0.1.0
+      - name: Check the rules
+        # --require: fail, rather than skip, if GND did not install.
+        run: >
+          python .claude/skills/components/scripts/rules_check.py check
+          --base "origin/${{ github.base_ref }}" --require
