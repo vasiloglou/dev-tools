@@ -343,6 +343,29 @@ def test_search_reads_a_file_again_only_when_it_changed(project):
     assert "module src/widget/scan.py" in tool(project, "search", "checksum", "everything", script=INDEX)[1]
 
 
+def test_search_names_the_symbol_and_reads_the_whole_docstring(project):
+    (project / "src/widget/graph.py").write_text(
+        '"""Graph helpers.\n\nStrongly connected components live here.\n"""\n\n\n'
+        'def ring_pairs(edges):\n    """Every genuine cycle among the edges.\n\n'
+        "    Tarjan's SCC over the edge graph, with acyclic-prefix subtraction.\n"
+        '    """\n\n\ndef count(edges):\n    """How many edges."""\n')
+    catalog(project, entry("core.graph", "Find cycles in a graph.", "src/widget/graph.py"))
+    # An exact function name names the symbol and its line under its module, and not the other symbol.
+    out = tool(project, "search", "ring_pairs", script=INDEX)[1]
+    assert ("module src/widget/graph.py: Graph helpers.\n"
+            "  symbol widget.graph.ring_pairs (line 7): Every genuine cycle among the edges.\n") in out, out
+    assert "widget.graph.count" not in out
+    # A word from the third docstring line finds the function; the summary shown is still the first line.
+    out = tool(project, "search", "--explain", "tarjan", script=INDEX)[1]
+    assert "  symbol widget.graph.ring_pairs (line 7) [1/1: tarjan]: Every genuine cycle among the edges." in out, out
+    assert "acyclic" not in out
+    # A later line of the module docstring is searched too; a module hit with no matching symbol lists none.
+    out = tool(project, "search", "strongly", "connected", script=INDEX)[1]
+    assert "module src/widget/graph.py: Graph helpers.\nno component matched" in out, out
+    # The same with and without the cache.
+    assert tool(project, "search", "tarjan", script=INDEX) == tool(project, "search", "tarjan", "--no-cache", script=INDEX)
+
+
 def test_scope_check_ignores_the_supervisors_own_files(project):
     phase(project, "setup")
     commit(project)
