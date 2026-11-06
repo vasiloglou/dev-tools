@@ -51,16 +51,20 @@ the main checkout's), because writing and checking read their installed versions
 | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
 | `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does` and `verbs` last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
 | `--root <dir>` | Runs against another checkout |
+| `--no-cache` | Before the command: parses every source file and ignores what earlier runs kept. After `search` it means the same |
 
 The search compares whole words (lower case, stop words dropped, a final "s" removed and
 a final "ies" read as "y"), not meanings. A component is matched on its id, `does` and `verbs`; a module on its name,
 docstring summaries and symbol names; a dependency name on its own summary plus the
 `does` and `verbs` of any component that lists it under `external:`.
 
-`search` keeps what it read from each source file in a cache outside the checkout
-(`$XDG_CACHE_HOME/components-index/`, by default under `~/.cache`), and reads a file
-again only when its size or time changed. `--no-cache` reads everything again; the
-result is the same. `write` and `--check` never use the cache.
+Every command keeps what it read from each source file in a cache outside the checkout
+(`$XDG_CACHE_HOME/components-index/`, by default under `~/.cache`) and parses a file
+again only when its content changed. `write`, `--check`, `changed`, `review`, `show`
+and `draft` read every file and look it up by a digest of its content, so they print
+what a full parse would print; `search` also skips reading a file whose size and time
+are unchanged. `--no-cache` before the command ignores the cache and saves nothing;
+the result is the same.
 
 ## Entry format
 
