@@ -1,10 +1,12 @@
-"""Tests for the scripts a project runs after a sync: the phase state tool, the component
-index and the phase-selection plugin. Each test works in a new project made by the sync."""
+"""Tests for the scripts a project runs after a sync: the phase state tool, the coder
+pool, the component index and the phase-selection plugin. Each test works in a new project made by the sync."""
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -354,6 +356,141 @@ def test_scope_check_ignores_the_supervisors_own_files(project):
     code, out = tool(project, "--allow", "src/widget/*", "--ignore", ".planning/phases/*-EVIDENCE/*",
                      "--max-added", "2", script=gate)
     assert code == 0 and out.strip() == "ok 1 files, 1 added"
+
+
+POOL = ".claude/skills/process-phase/scripts/coder_pool.py"
+TEAM = """[roles]
+coders = ["codex", "gemini"]
+
+[parallel]
+max_tracks = 3
+max_sessions_per_account = 2
+
+[coders.codex]
+model = "big"
+effort = "medium"
+"""
+
+
+def pool(project, on_path, *args, cwd=None):
+    """Run the coder-pool command with nothing on PATH but git and an empty stand-in for each named assistant."""
+    bin_dir = project.parent / "bin"
+    shutil.rmtree(bin_dir, ignore_errors=True)
+    bin_dir.mkdir()
+    for name, body in [(name, "") for name in on_path] + [("git", 'exec "%s" "$@"\n' % shutil.which("git"))]:
+        (bin_dir / name).write_text("#!/bin/sh\n" + body)
+        (bin_dir / name).chmod(0o755)
+    proc = subprocess.run([sys.executable, POOL, "show", *args], cwd=cwd or project, capture_output=True, text=True,
+                          env={**os.environ, "PATH": str(bin_dir)})
+    return proc.returncode, proc.stdout + proc.stderr
+
+
+def coders(project, text, name=".devtools/coders.toml"):
+    (project / name).parent.mkdir(exist_ok=True)
+    (project / name).write_text(text)
+
+
+def test_coder_pool_from_the_team_file_alone(project):
+    coders(project, TEAM)
+    code, out = pool(project, ["codex", "gemini", "claude"])
+    assert code == 0 and out == (
+        "coders:\n  codex/default: model=big effort=medium risk=any\n  gemini/default: model= effort= risk=any\n"
+        "parallel:\n  max_tracks: 3\n  max_sessions_per_account: 2\n  capacity: 4\n  effective_tracks: 3\n")
+    code, out = pool(project, ["codex", "claude"])
+    assert code == 0 and "gemini/" not in out and "capacity: 2" in out and "effective_tracks: 2" in out
+    assert "warning: coders: gemini not on PATH, dropped" in out
+
+
+def test_a_developers_local_file_overrides_the_team_file(project):
+    coders(project, TEAM)
+    coders(project, '[roles]\ncoders = ["codex"]\n\n[parallel]\nmax_tracks = 12\n\n[coders.codex]\neffort = "high"\n'
+           'accounts = [\n  { name = "A" },\n  { name = "B", env = { CODEX_HOME = "/x/b" } },\n]\n',
+           ".devtools/coders.local.toml")
+    code, out = pool(project, ["codex", "gemini"], "--json")
+    data = json.loads(out)
+    assert code == 0 and data["warnings"] == [] and sorted(data["installed"]) == ["codex", "gemini"]
+    assert [(e["tool"], e["account"], e["model"], e["effort"], e["risk"], e["env"]) for e in data["coders"]["pool"]] == [
+        ("codex", "A", "big", "high", "any", {}), ("codex", "B", "big", "high", "any", {"CODEX_HOME": "/x/b"})]
+    assert {key: value for key, value in data["coders"].items() if key != "pool"} == {
+        "fallback": False, "max_tracks": 12, "max_sessions_per_account": 2, "capacity": 4, "effective_tracks": 4}
+    assert "  codex/B: model=big effort=high risk=any CODEX_HOME=/x/b\n" in pool(project, ["codex", "gemini"])[1]
+
+
+def test_a_worktree_without_a_local_file_reads_the_main_checkouts(project):
+    coders(project, '[roles]\ncoders = ["codex"]\n')
+    commit(project)
+    coders(project, '[roles]\ncoders = ["gemini"]\n', ".devtools/coders.local.toml")
+    tree = project.parent / "track"
+    subprocess.run(["git", "worktree", "add", "-q", str(tree), "-b", "track"], cwd=project, check=True)
+    assert not (tree / ".devtools/coders.local.toml").exists()
+    out = pool(project, ["codex", "gemini", "claude"], cwd=tree)[1]
+    assert "gemini/default" in out and "codex/" not in out
+    coders(tree, '[roles]\ncoders = ["claude"]\n', ".devtools/coders.local.toml")
+    out = pool(project, ["codex", "gemini", "claude"], cwd=tree)[1]
+    assert "claude/default" in out and "gemini/" not in out and "fallback" not in out
+
+
+def test_with_no_configured_coder_on_path_the_pool_is_claude(project):
+    coders(project, '[roles]\ncoders = ["codex", "other"]\n')
+    code, out = pool(project, ["claude", "gemini"])
+    assert code == 0 and out.startswith(
+        "coders:\n  claude/default: model= effort= risk=any\n  (fallback: Claude Code coder)\nparallel:\n")
+    assert "effective_tracks: 4" in out and "warning: coders: codex not on PATH, dropped" in out
+    assert "warning: coders: other is not one of claude, codex, gemini, dropped" in out
+    assert "warning: coders: no configured coder on PATH; falling back to the Claude Code coder (claude -p)" in out
+    assert json.loads(pool(project, ["claude"], "--json")[1])["coders"]["fallback"] is True
+    code, out = pool(project, ["gemini"])
+    assert code == 0 and out.startswith("coders:\nparallel:\n") and "effective_tracks: 0" in out
+    assert "warning: coders: no coder on PATH; ask the user before Implement" in out
+    # With neither file the pool is the team default: codex, 4 tracks, 4 sessions per account.
+    (project / ".devtools/coders.toml").unlink()
+    assert pool(project, ["codex", "gemini"])[1] == (
+        "coders:\n  codex/default: model= effort= risk=any\n"
+        "parallel:\n  max_tracks: 4\n  max_sessions_per_account: 4\n  capacity: 4\n  effective_tracks: 4\n")
+
+
+def test_coder_pool_paths_are_settings_and_an_unknown_setting_is_an_error(project):
+    settings = project / ".claude/skills/process-phase/scripts/coder_pool.settings.json"
+    assert json.loads(settings.read_text()) == {
+        "team_config": ".devtools/coders.toml", "local_config": ".devtools/coders.local.toml"}
+    settings.write_text(json.dumps({"team_config": "config/team.toml", "local_config": "config/mine.toml"}))
+    coders(project, '[roles]\ncoders = ["gemini"]\n', "config/team.toml")
+    coders(project, "[coders.gemini]\nrisk = 'medium'\n", "config/mine.toml")
+    assert "  gemini/default: model= effort= risk=medium\n" in pool(project, ["codex", "gemini"])[1]
+    coders(project, '[roles]\ncoders = "gemini"\n', "config/team.toml")
+    code, out = pool(project, ["gemini"])
+    assert code == 1 and "roles.coders must be a list of tool names" in out
+    coders(project, '[roles\n', "config/team.toml")
+    code, out = pool(project, ["gemini"])
+    assert code == 1 and "config/team.toml" in out and "Traceback" not in out
+    settings.write_text(json.dumps({"team_config": "config/team.toml", "coders": ["codex"]}))
+    code, out = pool(project, ["codex"])
+    assert code == 1 and "coder_pool.settings.json: unknown setting(s): coders" in out
+
+
+def test_the_reader_for_python_without_tomllib_agrees_with_tomllib(project):
+    spec = importlib.util.spec_from_file_location("coder_pool", project / POOL)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    for text in (
+            TEAM, "", "# nothing\n", 'a = 1 # one\nb = -2\nc = 1_000\nd = true\ne = 1.5\n', "a.b = 1\n'c d'.e = \"f\"\n",
+            'a = "x # y \\" \\\\ \\t \\u00e9"\nb = \'c:\\d\'\n', "a = [\n  1, # one\n  [2, { b = [] }],\n]\n",
+            '[coders.codex]\naccounts = [{ name = "A" }, { name = "B", env = { CODEX_HOME = "~/.codex-b" } }]\n',
+            '[[coders.codex.accounts]]\nname = "A"\n[[coders.codex.accounts]]\nname = "B"\n'
+            '[coders.codex.accounts.env]\nCODEX_HOME = "/x"\n[coders.gemini]\nrisk = "medium"\n',
+            "[a.b]\nx = 1\n[a]\ny = 2\r\n[c]"):
+        assert module.SubsetReader(text, "file.toml").read() == tomllib.loads(text), text
+    for text in ("a = \n", "a 1\n", "a = 1 b = 2\n", "a = 1\na = 2\n", "[a]\n[a]\n", "[a\n", 'a = "open\n', "a = [1, 2\n",
+                 "a = {b = 1,}\n", "a = 01\n", "a = [1 2]\n", "[[a]]\n[a]\n", "a = 1\n[a]\n", 'a = "\\q"\n'):
+        with pytest.raises(tomllib.TOMLDecodeError):
+            tomllib.loads(text)
+        with pytest.raises(SystemExit, match=r"file\.toml:\d+: "):
+            module.SubsetReader(text, "file.toml").read()
+    # What it does not read is an error, never a wrong value.
+    for text in ('a = """\nb"""\n', "a = 2026-01-01\n", "a = 0x10\n", "a = inf\n"):
+        assert tomllib.loads(text)
+        with pytest.raises(SystemExit, match="older than 3.11"):
+            module.SubsetReader(text, "file.toml").read()
 
 
 def test_plain_pytest_leaves_out_phases_that_are_not_complete(project):

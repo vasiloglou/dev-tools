@@ -23,13 +23,33 @@ review is optional, not part of every write round. The validation policy in
 
 ### 1.1 Coder pool and limits
 
-Coders and parallelism are per developer. Resolve them once per Implement session with the project's coder-pool command (`references/project.md`). A project that names no such command uses the team defaults at the end of this list. It merges the team configuration with the developer's local, gitignored one (a worktree without one reads the main checkout's) and prints:
+Coders and parallelism are per developer. Resolve them once per Implement session with `python3 .claude/skills/process-phase/scripts/coder_pool.py show` (`--json` for a script). A project with neither file below gets the team defaults at the end of this list. The command merges the team file `.devtools/coders.toml` with the developer's local, gitignored `.devtools/coders.local.toml` (a worktree without one reads the main checkout's) and prints:
 
 - **`coders:`** the pool, one line per `tool/account`, in preference order, with its `model`, `effort`, `risk` and `env`. Each line is a pool you can send tracks to. Prefix the account's `env` to every command of that pool, resume included; a track keeps its account for all its rounds.
 - **`parallel:`** `max_tracks`, `max_sessions_per_account`, `capacity` and `effective_tracks = min(max_tracks, capacity)`. At most `max_sessions_per_account` concurrent sessions per account and at most `effective_tracks` tracks in total.
 - **Assignment.** High-risk and critical-path tracks (goldens, project invariants) go to the first pool entry with `risk = any`; a pool with `risk = medium` takes medium-risk tracks only, and a task stuck there after 2 rounds moves to the first `any` pool (record the move in the SUMMARY).
 - **Fallback.** When no configured coder is on PATH, the pool is `claude`. Tell the user in one line and continue with §2.2's Claude Code coder. When the pool is empty (`claude` missing too), stop and ask the user. Check each coder once before its first task (`codex --version`, `gemini --version`, `claude --version`).
 - Team defaults: `coders = ["codex"]`, 4 tracks, 4 sessions per account. Accounts, homes and other personal paths go in the local file only.
+
+Both files have the same shape, and every part is optional. Tables merge; a value or a list in the local file replaces the team's. The two paths are settings in `coder_pool.settings.json` beside the script. Never put keys or tokens in either file.
+
+```toml
+[roles]
+coders = ["codex", "gemini"]     # in preference order
+
+[parallel]
+max_tracks = 4
+max_sessions_per_account = 4
+
+[coders.codex]
+model = "<model id>"
+effort = "medium"
+risk = "any"                     # "medium": medium-risk tracks only
+accounts = [                     # local file only; without it, one account named "default"
+  { name = "A" },
+  { name = "B", env = { CODEX_HOME = "~/.codex-b" } },
+]
+```
 
 ## 2. Per-task loop (red → fix → focused green → commit)
 

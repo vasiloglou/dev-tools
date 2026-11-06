@@ -30,6 +30,13 @@ branch_prefix = "phase/"
 # ran when the first two steps only warned keeps "plan_approved".
 gated_from = "context_approved"
 
+# Where the coding assistants for Implement are configured (`coder_pool.py show` reads
+# both). The team file is checked in; the local one is each developer's own: add it to
+# .gitignore. With neither file the pool is codex, 4 tracks, 4 sessions per account.
+[sync.settings."scripts/coder_pool.settings.json"]
+team_config = ".devtools/coders.toml"
+local_config = ".devtools/coders.local.toml"
+
 # The skill that writes a phase's acceptance tests, and the helper agents the steps use.
 [[sync]]
 source = "skills/phase/phase-tests"
