@@ -21,6 +21,7 @@ Claude Code coder.
     [coders.codex]                   # every key is optional
     model = "<model id>"
     effort = "medium"
+    stuck_model = "<model id>"       # for a round on a stuck task, which the user approves
     risk = "any"                     # "medium": medium-risk tracks only
     accounts = [{ name = "A" }, { name = "B", env = { CODEX_HOME = "~/.codex-b" } }]
 
@@ -371,6 +372,7 @@ def coder_accounts(config: dict, tool: str) -> list:
             "env": dict(account.get("env", {})),
             "model": cfg.get("model", defaults.get("model", "")),
             "effort": cfg.get("effort", defaults.get("effort", "")),
+            "stuck_model": cfg.get("stuck_model", ""),
             "risk": cfg.get("risk", "any"),
         }
         for account in accounts
@@ -421,6 +423,7 @@ def render(resolved: dict) -> str:
         env = " ".join("%s=%s" % pair for pair in entry["env"].items())
         lines.append("  %s/%s: model=%s effort=%s risk=%s" % (
             entry["tool"], entry["account"], entry["model"], entry["effort"], entry["risk"])
+            + (" stuck_model=" + entry["stuck_model"] if entry["stuck_model"] else "")
             + (" " + env if env else ""))
     if coders["fallback"]:
         lines.append("  (fallback: Claude Code coder)")

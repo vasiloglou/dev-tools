@@ -404,16 +404,17 @@ def test_coder_pool_from_the_team_file_alone(project):
 def test_a_developers_local_file_overrides_the_team_file(project):
     coders(project, TEAM)
     coders(project, '[roles]\ncoders = ["codex"]\n\n[parallel]\nmax_tracks = 12\n\n[coders.codex]\neffort = "high"\n'
-           'accounts = [\n  { name = "A" },\n  { name = "B", env = { CODEX_HOME = "/x/b" } },\n]\n',
+           'stuck_model = "bigger"\naccounts = [\n  { name = "A" },\n  { name = "B", env = { CODEX_HOME = "/x/b" } },\n]\n',
            ".devtools/coders.local.toml")
     code, out = pool(project, ["codex", "gemini"], "--json")
     data = json.loads(out)
     assert code == 0 and data["warnings"] == [] and sorted(data["installed"]) == ["codex", "gemini"]
     assert [(e["tool"], e["account"], e["model"], e["effort"], e["risk"], e["env"]) for e in data["coders"]["pool"]] == [
         ("codex", "A", "big", "high", "any", {}), ("codex", "B", "big", "high", "any", {"CODEX_HOME": "/x/b"})]
+    assert [e["stuck_model"] for e in data["coders"]["pool"]] == ["bigger", "bigger"]
     assert {key: value for key, value in data["coders"].items() if key != "pool"} == {
         "fallback": False, "max_tracks": 12, "max_sessions_per_account": 2, "capacity": 4, "effective_tracks": 4}
-    assert "  codex/B: model=big effort=high risk=any CODEX_HOME=/x/b\n" in pool(project, ["codex", "gemini"])[1]
+    assert "  codex/B: model=big effort=high risk=any stuck_model=bigger CODEX_HOME=/x/b\n" in pool(project, ["codex", "gemini"])[1]
 
 
 def test_a_worktree_without_a_local_file_reads_the_main_checkouts(project):

@@ -25,7 +25,7 @@ review is optional, not part of every write round. The validation policy in
 
 Coders and parallelism are per developer. Resolve them once per Implement session with `python3 .claude/skills/process-phase/scripts/coder_pool.py show` (`--json` for a script). A project with neither file below gets the team defaults at the end of this list. The command merges the team file `.devtools/coders.toml` with the developer's local, gitignored `.devtools/coders.local.toml` (a worktree without one reads the main checkout's) and prints:
 
-- **`coders:`** the pool, one line per `tool/account`, in preference order, with its `model`, `effort`, `risk` and `env`. Each line is a pool you can send tracks to. Prefix the account's `env` to every command of that pool, resume included; a track keeps its account for all its rounds.
+- **`coders:`** the pool, one line per `tool/account`, in preference order, with its `model`, `effort`, `risk` and `env`, and its `stuck_model` when it has one. Each line is a pool you can send tracks to. Prefix the account's `env` to every command of that pool, resume included; a track keeps its account for all its rounds.
 - **`parallel:`** `max_tracks`, `max_sessions_per_account`, `capacity` and `effective_tracks = min(max_tracks, capacity)`. At most `max_sessions_per_account` concurrent sessions per account and at most `effective_tracks` tracks in total.
 - **Assignment.** High-risk and critical-path tracks (goldens, project invariants) go to the first pool entry with `risk = any`; a pool with `risk = medium` takes medium-risk tracks only, and a task stuck there after 2 rounds moves to the first `any` pool (record the move in the SUMMARY).
 - **Fallback.** When no configured coder is on PATH, the pool is `claude`. Tell the user in one line and continue with §2.2's Claude Code coder. When the pool is empty (`claude` missing too), stop and ask the user. Check each coder once before its first task (`codex --version`, `gemini --version`, `claude --version`).
@@ -44,6 +44,7 @@ max_sessions_per_account = 4
 [coders.codex]
 model = "<model id>"
 effort = "medium"
+stuck_model = "<model id>"       # for a round on a stuck task (§2.2)
 risk = "any"                     # "medium": medium-risk tracks only
 accounts = [                     # local file only; without it, one account named "default"
   { name = "A" },
@@ -94,8 +95,8 @@ codex exec resume --last -c model_reasoning_effort=<effort> \
 ```
 
 - Network stays off. Relaxing it for one task needs the user's sign-off, noted in the SUMMARY. Pass the `network_access=false` override on every call, resume included: `resume` does not inherit the first round's `-c` flags and falls back to `config.toml`.
-- **Stuck task.** A task is stuck when it cannot resolve the same failing focused test, or when codex asks for help. **Ask the user before any round on the stuck-task model** (show the task, the failure and the rounds so far); never start one without their explicit yes. With approval, start a *fresh* round with `-m <stuck-task model> -c model_reasoning_effort=<effort>` (`resume` keeps the original model), then return to the pool's `<model>` for the next task. Record the approval and the switch in the SUMMARY rounds table.
-- Model ids: the coding model and the stuck-task model come from the project's coder configuration (§1.1).
+- **Stuck task.** A task is stuck when it cannot resolve the same failing focused test, or when codex asks for help. **Ask the user before any round on the stuck-task model** (show the task, the failure and the rounds so far); never start one without their explicit yes. With approval, start a *fresh* round with `-m <stuck_model> -c model_reasoning_effort=<effort>` (`resume` keeps the original model), then return to the pool's `<model>` for the next task. Record the approval and the switch in the SUMMARY rounds table.
+- Model ids: the coding model is the pool's `model` and the stuck-task model is its `stuck_model` (§1.1). A pool with no `stuck_model` has none: ask the user which model to use when you ask for the round.
 - **More accounts.** A second codex account is a pool entry whose `env` sets its own `CODEX_HOME` (a separate CLI home); it runs the same line with that prefix and the same model. `resume` needs the same `CODEX_HOME`. No other coding CLI writes project code unless the user explicitly asks.
 
 #### gemini

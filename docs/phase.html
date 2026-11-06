@@ -82,7 +82,7 @@
     </li>
     <li>
       <h3>Implement</h3>
-      <p>The agent supervises; a separate coding agent writes the code, one failing test at a time. Each round is checked before it is accepted: a round that touched a file outside its list, or changed a locked test, is rejected whole. Independent tasks can run side by side in separate working copies.</p>
+      <p>The agent supervises; a separate coding agent writes the code, one failing test at a time. Each round is checked before it is accepted: a round that touched a file outside its list, or changed a locked test, is rejected whole. Independent tasks can run side by side in separate working copies, on <a href="#coders">more than one coding assistant</a>.</p>
       <p class="leaves"><strong>Leaves behind:</strong> the code, one commit per task, and a short summary of what was done and what deviated from the plan.</p>
     </li>
     <li>
@@ -403,6 +403,40 @@ ace2f59 docs(03): plan phase (1 plans)
     <li><strong>One full run per phase.</strong> It happens in Verify, on the finished code.</li>
     <li><strong>No review loops by default.</strong> Code review is optional. A failed test leads to a fix, not to a round of reports about the failure.</li>
   </ul>
+  <h2 id="coders">More than one coding assistant</h2>
+  <p>During Implement the code is written by a coding assistant run from the command line: Codex, Gemini or Claude Code. A project names the ones it uses in one small file, and independent tasks are spread over them, each in its own working copy. A developer can add a file of their own, kept out of git, for a second account or a different limit.</p>
+<pre class="code"><span class="dim"># .devtools/coders.toml: the team's file</span>
+<span class="k">[roles]</span>
+coders = ["codex", "gemini"]
+
+<span class="k">[parallel]</span>
+max_tracks = 6
+
+<span class="k">[coders.codex]</span>
+effort = "medium"
+
+<span class="k">[coders.gemini]</span>
+risk = "medium"
+
+<span class="dim"># .devtools/coders.local.toml: one developer's own</span>
+<span class="k">[coders.codex]</span>
+accounts = [
+  { name = "work" },
+  { name = "personal", env = { CODEX_HOME = "~/.codex-personal" } },
+]</pre>
+  <p>One command shows what the agent will use. An assistant that is not installed is left out, and when none is left the work goes to Claude Code.</p>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the coding assistants</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">coder-pool show</span>
+coders:
+  codex/work: model= effort=medium risk=any
+  codex/personal: model= effort=medium risk=any CODEX_HOME=~/.codex-personal
+  gemini/default: model= effort= risk=medium
+parallel:
+  max_tracks: 6
+  max_sessions_per_account: 4
+  capacity: 12
+  effective_tracks: 6</pre></div>
+  <p class="caption">Three places to send work, and at most six tasks at once. An empty model means the assistant's own default. Gemini is marked for medium-risk tasks only.</p>
   <h2>Your project's own rules</h2>
   <p>The shared skill knows nothing about your product. Rules that only make sense in your project (an invariant that must never break, an extra check before release, the command that runs your tests) go in one file your project owns, <code>references/project.md</code>, beside the skill. The agent reads it in Orient, and it wins over the shared text on anything project-specific. Updating the shared skill never touches it.</p>
   <div class="next">
