@@ -348,8 +348,15 @@ def test_search_names_the_symbol_and_reads_the_whole_docstring(project):
         '"""Graph helpers.\n\nStrongly connected components live here.\n"""\n\n\n'
         'def ring_pairs(edges):\n    """Every genuine cycle among the edges.\n\n'
         "    Tarjan's SCC over the edge graph, with acyclic-prefix subtraction.\n"
-        '    """\n\n\ndef count(edges):\n    """How many edges."""\n')
+        '    """\n\n\ndef count(edges):\n    """How many edges."""\n\n\n'
+        'def _sccs(edges):\n    """Iterative Tarjan with lowlink values."""\n\n\n'
+        'class _Stack:\n    """Node stack."""\n\n    def push(self, node):\n        """Push a node; its lowlink is set."""\n')
     catalog(project, entry("core.graph", "Find cycles in a graph.", "src/widget/graph.py"))
+    # The pages list the public names only; `show` keeps the private ones on its "also defines" line.
+    page = (project / "docs/components/modules/_root.md").read_text()
+    assert "ring_pairs" in page and "_sccs" not in page and "_Stack" not in page
+    shown = tool(project, "show", "core.graph", script=INDEX)[1]
+    assert "  18: _sccs" not in shown and "also defines: _sccs, _Stack" in shown, shown
     # An exact function name names the symbol and its line under its module, and not the other symbol.
     out = tool(project, "search", "ring_pairs", script=INDEX)[1]
     assert ("module src/widget/graph.py: Graph helpers.\n"
@@ -359,9 +366,14 @@ def test_search_names_the_symbol_and_reads_the_whole_docstring(project):
     out = tool(project, "search", "--explain", "tarjan", script=INDEX)[1]
     assert "  symbol widget.graph.ring_pairs (line 7) [1/1: tarjan]: Every genuine cycle among the edges." in out, out
     assert "acyclic" not in out
+    assert "  symbol widget.graph._sccs (line 18, private) [1/1: tarjan]: Iterative Tarjan with lowlink values." in out, out
     # A later line of the module docstring is searched too; a module hit with no matching symbol lists none.
     out = tool(project, "search", "strongly", "connected", script=INDEX)[1]
     assert "module src/widget/graph.py: Graph helpers.\nno component matched" in out, out
+    # A private function, and a method of a private class, are searched too and marked as private.
+    out = tool(project, "search", "lowlink", script=INDEX)[1]
+    assert ("  symbol widget.graph._sccs (line 18, private): Iterative Tarjan with lowlink values.\n"
+            "  symbol widget.graph._Stack.push (line 25, private): Push a node; its lowlink is set.\n") in out, out
     # The same with and without the cache.
     assert tool(project, "search", "tarjan", script=INDEX) == tool(project, "search", "tarjan", "--no-cache", script=INDEX)
 
