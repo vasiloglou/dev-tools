@@ -76,7 +76,7 @@ runs on 3.9.
 
 | Path | What |
 |---|---|
-| `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks, and `phase_tool.py setup` writes a new project's starter planning files. |
+| `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks, and `phase_tool.py setup` writes a new project's starter planning files. `scripts/coder_pool.py show` prints which coding assistants Implement may run in parallel and how many at once, from a team file and each developer's own. |
 | `skills/phase/phase-tests/` | How a phase's acceptance tests are written and locked. |
 | `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
 | `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
