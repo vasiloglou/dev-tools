@@ -95,6 +95,7 @@ after_apply: python3 scripts/components_index.py write
         <div>
           <p>The shared skills are written to know nothing about your product. What is specific to you goes in one file that you own and the sync never touches: <code>references/project.md</code>, beside the skill.</p>
           <p>Typical contents: the command that runs your tests, the rules that must never be broken, extra checks before a release, the reviewer you use. The agent reads it first, and it wins on anything project-specific.</p>
+          <p>A rule about which parts of the code may use which has a second home where it is checked rather than read: <code>docs/components/layers.toml</code> beside the <a href="components.html">component index</a>, which the sync never touches either.</p>
         </div>
         <div>
 <pre class="code"><span class="dim"># .claude/skills/process-phase/references/project.md</span>

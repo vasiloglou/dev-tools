@@ -13,13 +13,19 @@ Status: prototype.
 
 - **Phase workflow.** One roadmap phase at a time, in seven steps: Orient, Discuss (with
   a timeboxed prototype), Specify (acceptance tests, locked before code is written),
-  Plan, Implement, Verify, Close. You approve at four of them.
+  Plan, Implement, Verify, Close. You approve at four of them. Two advisory checks
+  compare the plans with the agreed tests and the change with the plans.
 - **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
   independent review of each change, and numbered records that are never edited.
 - **Component index.** A searchable map of what the code already does, so existing code
   is reused instead of written again. The agent can build it for a codebase that has
   none, check it against every change, and review it from the top: repair the index and
   list the code changes it would suggest.
+- **Project rules (optional, a trial).** A project states which areas of its code may
+  use which, and other rules about its components, and every change is checked against
+  them: only what the change added is reported. The index is exported as plain facts;
+  the rules are judged by [GND](https://github.com/vasiloglou/gnd-public), which the
+  project installs separately.
 
 A project picks the workflow that fits it. Both use the component index.
 
