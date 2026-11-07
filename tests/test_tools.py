@@ -509,35 +509,47 @@ def layered(project, cli_imports_sizes=True):
     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
 
 
-def fake_gnd(project, **reports):
-    """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for them."""
+def fake_gnd(project, report=None, exit_code=0, stderr=""):
+    """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it."""
     folder = project.parent / "fake-gnd"
     folder.mkdir(exist_ok=True)
     script = folder / "gnd"
     script.write_text(
         "#!%s\nimport shutil, sys\nfrom pathlib import Path\n"
-        "here, model, facts = Path(__file__).parent, Path(sys.argv[2]), Path(sys.argv[3])\n"
-        "name = facts.name.split('.')[0]\n"
-        "shutil.copy(model, here / 'model.json')\nshutil.copy(facts, here / (name + '.facts.json'))\n"
-        "print((here / (name + '.report.json')).read_text())\n" % sys.executable)
+        "here = Path(__file__).parent\n"
+        "shutil.copy(sys.argv[2], here / 'model.json'); shutil.copy(sys.argv[3], here / 'head.facts.json')\n"
+        "(here / 'argv.txt').write_text(' '.join(sys.argv[1:]))\n"
+        "sys.stderr.write((here / 'stderr.txt').read_text())\n"
+        "print((here / 'report.json').read_text())\n"
+        "sys.exit(int((here / 'exit.txt').read_text()))\n" % sys.executable)
     script.chmod(0o755)
-    for name, text in reports.items():
-        (folder / (name + ".report.json")).write_text(text if isinstance(text, str) else json.dumps(text))
+    (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
+    (folder / "exit.txt").write_text(str(exit_code))
+    (folder / "stderr.txt").write_text(stderr)
     (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": str(script)}))
     return folder
 
 
-def gnd_report(*verdicts, exit_code=0, version=7, rules=4, **more):
-    """A report with a verdict for each rule: the ones given, and a pass for the rest."""
-    given = {v["constraint_ref"] for v in verdicts}
-    rest = [verdict(n, "pass") for n in range(rules) if "constraints[%d]" % n not in given]
+STARTER_IDS = ["no_forbidden_area_use", "no_use_of_a_higher_rank", "no_import_inside_a_loop",
+               "canonical_component_has_a_test"]
+
+
+def gnd_report(*verdicts, exit_code=0, version=15, rules=STARTER_IDS, baseline=None, **more):
+    """A version-15 report with a verdict for each rule: the ones given, and a pass for the rest."""
+    given = {v["address"] for v in verdicts}
+    rest = [verdict(name, "pass") for name in rules if "constraint:" + name not in given]
     return {"schema_version": version, "exit_code": exit_code, "outcome": "accepted", "issues": [],
-            "verdicts": list(verdicts) + rest, **more}
+            "verdicts": list(verdicts) + rest, "baseline": baseline, **more}
 
 
-def verdict(index, state, *offending, modality="alethic", reason=None):
-    return {"constraint_ref": "constraints[%d]" % index, "constraint_type": "guarded", "modality": modality,
-            "verdict": state, "message": "as gnd words it", "offending_facts": list(offending), "reason_code": reason}
+def verdict(name, state, *offending, standing=(), reason=None):
+    """A verdict on the rule `name`; `standing` lists the offending rows that were broken at the base too."""
+    marks = ["standing" if row in standing else "new" for row in offending] if standing else None
+    return {"address": "constraint:" + name, "addressing": "declared-id", "constraint_type": "guarded",
+            "modality": "alethic", "verdict": state, "message": "as gnd words it", "remedy": None,
+            "offending_facts": list(offending), "reason_code": reason,
+            "novelty": ("standing" if marks and all(m == "standing" for m in marks) else "new") if marks else None,
+            "row_novelty": marks}
 
 
 USE = {"$a": "cli.run", "$b": "core.sizes", "$from": "cli", "$to": "core"}
@@ -548,8 +560,7 @@ def test_rules_init_never_overwrites(project):
     layered(project)
     path = project / "docs/components/rules.json"
     starter = path.read_text()
-    assert [rule["id"] for rule in json.loads(starter)["rules"]] == [
-        "no_forbidden_area_use", "no_use_of_a_higher_rank", "no_import_inside_a_loop", "canonical_component_has_a_test"]
+    assert [rule["id"] for rule in json.loads(starter)["rules"]] == STARTER_IDS
     path.write_text('{"rules": []}\n')
     code, out = tool(project, "init", script=RULES)
     assert code == 0 and "docs/components/rules.json exists; left as it is" in out
@@ -574,22 +585,28 @@ def test_rules_skips_without_gnd(project):
 
 def test_rules_names_rule_id_and_import_evidence(project):
     layered(project)
-    seen = fake_gnd(project, head=gnd_report(verdict(0, "fail", USE), verdict(1, "vacuous"), verdict(2, "pass"),
-                                             verdict(3, "warning", {"$a": "cli.run"}, modality="deontic"),
-                                             exit_code=1))
+    seen = fake_gnd(project, gnd_report(verdict("no_forbidden_area_use", "fail", USE),
+                                        verdict("no_use_of_a_higher_rank", "vacuous"),
+                                        verdict("canonical_component_has_a_test", "warning", {"$a": "cli.run"}),
+                                        exit_code=1))
     code, out = tool(project, "check", script=RULES)
     assert code == 1, out
-    assert ("fail: no_forbidden_area_use: This area must not use that one (a [[forbid]] pair in layers.toml): "
-            "a=cli.run b=core.sizes from=cli to=core (src/widget/cli.py -> src/widget/sizes.py)") in out
-    assert "warn: canonical_component_has_a_test: A canonical component lists no test: a=cli.run" in out
+    assert ("fail: no_forbidden_area_use: a=cli.run b=core.sizes from=cli to=core (src/widget/cli.py -> src/widget/sizes.py)\n"
+            "  remedy: This area must not use that one (a [[forbid]] pair in layers.toml): move the import, "
+            "or the module to the component it belongs to\n") in out
+    assert "warn: canonical_component_has_a_test: a=cli.run\n  remedy: A canonical component lists no test" in out
     assert "rules: 4 rule(s); 1 to fix, 1 warning(s)" in out
 
     model = json.loads((seen / "model.json").read_text())
     facts_seen = json.loads((seen / "head.facts.json").read_text())
-    assert [c["id"] for c in model["constraints"]][0] == "no_forbidden_area_use"
-    assert all("message" not in c and "level" not in c for c in model["constraints"])
+    argv = (seen / "argv.txt").read_text()
+    assert argv.startswith("check ") and "--rule-ids --allow-vacuous --format json" in argv and "--baseline" not in argv
+    assert [c["id"] for c in model["constraints"]] == STARTER_IDS
+    assert all("level" not in c and c["remedy"] for c in model["constraints"])
     assert [c["modality"] for c in model["constraints"]] == ["alethic", "alethic", "deontic", "deontic"]
     assert {f["id"] for f in model["fact_types"]} == set(facts_seen["facts"]) == set(facts_seen["population"]["covers"])
+    assert facts_seen["population"]["source"] == "tool-output"
+    assert facts_seen["population"]["producer"].startswith("components_index.py facts @ ")
     assert facts_seen["facts"]["area_must_not_use"] == [{"source": "cli", "target": "core"}]
 
     code, out = tool(project, "check", "--format", "json", script=RULES)
@@ -601,18 +618,23 @@ def test_rules_reports_only_violations_new_since_base(project):
     layered(project, cli_imports_sizes=False)
     commit(project)
     (project / "src/widget/cli.py").write_text('"""Cli."""\nfrom widget import sizes\n')
-    fake_gnd(project, head=gnd_report(verdict(0, "fail", OTHER, USE), exit_code=1),
-             base=gnd_report(verdict(0, "fail", OTHER), exit_code=1))
+    base = {"population": "base.pop.json", "new": 1, "standing": 1, "resolved": 0, "positional_keyed": 0, "undecided": 0}
+    seen = fake_gnd(project, gnd_report(verdict("no_forbidden_area_use", "fail", OTHER, USE, standing=[OTHER]),
+                                        exit_code=1, baseline=base))
     code, out = tool(project, "check", "--base", "main", script=RULES)
     assert code == 1, out
+    assert "--baseline" in (seen / "argv.txt").read_text()
     assert "a=cli.run b=core.sizes" in out and out.count("fail:") == 1, "what was broken at the base is not news"
     assert "(src/widget/cli.py -> src/widget/sizes.py) [new import]" in out
     assert "rules against main (" in out and "1 to fix, 0 warning(s), 1 standing" in out
+    assert json.loads(tool(project, "check", "--base", "main", "--format", "json", script=RULES)[1])["baseline"] == base
+    fake_gnd(project, gnd_report(verdict("no_forbidden_area_use", "fail", OTHER, USE), exit_code=1))
     code, out = tool(project, "check", script=RULES)
     assert code == 1 and out.count("fail:") == 2 and "[new import]" not in out and "standing" not in out
 
-    fake_gnd(project, head=gnd_report(verdict(2, "warning", *({"$a": "c.x%d" % n} for n in range(13)), modality="deontic")),
-             base=gnd_report())
+    fake_gnd(project, gnd_report(verdict("no_import_inside_a_loop", "warning",
+                                         *({"$a": "c.x%d" % n} for n in range(13)), standing=[{"$a": "none"}]),
+                                 baseline=base))
     code, out = tool(project, "check", "--base", "main", script=RULES)
     assert code == 0 and out.count("warn:") == 10 and "… +3 more for no_import_inside_a_loop" in out
     assert tool(project, "check", "--base", "main", "--strict", script=RULES)[0] == 1
@@ -620,35 +642,38 @@ def test_rules_reports_only_violations_new_since_base(project):
 
 def test_rules_vacuous_is_not_a_failure(project):
     layered(project)
-    fake_gnd(project, head=gnd_report(*(verdict(n, "vacuous") for n in range(4)), exit_code=2, outcome="inadequate"))
+    fake_gnd(project, gnd_report(*(verdict(name, "vacuous") for name in STARTER_IDS), allow_vacuous=True))
     code, out = tool(project, "check", script=RULES)
     assert code == 0 and "0 to fix, 0 warning(s)" in out
 
-    fake_gnd(project, head=gnd_report(verdict(1, "unchecked", reason="values-not-comparable"), exit_code=4))
+    fake_gnd(project, gnd_report(verdict("no_use_of_a_higher_rank", "unchecked", reason="values-not-comparable"), exit_code=4))
     code, out = tool(project, "check", script=RULES)
-    assert code == 1 and "fail: no_use_of_a_higher_rank: gnd could not decide this rule (values-not-comparable)" in out
+    assert code == 1 and "fail: no_use_of_a_higher_rank\n  remedy: gnd could not decide this rule (values-not-comparable)" in out
 
-    fake_gnd(project, head={"schema_version": 7, "exit_code": 3, "outcome": "ill_formed",
-                            "issues": [{"path": "$.constraints[0]", "message": "unknown fact type"}]})
+    fake_gnd(project, {"schema_version": 15, "exit_code": 3, "outcome": "ill_formed",
+                       "issues": [{"path": "$.constraints[0]", "message": "unknown fact type"}]}, exit_code=3)
     code, out = tool(project, "check", script=RULES)
     assert code == 2 and "gnd did not judge the rules (ill_formed, exit 3): $.constraints[0]: unknown fact type" in out
-    fake_gnd(project, head={"schema_version": 7, "exit_code": 70, "outcome": "internal_error", "issues": [],
-                            "verdicts": [], "error": "boom"})
+    fake_gnd(project, {"schema_version": 15, "exit_code": 70, "outcome": "internal_error", "issues": [],
+                       "verdicts": [], "error": "boom"}, exit_code=70)
     code, out = tool(project, "check", script=RULES)
     assert code == 2 and "gnd did not judge the rules (internal_error, exit 70): boom" in out, \
         "a report with no verdicts is not a pass"
-    fake_gnd(project, head=gnd_report(rules=3))
+    fake_gnd(project, gnd_report(rules=STARTER_IDS[:3]))
     code, out = tool(project, "check", script=RULES)
     assert code == 2 and "gnd gave no verdict for: canonical_component_has_a_test" in out
-    fake_gnd(project, head=gnd_report(verdict(7, "fail", USE)))
+    fake_gnd(project, gnd_report(verdict("no_such_rule", "fail", USE)))
     code, out = tool(project, "check", script=RULES)
     assert code == 2 and "gnd wrote a report this script cannot read" in out
-    fake_gnd(project, head=gnd_report(version=10))
+    fake_gnd(project, gnd_report(version=7))
     code, out = tool(project, "check", script=RULES)
-    assert code == 2 and "report version 10" in out, "later versions word the offending facts differently"
-    fake_gnd(project, head="Traceback: gnd broke")
+    assert code == 2 and "report version 7" in out
+    fake_gnd(project, "Traceback: gnd broke", exit_code=70)
     code, out = tool(project, "check", script=RULES)
     assert code == 2 and "gnd check failed" in out
+    fake_gnd(project, "", exit_code=64, stderr="usage: gnd check ...\ngnd check: error: unrecognized arguments: --rule-ids\n")
+    code, out = tool(project, "check", script=RULES)
+    assert code == 2 and "this GND has no --rule-ids: install a build at or after git+" in out
 
     (project / "docs/components/rules.json").write_text('{"rules": [{"id": "Bad Id"}, {"id": "ok", "level": "maybe"}]}')
     code, out = tool(project, "check", script=RULES)
@@ -658,7 +683,7 @@ def test_rules_vacuous_is_not_a_failure(project):
 def test_rules_says_when_the_rules_file_changed(project):
     layered(project)
     commit(project)
-    fake_gnd(project, head=gnd_report(), base=gnd_report())
+    fake_gnd(project, gnd_report(baseline={"new": 0, "standing": 0}))
     code, out = tool(project, "check", "--base", "main", script=RULES)
     assert code == 0 and "reread:" not in out
     path = project / "docs/components/rules.json"
@@ -680,7 +705,7 @@ def test_rules_with_real_gnd(project):
     (project / "src/widget/cli.py").write_text('"""Cli."""\nfrom widget import sizes\n')
     code, out = tool(project, "check", "--base", "main", script=RULES)
     assert code == 1, out
-    assert "fail: no_forbidden_area_use:" in out and "a=cli.run b=core.sizes from=cli to=core" in out
+    assert "fail: no_forbidden_area_use: a=cli.run b=core.sizes from=cli to=core" in out and "\n  remedy: This area" in out
     assert "(src/widget/cli.py -> src/widget/sizes.py) [new import]" in out and "1 to fix, 0 warning(s), 2 standing" in out
     (project / "docs/components/layers.toml").write_text("[rank]\ncli = 0\ncore = 1\n")
     code, out = tool(project, "check", script=RULES)

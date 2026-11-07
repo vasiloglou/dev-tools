@@ -27,15 +27,18 @@ moved the catalog finds them there.
 
 ## Set it up
 
-1. Install GND where the check will run (Python 3.11 or newer):
+1. Install GND where the check will run (Python 3.11 or newer). The check needs the
+   rule-check flags (`--rule-ids`, `--baseline`, `--allow-vacuous`), which the published
+   release 0.1.0 does not have; until the next release, install from the repository:
 
    ```bash
-   uv tool install get-nick-done==0.1.0
+   uv tool install "get-nick-done @ git+https://github.com/vasiloglou/gnd-public@f4ce6992"
    ```
 
-   A project that would rather not install it sets
-   `gnd_command = "uvx --from get-nick-done==0.1.0 gnd"`. Release 0.1.0 is the one this
-   script was tried with; it stops (exit 2) on a report from a version it does not know.
+   That commit is the one this script was tried with. A project that would rather not
+   install it sets `gnd_command` to a command that runs it, for example
+   `uv run --project <a checkout of gnd-public> gnd`. The script stops (exit 2) when GND
+   has no `--rule-ids`, and on a report of a version it does not know.
 2. Write the starter files (neither is overwritten if it exists):
 
    ```bash
@@ -73,10 +76,10 @@ moved the catalog finds them there.
 python3 .claude/skills/components/scripts/rules_check.py check --base <base branch>
 ```
 
-- `fail: <rule id>: <message>: <the components> (<one import behind them>)` A `must`
-  rule the change broke. Fix the import, or move the module to the component it belongs
-  to. Do not edit the rule to make the line go away; a rule changes only with the
-  user's go-ahead.
+- `fail: <rule id>: <the components> (<one import behind them>)`, then `remedy:` with
+  the rule's advice. A `must` rule the change broke. Fix the import, or move the module
+  to the component it belongs to. Do not edit the rule to make the line go away; a rule
+  changes only with the user's go-ahead.
 - `warn:` A `should` rule the change broke. Fix it, or say why not in the PR body.
 - `[new import]` at the end of a line: the change added the import the line names. For
   each rule these come first, and they are where to start. A line without the mark is
@@ -117,7 +120,7 @@ A rule is one object in the `rules` list of `rules.json`:
 {
   "id": "canonical_does_not_use_experimental",
   "level": "must",
-  "message": "A canonical component uses an experimental one: finish it first, or mark the caller experimental",
+  "remedy": "A canonical component uses an experimental one: finish it first, or mark the caller experimental",
   "type": "guarded",
   "antecedent": [
     {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}},
@@ -129,7 +132,8 @@ A rule is one object in the `rules` list of `rules.json`:
 
 - `id`: lower-case letters, digits and `_`; unique, and not the name of a fact type.
 - `level`: `must` (a `fail:`) or `should` (a `warn:`). Default `must`.
-- `message`: what the line says, and what to do about it.
+- `remedy`: what to do when the rule is broken; printed under each line. GND keeps it
+  on the rule and repeats it in its own reports.
 - Everything else is a GND constraint as GND writes it, of a kind GND allows at the top
   level of a model (`guarded`, `subset`, `equality`, `value` and others). The kinds GND
   writes inside one fact type (a ring constraint such as acyclic, or a uniqueness or
@@ -143,6 +147,11 @@ A rule is one object in the `rules` list of `rules.json`:
   - `comparison`: two values compared with `=`, `!=`, `<`, `<=`, `>`, `>=`.
 - The script adds what GND also wants on a rule (its modality, source, status and
   provenance); do not write those.
+
+What the script does itself is small: it turns the facts file into a GND model and
+population, runs `gnd check` with `--rule-ids --allow-vacuous`, and with `--base` adds
+`--baseline` so that GND marks each violation new or standing. GND's own account of
+those flags: <https://github.com/vasiloglou/gnd-public/blob/main/docs/how-to/adopt-rules-with-a-baseline.md>.
 
 An antecedent has no "not" and no "or": a rule that needs "unless both are in the same
 area" has to be turned around until the exception is in the consequent, or split in two.

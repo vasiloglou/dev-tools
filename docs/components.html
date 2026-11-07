@@ -189,7 +189,7 @@ changed against develop (d74dcb8): 5 file(s) differ; 0 to fix, 0 warning(s), 0 t
       <ul>
         <li><strong>Layers:</strong> a small file gives each area a rank, or names pairs that are never allowed. No rule to write.</li>
         <li><strong>Other rules:</strong> one entry each in a rules file, marked <em>must</em> (a failure) or <em>should</em> (a warning). Four starter rules ship.</li>
-        <li><strong>Only what the change added:</strong> the base and the branch are judged by the same rules, and what was already broken is counted, not reported. An existing project can switch the check on without fixing its history first.</li>
+        <li><strong>Only what the change added:</strong> GND judges the base and the branch by the same rules and marks each finding new or standing; what was already broken is counted, not reported. An existing project can switch the check on without fixing its history first.</li>
       </ul>
       <p>The rules are judged by <a href="https://github.com/vasiloglou/gnd-public">GND</a>, a checker of facts against rules that the project installs separately. Without it the check says so and passes; nothing else depends on it. This check is a trial: it has run on two codebases and no project has adopted it yet.</p>
     </div>
@@ -203,9 +203,12 @@ report = 1
 cli = 2
 
 <span class="p">$</span> <span class="cmd">rules check --base develop</span>
-fail: no_use_of_a_higher_rank: A component uses one of a higher rank ([rank] in layers.toml): a=fs.scan b=report.rows from=fs to=report rank=0 used=1 (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
-warn: no_import_inside_a_loop: This import is part of a loop of imports between components: a=fs.scan b=report.rows (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
-warn: no_import_inside_a_loop: This import is part of a loop of imports between components: a=report.rows b=fs.scan (src/shelf/report.py -&gt; src/shelf/scan.py)
+fail: no_use_of_a_higher_rank: a=fs.scan b=report.rows from=fs to=report rank=0 used=1 (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
+  remedy: A component uses one of a higher rank ([rank] in layers.toml): move what it needs down, or the caller up
+warn: no_import_inside_a_loop: a=fs.scan b=report.rows (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
+  remedy: This import is part of a loop of imports between components: move the shared code into a component both can use
+warn: no_import_inside_a_loop: a=report.rows b=fs.scan (src/shelf/report.py -&gt; src/shelf/scan.py)
+  remedy: This import is part of a loop of imports between components: move the shared code into a component both can use
 rules against develop (f8ca93c): 4 rule(s); 1 to fix, 2 warning(s), 4 standing
 <span class="dim">exit code 1</span></pre></div>
       <p class="caption">One new import breaks the rank rule and closes a loop. The line marked as a new import is the one to fix; the last line is an old import the new one pulled into the loop. The four standing items were there before the branch. <code>rules</code> is short for <code>python3 .claude/skills/components/scripts/rules_check.py</code>.</p>

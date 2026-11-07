@@ -7,21 +7,22 @@
 ``check`` asks ``components_index.py facts`` for the catalog and the import graph as
 facts, adds the rules in ``rules.json``, and has ``gnd check`` judge them
 (https://github.com/vasiloglou/gnd-public). It prints ``fail:`` for a broken ``must``
-rule and ``warn:`` for a broken ``should`` rule, each with the rule's id, its message,
-the components and one import behind them. With ``--base`` it judges the merge base
-with REF as well, under today's rules, and reports only what the change added; a line
-ends in ``[new import]`` when the change added the import it names, and for each rule
-those come first.
+rule and ``warn:`` for a broken ``should`` rule, each with the rule's id, the components
+and one import behind them, and the rule's remedy on the next line. With ``--base`` GND
+judges the merge base with REF as well, under today's rules, and only what the change
+added is printed; a line ends in ``[new import]`` when the change added the import it
+names, and for each rule those come first.
 
-Exit 0 when nothing is to fix, 1 when a ``fail:`` is printed (with ``--strict`` also a
-``warn:``), 2 when the check could not run. Without GND it prints ``skip:`` and exits 0
-(1 with ``--require``). Exit 0 means no ``must`` rule is newly broken in the facts the
-index script extracted: with ``--base``, what was broken before still is, and an import
-the script cannot see (a dynamic import, a name built at run time) breaks no rule.
+Exit 0 means no ``must`` rule is newly broken in the facts the index script extracted:
+with ``--base``, what was broken before still is, and an import the script cannot see
+(a dynamic import, a name built at run time) breaks no rule. Exit 1 when a ``fail:`` is
+printed (with ``--strict`` also a ``warn:``), 2 when the check did not run. Without GND
+it prints ``skip:`` and exits 0 (1 with ``--require``).
 
 ``rules.json`` and ``layers.toml`` live beside the catalog, in the index script's
 ``docs_dir``. Settings live beside this script, in rules_check.settings.json. Needs
-Python 3.11 or newer.
+Python 3.11 or newer, and a GND with the rule-check flags (``--rule-ids``,
+``--baseline``, ``--allow-vacuous``: report version 15).
 """
 from __future__ import annotations
 
@@ -38,25 +39,28 @@ from pathlib import Path
 
 DEFAULT_SETTINGS = {
     'index_script': 'scripts/components_index.py',
-    # The command that runs GND, for example "uvx --from get-nick-done==0.1.0 gnd".
+    # The command that runs GND, for example "uv tool run --from <where GND is> gnd".
     'gnd_command': 'gnd',
 }
 SHOWN = 10  # lines printed for one rule; --format json has them all
-REPORTS = {7}  # the `gnd check` report versions this script was tried with; later ones word offending facts differently
+REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, and new or standing
 BANDS = {0, 1, 2, 4}  # exit codes of a check that ran: accepted, violated, vacuous rules, undecided
 USES = ('component_uses', 'component_uses_in_cycle')
 MODEL_ID = 'urn:devtools:component-rules@1'
+GND_FROM = 'git+https://github.com/vasiloglou/gnd-public@f4ce6992'  # the build this script was tried with
 
 STARTER_RULES = {'rules': [
     {'id': 'no_forbidden_area_use', 'level': 'must',
-     'message': 'This area must not use that one (a [[forbid]] pair in layers.toml)',
+     'remedy': 'This area must not use that one (a [[forbid]] pair in layers.toml): move the import, '
+               'or the module to the component it belongs to',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}},
                     {'fact_type': 'component_in_area', 'bind': {'component': '$a', 'area': '$from'}},
                     {'fact_type': 'component_in_area', 'bind': {'component': '$b', 'area': '$to'}}],
      'consequent': {'absence': {'fact_type': 'area_must_not_use', 'bind': {'source': '$from', 'target': '$to'}}}},
     {'id': 'no_use_of_a_higher_rank', 'level': 'must',
-     'message': 'A component uses one of a higher rank ([rank] in layers.toml)',
+     'remedy': 'A component uses one of a higher rank ([rank] in layers.toml): move what it needs down, '
+               'or the caller up',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}},
                     {'fact_type': 'component_in_area', 'bind': {'component': '$a', 'area': '$from'}},
@@ -65,12 +69,13 @@ STARTER_RULES = {'rules': [
                     {'fact_type': 'area_has_rank', 'bind': {'area': '$to', 'rank': '$used'}}],
      'consequent': {'comparison': {'operator': '<=', 'left': '$used', 'right': '$rank'}}},
     {'id': 'no_import_inside_a_loop', 'level': 'should',
-     'message': 'This import is part of a loop of imports between components',
+     'remedy': 'This import is part of a loop of imports between components: move the shared code '
+               'into a component both can use',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_uses_in_cycle', 'bind': {'caller': '$a', 'callee': '$b'}}],
      'consequent': {'absence': {'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}}}},
     {'id': 'canonical_component_has_a_test', 'level': 'should',
-     'message': 'A canonical component lists no test',
+     'remedy': 'A canonical component lists no test: add a tests: line to its entry, or write one',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_has_status', 'bind': {'component': '$a', 'status': 'canonical'}}],
      'consequent': {'exists': {'atoms': [{'fact_type': 'component_has_test',
@@ -139,8 +144,8 @@ def load_rules(root: Path) -> list[dict]:
         seen.add(name)
         if rule.get('level', 'must') not in {'must', 'should'}:
             problems.append(f'{name}: "level" is must or should')
-        if not isinstance(rule.get('message', ''), str) or 'type' not in rule:
-            problems.append(f'{name}: needs a "type", and "message" is text')
+        if not isinstance(rule.get('remedy', ''), str) or 'type' not in rule:
+            problems.append(f'{name}: needs a "type", and "remedy" is text')
     if problems:
         raise Problem(f'{RULES}: ' + '; '.join(problems))
     return rules
@@ -150,9 +155,9 @@ def model(types: dict, rules: list[dict]) -> dict:
     """The GND model: fact types as the facts file describes them, and the project's rules."""
     constraints = []
     for rule in rules:
-        body = {key: value for key, value in rule.items() if key not in {'message', 'level'}}
+        body = {key: value for key, value in rule.items() if key != 'level' and (key != 'remedy' or value)}
         body.update(modality='alethic' if rule.get('level', 'must') == 'must' else 'deontic', source='explicit',
-                    status='confirmed', provenance={'user_quote': rule.get('message') or rule['id']})
+                    status='confirmed', provenance={'user_quote': rule.get('remedy') or rule['id']})
         constraints.append(body)
     return {
         'version': 4, 'model_id': MODEL_ID, 'rejected_proposals': [],
@@ -167,9 +172,9 @@ def model(types: dict, rules: list[dict]) -> dict:
 
 
 def population(doc: dict) -> dict:
-    return {'format_version': 2, 'facts': doc['facts'],
-            'population': {'covers': sorted(doc['facts']), 'model': 'model.json', 'model_id': MODEL_ID,
-                           'source': 'fixture'}}
+    header = {'covers': sorted(doc['facts']), 'model': 'model.json', 'model_id': MODEL_ID, 'source': 'tool-output',
+              'producer': f'{Path(SETTINGS["index_script"]).name} facts @ {doc.get("revision") or "no revision"}'[:200]}
+    return {'format_version': 2, 'facts': doc['facts'], 'population': header}
 
 
 def run(command: list, what: str, **options) -> subprocess.CompletedProcess:
@@ -193,11 +198,18 @@ def read_facts(root: Path, base: str = '') -> dict:
     return doc
 
 
-def judge(gnd: list, folder: Path, name: str, doc: dict) -> dict:
-    """The report of `gnd check` on one set of facts, under the model already in `folder`."""
-    facts_file = folder / f'{name}.pop.json'
-    facts_file.write_text(json.dumps(population(doc)), encoding='utf-8')
-    done = run([*gnd, 'check', str(folder / 'model.json'), str(facts_file), '--format', 'json'], 'gnd')
+def judge(gnd: list, folder: Path, head: dict, base: dict | None) -> dict:
+    """The report of `gnd check` on the head facts, against the base facts when given."""
+    for name, doc in (('head', head), ('base', base)):
+        if doc is not None:
+            (folder / f'{name}.pop.json').write_text(json.dumps(population(doc)), encoding='utf-8')
+    command = [*gnd, 'check', str(folder / 'model.json'), str(folder / 'head.pop.json'), '--rule-ids',
+               '--allow-vacuous', '--format', 'json']
+    if base is not None:
+        command[-2:-2] = ['--baseline', str(folder / 'base.pop.json')]
+    done = run(command, 'gnd')
+    if done.returncode == 64 and 'unrecognized arguments' in done.stderr:
+        raise Problem(f'this GND has no --rule-ids: install a build at or after {GND_FROM}')
     try:
         report = json.loads(done.stdout)
     except ValueError:
@@ -208,29 +220,29 @@ def judge(gnd: list, folder: Path, name: str, doc: dict) -> dict:
         issues = '; '.join(f'{i.get("path")}: {str(i.get("message"))[:200]}' for i in (report.get('issues') or [])[:5])
         raise Problem(f'gnd did not judge the rules ({report.get("outcome")}, exit {report.get("exit_code")}): '
                       f'{issues or report.get("error")}')
-    if report.get('schema_version') not in REPORTS:
-        raise Problem(f'gnd wrote report version {report.get("schema_version")}; this script reads version '
-                      f'{", ".join(map(str, sorted(REPORTS)))} (get-nick-done 0.1.0)')
+    if report.get('schema_version') != REPORT:
+        raise Problem(f'gnd wrote report version {report.get("schema_version")}; this script reads version {REPORT}')
     return report
 
 
-def findings(report: dict, rules: list[dict]) -> tuple[dict, list]:
-    """Broken rules as {(rule id, binding as text): (level, rule, binding)}, and the rules gnd could not decide."""
-    broken, undecided, judged = {}, [], set()
+def findings(report: dict, rules: list[dict]) -> tuple[list, list]:
+    """What is broken, as (level, rule, binding, new), and the rules gnd could not decide, as (level, rule, why)."""
+    by_id = {rule['id']: rule for rule in rules}
+    broken, undecided, judged = [], [], set()
     try:
         for verdict in report['verdicts']:
-            place = re.fullmatch(r'constraints\[(\d+)\]', verdict['constraint_ref'])
-            rule = rules[int(place[1])]  # every rule is a top-level constraint, in the order of rules.json
+            rule = by_id[verdict['address'].removeprefix('constraint:')]  # every rule has an id
             judged.add(rule['id'])
             level = 'fail' if rule.get('level', 'must') == 'must' else 'warn'
             if verdict['verdict'] in {'fail', 'warning'}:
-                for binding in verdict.get('offending_facts') or [None]:
-                    broken[rule['id'], json.dumps(binding, sort_keys=True)] = (level, rule, binding)
+                rows = verdict.get('offending_facts') or [None]
+                marks = verdict.get('row_novelty') or [verdict.get('novelty')] * len(rows)
+                broken.extend((level, rule, row, mark != 'standing') for row, mark in zip(rows, marks))
             elif verdict['verdict'] == 'unchecked':
                 undecided.append((level, rule, verdict.get('reason_code') or verdict.get('message', '')))
             elif verdict['verdict'] not in {'pass', 'vacuous'}:
                 raise ValueError(f'unknown verdict {verdict["verdict"]!r}')
-    except (KeyError, TypeError, IndexError, ValueError) as exc:
+    except (KeyError, TypeError, IndexError, ValueError, AttributeError) as exc:
         raise Problem(f'gnd wrote a report this script cannot read: {type(exc).__name__}: {exc}')
     unjudged = [rule['id'] for rule in rules if rule['id'] not in judged]
     if unjudged:
@@ -272,49 +284,51 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
         return int(require)
     rules = load_rules(root)
     head = read_facts(root)
-    notes, standing, old = [], set(), None
+    notes, before, old = [], None, None
+    if base:
+        before = read_facts(root, base)
+        if before['facts']['component_is_listed']:
+            old = {(row['caller'], row['callee']): row['imports'] for row in before['evidence']['component_uses']}
+        else:
+            notes.append(f'no catalog at {before["revision"][:7]}: everything broken counts as new')
+        notes.extend(f'rules changed in this change: {path}' for path in changed_rules(root, before['revision']))
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
         (folder / 'model.json').write_text(json.dumps(model(head['types'], rules)), encoding='utf-8')
-        broken, undecided = findings(judge(gnd, folder, 'head', head), rules)
-        if base:
-            before = read_facts(root, base)
-            if before['facts']['component_is_listed']:
-                old = {(row['caller'], row['callee']): row['imports'] for row in before['evidence']['component_uses']}
-                standing = broken.keys() & findings(judge(gnd, folder, 'base', before), rules)[0].keys()
-            else:
-                notes.append(f'no catalog at {before["revision"][:7]}: everything broken counts as new')
-            notes.extend(f'rules changed in this change: {path}' for path in changed_rules(root, before['revision']))
+        report = judge(gnd, folder, head, before if old is not None else None)
+    broken, undecided = findings(report, rules)
     edges = {(row['caller'], row['callee']): row['imports'] for row in head['evidence']['component_uses']}
     rows = []
-    for key, (level, rule, binding) in sorted(broken.items()):
+    for level, rule, binding, new in broken:
         imports = edges.get(used_pair(rule, binding), [])
         added = [pair for pair in imports if pair not in old.get(used_pair(rule, binding), [])] if old is not None else []
         shown = ''.join(f' ({" -> ".join(pair)})' for pair in (added or imports)[:1])
-        rows.append({'rule': rule['id'], 'level': level, 'message': rule.get('message', ''), 'binding': binding,
+        rows.append({'rule': rule['id'], 'level': level, 'remedy': rule.get('remedy', ''), 'binding': binding,
                      'text': describe(binding) + shown + (' [new import]' if added else ''),
-                     'new': key not in standing, 'new_import': bool(added), 'old_import': bool(imports) and not added})
+                     'new': new, 'new_import': bool(added), 'old_import': bool(imports) and not added})
     order = [rule['id'] for rule in rules]
-    rows.sort(key=lambda row: (order.index(row['rule']), not row['new_import']))
-    rows.extend({'rule': rule['id'], 'level': level, 'message': f'gnd could not decide this rule ({why})',
+    rows.sort(key=lambda row: (order.index(row['rule']), not row['new_import'], row['text']))
+    rows.extend({'rule': rule['id'], 'level': level, 'remedy': f'gnd could not decide this rule ({why})',
                  'binding': None, 'text': '', 'new': True, 'new_import': False, 'old_import': False}
                 for level, rule, why in undecided)
     new = [row for row in rows if row['new']]
     fails = sum(row['level'] == 'fail' for row in new)
-    against = f' against {base} ({before["revision"][:7]})' if base else ''
+    against = f' against {base} ({before["revision"][:7]})' if old is not None else ''
     summary = (f'rules{against}: {len(rules)} rule(s); {fails} to fix, {len(new) - fails} warning(s)'
-               + (f', {len(rows) - len(new)} standing' if base else ''))
+               + (f', {len(rows) - len(new)} standing' if old is not None else ''))
     if as_json:
-        print(json.dumps({'rows': rows, 'notes': notes, 'summary': summary}, indent=1))
+        print(json.dumps({'rows': rows, 'notes': notes, 'summary': summary, 'baseline': report.get('baseline')}, indent=1))
     else:
         for name, group in itertools.groupby(new, key=lambda row: row['rule']):
             group = list(group)
             for row in group[:SHOWN]:
-                print(f'{row["level"]}: {name}: {row["message"] or "broken"}' + (f': {row["text"]}' if row['text'] else ''))
+                print(f'{row["level"]}: {name}' + (f': {row["text"]}' if row['text'] else ''))
+                if row['remedy']:
+                    print(f'  remedy: {row["remedy"]}')
             if len(group) > SHOWN:
                 old_ones = sum(row['old_import'] for row in group[SHOWN:])
                 print(f'… +{len(group) - SHOWN} more for {name}'
-                      + (f', {old_ones} of them through imports that were already there' if base else '')
+                      + (f', {old_ones} of them through imports that were already there' if old is not None else '')
                       + ' (--format json lists them all)')
         for note in notes:
             print(f'reread: {note}')
