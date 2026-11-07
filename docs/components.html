@@ -38,6 +38,7 @@
 <pre><span class="p">$</span> <span class="cmd">components search human readable size</span>
 component format.sizes: Format a byte count as a short human-readable size such as 1.5 kB (humanize_bytes)
 module src/shelf/units.py: Turn byte counts into short text a person can read.
+  symbol shelf.units.humanize_bytes (line 9): Format a byte count as a short human-readable size.
 component fs.scan: Walk a folder tree and list every regular file with its size in bytes
 module src/shelf/scan.py: Walk a folder and list the regular files in it.
 coverage: 4/4 src/shelf modules assigned to components; external: none
@@ -45,7 +46,7 @@ coverage: 4/4 src/shelf modules assigned to components; external: none
 <span class="p">$</span> <span class="cmd">components search checksum</span>
 no component matched: this is not proof that nothing exists; search modules/ and git grep
 coverage: 4/4 src/shelf modules assigned to components; external: none</pre></div>
-      <p class="caption">A match names the component and the file. No match says so plainly, and says it is not proof that nothing exists.</p>
+      <p class="caption">A match names the component, the file and the function, with its line. No match says so plainly, and says it is not proof that nothing exists.</p>
     </div>
   </div>
 
