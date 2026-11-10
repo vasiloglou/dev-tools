@@ -21,8 +21,9 @@ it prints ``skip:`` and exits 0 (1 with ``--require``).
 
 ``rules.json`` and ``layers.toml`` live beside the catalog, in the index script's
 ``docs_dir``. Settings live beside this script, in rules_check.settings.json. Needs
-Python 3.11 or newer, and a GND with the rule-check flags (``--rule-ids``,
-``--baseline``, ``--allow-vacuous``: report version 15).
+Python 3.11 or newer, and GND 0.2.0 or newer (get-nick-done on PyPI), the first release
+with the rule-check flags (``--rule-ids``, ``--baseline``, ``--allow-vacuous``: report
+version 15).
 """
 from __future__ import annotations
 
@@ -39,7 +40,7 @@ from pathlib import Path
 
 DEFAULT_SETTINGS = {
     'index_script': 'scripts/components_index.py',
-    # The command that runs GND, for example "uv tool run --from <where GND is> gnd".
+    # The command that runs GND, for example "uvx --from get-nick-done==0.2.0 gnd".
     'gnd_command': 'gnd',
 }
 SHOWN = 10  # lines printed for one rule; --format json has them all
@@ -47,7 +48,7 @@ REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, a
 BANDS = {0, 1, 2, 4}  # exit codes of a check that ran: accepted, violated, vacuous rules, undecided
 USES = ('component_uses', 'component_uses_in_cycle')
 MODEL_ID = 'urn:devtools:component-rules@1'
-GND_FROM = 'git+https://github.com/vasiloglou/gnd-public@f4ce6992'  # the build this script was tried with
+GND_FROM = 'get-nick-done 0.2.0'  # the first release with the flags, and the one this script was tried with
 
 STARTER_RULES = {'rules': [
     {'id': 'no_forbidden_area_use', 'level': 'must',
@@ -209,7 +210,7 @@ def judge(gnd: list, folder: Path, head: dict, base: dict | None) -> dict:
         command[-2:-2] = ['--baseline', str(folder / 'base.pop.json')]
     done = run(command, 'gnd')
     if done.returncode == 64 and 'unrecognized arguments' in done.stderr:
-        raise Problem(f'this GND has no --rule-ids: install a build at or after {GND_FROM}')
+        raise Problem(f'this GND has no --rule-ids: install {GND_FROM} or newer')
     try:
         report = json.loads(done.stdout)
     except ValueError:

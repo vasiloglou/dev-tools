@@ -27,18 +27,18 @@ moved the catalog finds them there.
 
 ## Set it up
 
-1. Install GND where the check will run (Python 3.11 or newer). The check needs the
-   rule-check flags (`--rule-ids`, `--baseline`, `--allow-vacuous`), which the published
-   release 0.1.0 does not have; until the next release, install from the repository:
+1. Install GND where the check will run (Python 3.11 or newer). The check needs release
+   0.2.0 or newer, the first with the rule-check flags (`--rule-ids`, `--baseline`,
+   `--allow-vacuous`):
 
    ```bash
-   uv tool install "get-nick-done @ git+https://github.com/vasiloglou/gnd-public@f4ce6992"
+   uv tool install get-nick-done==0.2.0
    ```
 
-   That commit is the one this script was tried with. A project that would rather not
-   install it sets `gnd_command` to a command that runs it, for example
-   `uv run --project <a checkout of gnd-public> gnd`. The script stops (exit 2) when GND
-   has no `--rule-ids`, and on a report of a version it does not know.
+   Release 0.2.0 is the one this script was tried with. A project that would rather not
+   install it sets `gnd_command = "uvx --from get-nick-done==0.2.0 gnd"`. The script
+   stops (exit 2) when GND has no `--rule-ids` (release 0.1.0), and on a report of a
+   version it does not know.
 2. Write the starter files (neither is overwritten if it exists):
 
    ```bash

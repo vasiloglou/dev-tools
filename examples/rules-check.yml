@@ -17,10 +17,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # The rule-check flags are newer than release 0.1.0: install from the repository
-      # (a private one needs a token here) until the next release.
+      # 0.2.0 is the first release with the rule-check flags.
       - name: Install GND
-        run: pip install "get-nick-done @ git+https://github.com/vasiloglou/gnd-public@f4ce6992"
+        run: pip install get-nick-done==0.2.0
       - name: Check the rules
         # --require: fail, rather than skip, if GND did not install.
         run: >

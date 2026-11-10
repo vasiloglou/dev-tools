@@ -673,7 +673,7 @@ def test_rules_vacuous_is_not_a_failure(project):
     assert code == 2 and "gnd check failed" in out
     fake_gnd(project, "", exit_code=64, stderr="usage: gnd check ...\ngnd check: error: unrecognized arguments: --rule-ids\n")
     code, out = tool(project, "check", script=RULES)
-    assert code == 2 and "this GND has no --rule-ids: install a build at or after git+" in out
+    assert code == 2 and "this GND has no --rule-ids: install get-nick-done 0.2.0 or newer" in out
 
     (project / "docs/components/rules.json").write_text('{"rules": [{"id": "Bad Id"}, {"id": "ok", "level": "maybe"}]}')
     code, out = tool(project, "check", script=RULES)
