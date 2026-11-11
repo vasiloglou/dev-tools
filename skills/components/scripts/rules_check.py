@@ -40,7 +40,7 @@ from pathlib import Path
 
 DEFAULT_SETTINGS = {
     'index_script': 'scripts/components_index.py',
-    # The command that runs GND, for example "uvx --from get-nick-done==0.2.0 gnd".
+    # The command that runs GND, for example "uvx --from get-nick-done==0.3.0 gnd".
     'gnd_command': 'gnd',
 }
 SHOWN = 10  # lines printed for one rule; --format json has them all
@@ -48,7 +48,7 @@ REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, a
 BANDS = {0, 1, 2, 4}  # exit codes of a check that ran: accepted, violated, vacuous rules, undecided
 USES = ('component_uses', 'component_uses_in_cycle')
 MODEL_ID = 'urn:devtools:component-rules@1'
-GND_FROM = 'get-nick-done 0.2.0'  # the first release with the flags, and the one this script was tried with
+GND_FROM = 'get-nick-done 0.2.0'  # the first release with the flags; 0.3.0 is the one this script was last tried with
 
 STARTER_RULES = {'rules': [
     {'id': 'no_forbidden_area_use', 'level': 'must',

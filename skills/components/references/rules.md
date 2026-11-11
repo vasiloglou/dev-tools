@@ -32,11 +32,11 @@ moved the catalog finds them there.
    `--allow-vacuous`):
 
    ```bash
-   uv tool install get-nick-done==0.2.0
+   uv tool install get-nick-done==0.3.0
    ```
 
-   Release 0.2.0 is the one this script was tried with. A project that would rather not
-   install it sets `gnd_command = "uvx --from get-nick-done==0.2.0 gnd"`. The script
+   Release 0.3.0 is the one this script was last tried with. A project that would rather not
+   install it sets `gnd_command = "uvx --from get-nick-done==0.3.0 gnd"`. The script
    stops (exit 2) when GND has no `--rule-ids` (release 0.1.0), and on a report of a
    version it does not know.
 2. Write the starter files (neither is overwritten if it exists):

@@ -67,7 +67,7 @@ exclude = ["scripts/components_index.py"]
 # skill). The check needs GND; without it the check prints `skip:` and passes.
 # [sync.settings."scripts/rules_check.settings.json"]
 # index_script = "scripts/components_index.py"
-# gnd_command = "uvx --from get-nick-done==0.2.0 gnd"
+# gnd_command = "uvx --from get-nick-done==0.3.0 gnd"
 
 [[sync]]
 source = "skills/components/scripts/components_index.py"
