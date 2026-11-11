@@ -47,13 +47,14 @@
 <section class="band"><div class="wrap">
   <div class="section-head">
     <h2>What it can do</h2>
-    <p>Three pieces a project can take together or one at a time, and a command that delivers them.</p>
+    <p>Three pieces a project can take together or one at a time, an optional check of the project's own rules, and a command that delivers them.</p>
   </div>
   <div class="table-scroll"><table>
     <tr><th>You want</th><th>What dev-tools gives the agent</th><th>Read more</th></tr>
     <tr><td>A feature built against tests you agreed to</td><td>Seven fixed steps for one roadmap phase. A short prototype first, then acceptance tests that are locked before any code is written, then the build, one full test run, and a close. You approve at four of the steps.</td><td><a href="phase.html">Phase workflow</a></td></tr>
     <tr><td>Work you can defend later</td><td>A spec you approve before any code, an independent reviewer in a different tool who tries to break the result, and numbered records that state the command, its exit code and a fingerprint of every file the claim rests on.</td><td><a href="milestone.html">Milestone workflow</a></td></tr>
     <tr><td>No second copy of code that already exists</td><td>A map of the codebase, searchable by what the code does. The agent can build it for a project that has none, check it against every change, and review it against the code from time to time.</td><td><a href="components.html">Component index</a></td></tr>
+    <tr><td>Your own rules about which part of the code may use which</td><td>Optional, and a trial. The project writes its rules down once, and every change is checked against them by GND, a separate checker of facts against rules. Only what the change added is reported.</td><td><a href="rules.html">Project rules and GND</a></td></tr>
     <tr><td>To stop today and carry on another day, or with another agent</td><td>The current phase, the current step and the files still missing are written in the repository. Any session reads the same state and continues.</td><td><a href="phase.html">Phase workflow</a></td></tr>
     <tr><td>The same process in every project, for Claude Code and Codex</td><td>One command copies the skills into a project and records what it delivered. A later update never overwrites a file you changed without telling you.</td><td><a href="adopt.html">Add it to your project</a></td></tr>
     <tr><td>To move a project that already has its own process</td><td>The agent finds the project's own copies, lists every line a replacement would drop, and carries the project's rules into a file the project owns before anything is replaced.</td><td><a href="adopt.html">Add it to your project</a></td></tr>
