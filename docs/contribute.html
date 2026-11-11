@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contribute · dev-tools</title>
+<meta name="description" content="How to contribute to dev-tools: open a pull request from a fork. The maintainer reviews and merges every change.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="why.html">Why</a>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+    <a href="contribute.html" aria-current="page">Contribute</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Contribute</p>
+  <h1>Changes come in as pull requests. One person merges them.</h1>
+  <p class="lede">The repository is public and contributions are welcome. Nothing reaches the <code>main</code> branch except through a pull request, and the maintainer reviews and merges each one.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>How a change gets in</h2>
+  </div>
+  <ol class="steps from1 narrow">
+    <li>
+      <h3>Open an issue for anything larger than a fix</h3>
+      <p>Say what went wrong or what is missing. For a defect, include the command you ran and what it printed. A short discussion first saves a pull request that goes the wrong way.</p>
+      <p class="leaves"><a href="https://github.com/vasiloglou/dev-tools/issues">Issues on GitHub →</a></p>
+    </li>
+    <li>
+      <h3>Fork the repository and make a branch</h3>
+      <p>You do not need any access to this repository. Fork it, branch from <code>main</code>, and work there.</p>
+    </li>
+    <li>
+      <h3>Make the change and run the tests</h3>
+      <p>The tests cover the sync command and the scripts a project runs after a sync. They need Python 3.11 or newer.</p>
+<pre class="code">uv run --no-project --with pytest python -m pytest tests -q</pre>
+    </li>
+    <li>
+      <h3>Open a pull request against <code>main</code></h3>
+      <p>Say what changed and why, and link the issue if there is one. Keep it to one purpose, so it can be read and accepted in one go.</p>
+    </li>
+    <li>
+      <h3>Review <span class="gate">the maintainer approves</span></h3>
+      <p>The maintainer, <a href="https://github.com/vasiloglou">@vasiloglou</a>, reviews every pull request and is the only person who can approve and merge one. You may be asked for changes before it goes in.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>What makes a change easy to accept</h2>
+    <p>The skill text is the product. Changing a sentence changes how an agent behaves in every project that takes the next update, so the bar is the same for prose as for code.</p>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>A script change comes with a test</h3>
+      <p>The sync command, the state tool and the index script each have tests under <code>tests/</code>. A fix arrives with a test that fails without it.</p>
+    </div>
+    <div class="card">
+      <h3>A wording change says what prompted it</h3>
+      <p>Name the run where the agent went wrong, or the sentence it misread. "Clearer" is not a reason anyone can check.</p>
+    </div>
+    <div class="card">
+      <h3>Shared skills stay general</h3>
+      <p>A rule that only makes sense in one project belongs in that project's own <code>project.md</code>, not in the shared text.</p>
+    </div>
+    <div class="card">
+      <h3>Both agents read the same file</h3>
+      <p>A skill is copied for Claude Code and for Codex byte for byte. Write it so it is correct for either.</p>
+    </div>
+    <div class="card">
+      <h3>Captures on this site are real output</h3>
+      <p>If a change alters what a command prints, replace the capture with a new run. Do not edit the old one by hand.</p>
+    </div>
+    <div class="card">
+      <h3>The page that describes it is updated too</h3>
+      <p>The site lives in <code>docs/</code> as plain HTML with no build step. A change in behaviour and its description go in the same pull request.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Where things live</h2>
+  </div>
+  <div class="table-scroll"><table>
+    <tr><th>Path</th><th>What</th></tr>
+    <tr><td><code>skills/phase/</code></td><td>The phase workflow, how its acceptance tests are written and locked, and the pytest plugin that selects a phase's tests.</td></tr>
+    <tr><td><code>skills/milestone/</code></td><td>The milestone workflow: <code>start-milestone</code>, <code>process-milestone</code>, <code>process-phase</code>.</td></tr>
+    <tr><td><code>skills/components/</code></td><td>The component index: the skill and the script that generates, checks and searches it.</td></tr>
+    <tr><td><code>skills/adopt-devtools/</code></td><td>How an agent moves an existing project to the shared skills.</td></tr>
+    <tr><td><code>agents/</code></td><td>Helper agents the phase steps hand work to.</td></tr>
+    <tr><td><code>devtools/sync.py</code></td><td>The sync command.</td></tr>
+    <tr><td><code>examples/</code></td><td>A complete project file, and a GitHub Actions job that checks the index.</td></tr>
+    <tr><td><code>docs/</code></td><td>This site.</td></tr>
+    <tr><td><code>tests/</code></td><td>Tests for the sync command and the scripts.</td></tr>
+  </table></div>
+</div></section>
+
+<section class="band"><div class="wrap narrow">
+  <h2>How <code>main</code> is protected</h2>
+  <ul>
+    <li><strong>Pull requests only.</strong> A change reaches <code>main</code> through a pull request with an approving review.</li>
+    <li><strong>One reviewer.</strong> Every path in the repository is owned by the maintainer, and the review that counts is the owner's.</li>
+    <li><strong>History is kept.</strong> The branch cannot be force-pushed or deleted.</li>
+  </ul>
+  <p>This site is served from <code>docs/</code> on <code>main</code>, so a merged change to a page is live a minute or two later.</p>
+  <div class="next">
+    <a class="btn primary" href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a>
+    <a class="btn" href="why.html">Why it exists</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="why.html">Why it exists</a> · <a href="contribute.html">Contribute</a> · <a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>
