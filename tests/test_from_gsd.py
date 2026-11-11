@@ -181,9 +181,10 @@ def run(*args):
     return proc.returncode, proc.stdout + proc.stderr
 
 
-def install(root, **settings):
+def install(root, planning_dir=".planning", **settings):
     config = (ROOT / "examples/phase-project.devtools.toml").read_text().replace('"myapp"', '""')
     config = config.replace("after_apply =", "# after_apply =")
+    config = config.replace('planning_dir = ".planning"', 'planning_dir = "%s"' % planning_dir)
     for name, value in settings.items():
         config = config.replace("%s = false" % name, "%s = %s" % (name, value))
     (root / ".devtools.toml").write_text(config)
@@ -205,10 +206,44 @@ def test_a_converted_project_passes_the_phase_tools_check(project):
     assert code == 0, env
     code, env = phase(project, "status")
     data = env["data"]
-    assert data["current_phase"] == "03" and data["phase_status"] == "plan_approved"
-    assert data["completed_phases"] == ["01", "02"]
-    assert data["phase_dir"] == ".planning/phases/03-report", "the phase folders are not touched"
-    assert "03-TESTLOCK.json" in data["missing"], "a phase carried mid-way shows what it lacks"
+    assert data["current_phase"] == "02.1" and data["phase_status"] == "not_started", \
+        "phase 3 was under way but depends on 2.1, which GSD never finished: 2.1 goes first"
+    assert data["completed_phases"] == ["01", "02"] and data["blockers"] == []
+    assert "base_branch: main" in (project / ".planning/STATE.md").read_text(), "not the branch the move runs on"
+    changed = subprocess.run(["git", "status", "--short", ".planning/phases/01-scan-the-tree",
+                              ".planning/phases/02-find-duplicates"], cwd=project, capture_output=True, text=True)
+    assert changed.stdout == "", "the folders of finished phases are not touched"
+
+
+def test_a_phase_gsd_did_not_finish_is_carried_no_further_than_its_discussion(project):
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(road.read_text().replace("**Depends on:** Phase 2, Phase 2.1", "**Depends on:** Phase 2"))
+    install(project)
+    code, out = run("survey", "--project", str(project))
+    assert "Current phase after the move: 3 (Report), context_approved" in out
+    assert "GSD's 3 plan, summary and verification file(s) for it move to phases/03-report/gsd/" in out
+    assert run("convert", "--project", str(project))[0] == 0
+    folder = project / ".planning/phases/03-report"
+    assert sorted(p.name for p in folder.iterdir()) == ["03-CONTEXT.md", "gsd"], "the context stays, the rest is input"
+    assert sorted(p.name for p in (folder / "gsd").iterdir()) == ["03-01-PLAN.md", "03-01-SUMMARY.md", "03-02-PLAN.md"]
+    block = road.read_text().split("## Phase 3: Report")[1].split("## Phase")[0]
+    assert "- **Status:** context_approved" in block and "`tests/acceptance/p03_report/`" in block
+    assert "- **Under GSD:** a CONTEXT file, 2 plan(s), 1 summary(ies). Its plans, summaries and verification are in " \
+           "`phases/03-report/gsd/`" in block
+    git(project, "add", "-A")
+    assert phase(project, "check", "--all")[0] == 0
+    code, env = phase(project, "status")
+    assert env["data"]["phase_status"] == "context_approved" and env["data"]["next_step"] == "specify"
+    code, env = phase(project, "advance", "--to", "tests_approved")
+    assert code == 1 and "missing artifact: 03-TESTLOCK.json" in env["data"]["problems"], \
+        "the tests are written and locked here, as for any phase"
+    (folder / "03-TESTLOCK.json").write_text('{"phase": "03", "files": {}}')
+    (folder / "03-EVIDENCE").mkdir()
+    (folder / "03-EVIDENCE/red.txt").write_text("1 failed\n")
+    assert phase(project, "advance", "--to", "tests_approved")[0] == 0
+    code, env = phase(project, "advance", "--to", "plan_approved")
+    assert code == 1 and env["data"]["problems"] == ["missing artifact: 03-MM-PLAN.md"], \
+        "GSD's plans do not pass for the plan this step writes"
 
 
 def test_gsds_own_files_are_kept_in_the_archive(project):
@@ -219,7 +254,11 @@ def test_gsds_own_files_are_kept_in_the_archive(project):
     assert not (project / ".planning/PROJECT.md").exists() and not (project / ".planning/config.json").exists()
     assert (project / ".planning/MILESTONES.md").is_file(), "history that other files link to stays in place"
     record = (archive / "CONVERSION.md").read_text()
-    assert "| SCAN-01 | REQ-SCAN-01 |" in record and "| 3 Report | plan_approved |" in record
+    assert "| SCAN-01 | REQ-SCAN-01 |" in record
+    assert "| 3 Report | not_started | under GSD: a CONTEXT file, 2 plan(s), 1 summary(ies) | `phases/03-report/` |" in record
+    assert "| `phases/03-report/gsd/03-01-PLAN.md` | GSD's file of a phase it did not finish, moved from " \
+           "`phases/03-report/` |" in record
+    assert "phase 3 was under way under GSD and depends on phase 2.1, which is not finished" in record
 
 
 def test_the_roadmap_keeps_numbers_goals_and_dependencies(project):
@@ -267,8 +306,9 @@ def test_decisions_and_constraints_are_carried_and_existing_files_are_kept(proje
 
 def test_a_dry_run_and_a_survey_write_nothing(project):
     code, out = run("survey", "--project", str(project))
-    assert code == 0 and "Phases: 5 (2 complete, 2 not_started, 1 plan_approved)" in out, out
-    assert "Current phase after the move: 3 (Report), plan_approved" in out
+    assert code == 0 and "Phases: 5 (2 complete, 3 not_started)" in out, out
+    assert "Current phase after the move: 2.1 (Hash Cache), not_started" in out
+    assert "Base branch STATE.md will record: main (from the branch of that name)" in out
     code, out = run("convert", "--project", str(project), "--dry-run")
     assert code == 0 and "would write" in out and "archive/gsd/PROJECT.md" in out
     assert subprocess.run(["git", "status", "--porcelain"], cwd=project, capture_output=True, text=True).stdout == ""
@@ -352,3 +392,235 @@ def test_the_survey_lists_gsds_own_files_inside_the_project(project):
     code, out = run("survey", "--project", str(project), "--installed")
     assert out.split() == [".claude/agents/gsd-planner.md", ".claude/gsd-core/VERSION",
                            ".claude/gsd-file-manifest.json", ".codex/get-shit-done/bin/tool.cjs"]
+
+
+@pytest.mark.parametrize("line, depends, also", [
+    ("Nothing (first phase)", [], []),
+    ("Phase 4 and Phase 04.1", ["04", "04.1"], []),
+    ("Phases 132 and 134 (documents shipped behavior)", ["132", "134"], []),
+    ("Phases 6, 8", ["06", "08"], []),
+    ("Phase 1, 2 and 3", ["01", "02", "03"], []),
+    ("Phases 1-4", ["01", "02", "03", "04"], []),
+    ("Phase 10, Phase 13, Phase 14, and the Phase 7/07.1/8 source", ["07", "07.1", "08", "10", "13", "14"], []),
+    ("Phase 131 (shares the access pattern; independent of Phases 132 and 133)", ["131"], ["132", "133"]),
+    ("Phase 6 only. May execute in parallel with Phases 7 and 8 — it touches only `evolve/`", ["06"], ["07", "08"]),
+    ("Nothing (runs in parallel with Phases 81/82)", [], ["81", "82"]),
+    ("Phase 81 (fact inventory). Grounding source: `.planning/milestones/v1.12-phases/73.5-x/`", ["81"], []),
+])
+def test_a_dependency_line_is_read_however_the_roadmap_words_it(line, depends, also):
+    assert gsd.dependencies(line) == (depends, also)
+
+
+def test_dependencies_in_the_plural_are_carried_and_doubtful_ones_are_reported(project):
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(road.read_text()
+                    .replace("**Depends on:** Phase 2, Phase 2.1", "**Depends on:** Phases 1 and 2")
+                    .replace("**Depends on**: Phase 3\n", "**Depends on**: Phase 1 (independent of Phase 2)\n"))
+    code, out = run("convert", "--project", str(project))
+    assert code == 0, out
+    text = road.read_text()
+    assert "- **Depends on:** 1, 2" in text.split("## Phase 3: Report")[1].split("## Phase")[0]
+    assert "- **Depends on:** 1\n" in text.split("## Phase 4: Export")[1]
+    record = (project / ".planning/archive/gsd/CONVERSION.md").read_text()
+    assert "phase 4: its dependency line in GSD also names phase 2, which is not carried as a dependency" in record
+
+
+PUT_OFF = """
+<details>
+<summary>v0.9 Old Engine (Phases 5-6) - PAUSED</summary>
+
+- [x] **Phase 5: Engine Spike** - done before the pause
+- [ ] **Phase 6: Engine Rewrite** - never started
+
+</details>
+
+- [ ] **Phase 7: Themes** (DEFERRED) - later
+- [ ] **Phase 8: Plugin System** - deferred work on plugins is not a marker
+
+## Backlog
+
+### Phase 999.1: Dark Mode
+
+**Goal**: someday
+
+## Phase Details
+"""
+
+
+def test_phases_gsd_put_off_are_listed_and_not_queued(project):
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(road.read_text().replace("\n## Phase Details\n", PUT_OFF, 1))
+    code, out = run("survey", "--project", str(project), "--format", "json")
+    found = json.loads(out)
+    assert [(p["id"], p["parked"]) for p in found["parked"]] == [("06", "paused"), ("07", "deferred"), ("999.1", "backlog")]
+    ids = [p["id"] for p in found["phases"]]
+    assert "05" in ids and "08" in ids and "999" not in ids, "a finished phase and an ordinary one stay phases"
+    install(project, phase_gaps="true")
+    assert run("convert", "--project", str(project))[0] == 0
+    text = road.read_text()
+    assert "## Phase 6:" not in text and "## Phase 999" not in text
+    tail = text.split("## Put off under GSD")[1]
+    assert "- Phase 6, Engine Rewrite (paused, GSD milestone v0.9). Goal: never started" in tail
+    assert "- Phase 999.1, Dark Mode (backlog). Goal: someday" in tail
+    git(project, "add", "-A")
+    assert phase(project, "check", "--all")[0] == 0
+    code, env = phase(project, "status", "--phase", "next")
+    assert env["data"]["current_phase"] == "02.1", "nothing GSD put off is next"
+
+
+def test_the_owner_can_bring_a_put_off_phase_back(project):
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(road.read_text().replace("\n## Phase Details\n", PUT_OFF, 1))
+    code, out = run("survey", "--project", str(project), "--open", "6", "--format", "json")
+    found = json.loads(out)
+    assert [p["id"] for p in found["parked"]] == ["07", "999.1"]
+    assert next(p for p in found["phases"] if p["id"] == "06")["status"] == "not_started"
+
+
+WORKSTREAM = {
+    "active-workstream": "harbor\n",
+    "workstreams/harbor/STATE.md": "---\ngsd_state_version: 1.0\nstatus: executing\nlast_activity: 2026-07-01 -- ran it\n---\n",
+    "workstreams/harbor/ROADMAP.md": "# Roadmap\n\n- [x] **Phase 38: Matrix** - done\n- [ ] **Phase 39: Report** - next\n",
+    "workstreams/harbor/phases/38-matrix/38-01-PLAN.md": "# Plan\n",
+    "workstreams/harbor/phases/38-matrix/38-01-SUMMARY.md": "# Summary\n",
+    "workstreams/old/ROADMAP.md": "# Roadmap\n\n- [x] **Phase 1: Before** - done\n",
+}
+
+
+def test_a_project_with_workstreams_is_not_moved_until_the_owner_names_the_plan(project):
+    for name, text in WORKSTREAM.items():
+        write(project / ".planning", name, text)
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "workstreams")
+    code, out = run("survey", "--project", str(project))
+    assert "Plans GSD keeps here (a move reads one of them):" in out
+    assert "  root plan          3 phase folder(s)" in out and "<- this survey" in out
+    assert "  workstream harbor  1 phase folder(s), last activity 2026-07-01, status executing   <- GSD's active workstream" in out
+    code, out = run("convert", "--project", str(project))
+    assert code == 2 and "GSD keeps 2 workstream(s) under .planning/workstreams/ and names 'harbor' as the one in use" in out
+    assert (project / ".planning/PROJECT.md").is_file(), "nothing was written"
+    code, out = run("convert", "--project", str(project), "--root-plan")
+    assert code == 0, out
+    record = (project / ".planning/archive/gsd/CONVERSION.md").read_text()
+    assert "| workstream `harbor` | 1 | 2026-07-01 | GSD's active workstream |" in record
+    assert (project / ".planning/workstreams/harbor/STATE.md").read_text() == WORKSTREAM["workstreams/harbor/STATE.md"]
+
+
+def test_a_workstream_can_be_the_plan_that_is_moved(project):
+    for name, text in WORKSTREAM.items():
+        write(project / ".planning", name, text)
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "workstreams")
+    where = ".planning/workstreams/harbor"
+    install(project, planning_dir=where, phase_gaps="true")
+    root_before = {name: (project / ".planning" / name).read_text() for name in gsd.MOVED}
+    code, out = run("survey", "--project", str(project), "--planning-dir", where)
+    assert 'planning_dir = "%s"' % where in out and "this is workstream 'harbor'" in out
+    code, out = run("convert", "--project", str(project), "--planning-dir", where)
+    assert code == 0, out
+    assert {name: (project / ".planning" / name).read_text() for name in gsd.MOVED} == root_before, \
+        "the root plan stays as GSD wrote it"
+    assert "Hash with SHA-256" in (project / where / "DECISIONS.md").read_text(), "the project's decisions come from the root"
+    assert (project / where / "archive/gsd/ROADMAP.md").read_text() == WORKSTREAM["workstreams/harbor/ROADMAP.md"]
+    git(project, "add", "-A")
+    code, env = phase(project, "check", "--all")
+    assert code == 0, env
+    code, env = phase(project, "status")
+    assert env["data"]["current_phase"] == "39" and env["data"]["completed_phases"] == ["38"]
+
+
+def test_a_planning_folder_that_git_ignores_is_not_moved_without_a_word(tmp_path):
+    root = tmp_path / "widget"
+    for name, text in [("STATE.md", STATE), ("ROADMAP.md", ROADMAP), ("PROJECT.md", PROJECT), ("config.json", "{}")]:
+        write(root / ".planning", name, text)
+    write(root, ".gitignore", ".planning/\n")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    git(root, "add", "-A")
+    git(root, "commit", "-qm", "start")
+    code, out = run("survey", "--project", str(root))
+    assert code == 0 and "git ignores .planning/, so nothing the move writes could be committed" in out
+    code, out = run("convert", "--project", str(root))
+    assert code == 2 and "--ignored-plan" in out and (root / ".planning/PROJECT.md").is_file()
+    assert run("convert", "--project", str(root), "--ignored-plan")[0] == 0
+
+
+def test_the_decisions_table_is_read_by_its_headings(project):
+    path = project / ".planning/PROJECT.md"
+    table = path.read_text().split("## Key Decisions")[1]
+    path.write_text(path.read_text().replace(table, """
+
+| Decision | Outcome | Rationale / Evidence |
+|----------|---------|----------------------|
+| Hash with SHA-256 | ✓ Good | Collisions must not happen |
+| Split on `a|b` | — Pending | The files use it |
+"""))
+    assert run("convert", "--project", str(project))[0] == 0
+    decisions = (project / ".planning/DECISIONS.md").read_text()
+    assert "| Hash with SHA-256 | Collisions must not happen Outcome under GSD: Good | Carried" in decisions
+    assert "| Split on `a/b` | The files use it | Carried" in decisions, "a | inside backticks is part of the cell"
+
+
+def test_a_decisions_table_with_a_number_and_a_date_column(project):
+    path = project / ".planning/PROJECT.md"
+    table = path.read_text().split("## Key Decisions")[1]
+    path.write_text(path.read_text().replace(table, """
+
+| # | Decision | Why | Date |
+|---|----------|-----|------|
+| 1 | Hash with SHA-256 | Collisions must not happen | 2026-05-01 |
+| 2 | Keep the cache | | |
+"""))
+    assert run("convert", "--project", str(project))[0] == 0
+    rows = [l for l in (project / ".planning/DECISIONS.md").read_text().splitlines() if "Carried from GSD" in l]
+    assert rows[0].startswith("| DEC-003 | 2026-05-01 | Hash with SHA-256 | Collisions must not happen |")
+    assert "| Keep the cache | Not recorded |" in rows[1] and len(rows) == 2, "the heading row is not a decision"
+
+
+def test_what_an_existing_file_would_have_held_is_set_aside_for_the_owner(project):
+    write(project, ".planning/DECISIONS.md", "# Decisions\n\n- 2026-01-02: we hash files\n")
+    code, out = run("convert", "--project", str(project), "--owner", "Ada")
+    assert code == 0 and "left as they were: DECISIONS.md" in out
+    assert (project / ".planning/DECISIONS.md").read_text() == "# Decisions\n\n- 2026-01-02: we hash files\n"
+    draft = (project / ".planning/archive/gsd/DECISIONS-to-merge.md").read_text()
+    assert "| DEC-001 |" in draft and "| Ada |" in draft and "Hash with SHA-256" in draft
+    record = (project / ".planning/archive/gsd/CONVERSION.md").read_text()
+    assert "`DECISIONS.md` was already there and was left as it was. What the move would have written is in " \
+           "`archive/gsd/DECISIONS-to-merge.md`" in record
+
+
+def test_the_base_branch_is_never_the_branch_the_move_runs_on(project):
+    git(project, "branch", "-m", "main", "trunk")
+    code, out = run("survey", "--project", str(project))
+    assert "Base branch STATE.md will record: cannot be told; pass --base-branch" in out
+    code, out = run("convert", "--project", str(project))
+    assert code == 2 and "base branch cannot be told" in out and (project / ".planning/PROJECT.md").is_file()
+    assert run("convert", "--project", str(project), "--base-branch", "trunk")[0] == 0
+    state = (project / ".planning/STATE.md").read_text()
+    assert "base_branch: trunk" in state and "move-to-devtools" not in state
+
+
+def test_the_survey_says_what_the_project_is_written_in(project):
+    write(project, "src/app.ts", "export const a = 1\n")
+    write(project, "src/view.ts", "export const b = 2\n")
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "code")
+    code, out = run("survey", "--project", str(project))
+    assert "Files git tracks: 2 .ts. Python set up: no" in out
+    assert "the phase skills are written for Python and pytest, and this project has no Python" in out
+    write(project, "pyproject.toml", "[project]\nname = 'widget'\n")
+    write(project, "widget/core.py", "A = 1\n")
+    git(project, "add", "-A")
+    git(project, "commit", "-qm", "python")
+    code, out = run("survey", "--project", str(project))
+    assert "Python set up: pyproject.toml" in out and "written for Python and pytest, and this project" not in out
+
+
+def test_the_survey_names_the_skill_check_setting_when_other_skills_are_there(project):
+    write(project, ".claude/skills/release-notes/SKILL.md", "---\nname: release-notes\n---\n")
+    write(project, ".claude/agents/gsd-planner.md", "x\n")
+    code, out = run("survey", "--project", str(project))
+    assert 'skill_check = "synced"   (1 skill or agent file(s) here are not the sync\'s, e.g. ' \
+           '.claude/skills/release-notes/SKILL.md)' in out
+    install(project)
+    code, out = run("survey", "--project", str(project))
+    assert "(1 skill or agent file(s) here" in out, "what the sync delivered is not counted"
