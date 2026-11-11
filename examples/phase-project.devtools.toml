@@ -75,6 +75,8 @@ exclude = ["scripts/components_index.py"]
 # [sync.settings."scripts/rules_check.settings.json"]
 # index_script = "scripts/components_index.py"
 # gnd_command = "uvx --from get-nick-done==0.3.0 gnd"
+# Where the phase tool is, for rules about the plans of a phase (`check --phase NN`).
+# phase_script = ".claude/skills/process-phase/scripts/phase_tool.py"
 
 [[sync]]
 source = "skills/components/scripts/components_index.py"

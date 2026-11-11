@@ -18,6 +18,7 @@ envelope with ``--format json`` or a short human summary with ``--format md`` (d
     phase_tool.py complete --phase NN
     phase_tool.py branch [--set NAME]
     phase_tool.py migration-check | golden-diff [--base REF] | evidence-check [--phase NN]
+    phase_tool.py facts --phase NN
 
 Common options: --format json|md, --root DIR.
 Exit codes: 0 ok, 1 domain failure, 2 usage error. ``status`` always exits 0.
@@ -934,13 +935,18 @@ def listed(value: str, pattern=r"`([^`]+)`") -> list:
     return [item[2:] if item.startswith("./") else item for item in found if item]
 
 
+# The one-value frontmatter keys of a plan that `facts` passes on as they are written.
+PLAN_KEYS = ("golden_impact", "llm_dependency", "gap_closure", "autonomous", "prove_method")
+
+
 def parse_plan(text: str) -> dict:
     """What a plan declares: its wave, the plans it depends on, its requirements and the tests
     its frontmatter lists, and for each task the files it changes, the locked tests it turns
     green and its verify command. A task is a ``### <id>`` block between <tasks> and </tasks>;
     a field is ``- **name:** value`` and may run on over indented lines."""
     _, body = split_frontmatter(text)
-    wave = scalar(parse_frontmatter(text).get("wave", ""))
+    front = parse_frontmatter(text)
+    wave = scalar(front.get("wave", ""))
     section = re.search(r"<tasks>(.*?)</tasks>", body, re.S)
     tasks = []
     for block in re.split(r"^### ", section.group(1) if section else "", flags=re.M)[1:]:
@@ -949,10 +955,15 @@ def parse_plan(text: str) -> dict:
                       "files": listed(fields.get("files", "")) + listed(fields.get("unit_tests", "")),
                       "turns_green": [name for name in listed(fields.get("turns_green", ""), TEST_ID.pattern)
                                       if "::" in name],
+                      "read_first": listed(fields.get("read_first", "")),
+                      "type": fields.get("type", "").strip(),
                       "verify": fields.get("verify", "").strip()})
     reuse = re.search(r"^## Reuse[ \t]*\n(.*?)(?=^#{1,2} |\Z)", text, re.M | re.S)
     new = re.findall(r"^[ \t]*(?:- )?new_component:[ \t]*([^\n]+)$", reuse.group(1) if reuse else "", re.M | re.I)
+    old = re.findall(r"^[ \t]*(?:- )?reuse:[ \t]*([^\n<]+)$", reuse.group(1) if reuse else "", re.M | re.I)
     return {"wave": int(wave) if wave.isdigit() and int(wave) else None,
+            "declares": {key: scalar(front[key]) for key in PLAN_KEYS if scalar(front.get(key, ""))},
+            "reuse": re.findall(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", " ".join(old)),
             "depends_on": frontmatter_list(text, "depends_on"),
             "claims": [name for name in frontmatter_list(text, "turns_green") if "::" in name],
             "requirements": re.findall(r"REQ-[A-Z]+-\d+", " ".join(frontmatter_list(text, "requirements"))),
@@ -1018,6 +1029,37 @@ def track_cap(root: Path):
     return cap if proc.returncode == 0 and type(cap) is int and cap > 0 else None
 
 
+def plan_order(nn: str, plans: dict) -> tuple:
+    """The order `depends_on` gives the plans of a phase, by plan id: the plans each one names,
+    every plan that runs before it, and the entries that name no other plan of the phase, as
+    (plan file, entry, the id read from it). An id may be written NN-MM, MM or as the file name."""
+    ids = {plan["id"] for plan in plans.values()}
+    after, unknown = {}, []
+    for name, plan in plans.items():
+        wanted = []
+        for raw in plan["depends_on"]:
+            if raw.lower() in ("none", "null", "~"):
+                continue  # written out instead of an empty list
+            dep = raw[:-len("-PLAN.md")] if raw.endswith("-PLAN.md") else raw
+            dep = nn + "-" + dep if re.fullmatch(r"\d\d", dep) else dep
+            if dep in ids and dep != plan["id"]:
+                wanted.append(dep)
+            else:
+                unknown.append((name, raw, dep))
+        after[plan["id"]] = wanted
+
+    def reach(start):
+        seen, todo = set(), list(after[start])
+        while todo:
+            dep = todo.pop()
+            if dep not in seen:
+                seen.add(dep)
+                todo.extend(after[dep])
+        return seen
+
+    return after, {plan_id: reach(plan_id) for plan_id in after}, unknown
+
+
 SHOWN_FILES = 5  # the files named in one line about two plans; the line counts the rest
 
 
@@ -1031,33 +1073,14 @@ def check_plan_order(pl: Planning, nn: str, plans: dict) -> tuple:
     folder and the `shared_files` setting. A warning: a wave with more plans that can start at
     once than the coder pool runs here."""
     by_id = {plan["id"]: (name, plan) for name, plan in plans.items()}
-    issues, warnings, after = [], [], {}
+    issues, warnings = [], []
+    after, earlier, unknown = plan_order(nn, plans)
     for name, plan in plans.items():
-        wanted = []
-        for raw in plan["depends_on"]:
-            if raw.lower() in ("none", "null", "~"):
-                continue  # written out instead of an empty list
-            dep = raw[:-len("-PLAN.md")] if raw.endswith("-PLAN.md") else raw
-            dep = nn + "-" + dep if re.fullmatch(r"\d\d", dep) else dep
-            if dep in by_id and dep != plan["id"]:
-                wanted.append(dep)
-            else:
-                issues.append(issue(name, 0, "plans", "depends_on names %s, which is %s"
-                                    % (raw, "this plan" if dep == plan["id"] else "no plan of phase " + nn)))
-        after[plan["id"]] = wanted
+        issues.extend(issue(name, 0, "plans", "depends_on names %s, which is %s"
+                            % (raw, "this plan" if dep == plan["id"] else "no plan of phase " + nn))
+                      for where, raw, dep in unknown if where == name)
         if plan["wave"] is None and len(plans) > 1:
             issues.append(issue(name, 0, "plans", "plan frontmatter: wave is missing or not a whole number from 1 up"))
-
-    def reach(start):
-        seen, todo = set(), list(after[start])
-        while todo:
-            dep = todo.pop()
-            if dep not in seen:
-                seen.add(dep)
-                todo.extend(after[dep])
-        return seen
-
-    earlier = {plan_id: reach(plan_id) for plan_id in after}
     for plan_id in sorted(after):
         name, plan = by_id[plan_id]
         if plan_id in earlier[plan_id]:
@@ -1094,6 +1117,25 @@ def check_plan_order(pl: Planning, nn: str, plans: dict) -> tuple:
     return issues, warnings
 
 
+def traceability(text: str) -> tuple:
+    """What NN-TESTS.md lists: its test_dir, and each row of the Traceability table that names
+    a test, as (line number, test ids, whether the row is a guard). The rows are None when the
+    file has no such table."""
+    folder = parse_frontmatter(text).get("test_dir", "").rstrip("/")
+    table = re.search(r"^## Traceability[ \t]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not table:
+        return folder, None
+    rows = [(number, TEST_ID.findall(line), line.strip().strip("|").split("|")[-1].strip() == "guard")
+            for number, line in enumerate(table.group(1).splitlines(), text[:table.start(1)].count("\n") + 1)]
+    return folder, [row for row in rows if row[1]]
+
+
+def test_path(folder: str, name: str) -> str:
+    """A test id with its folder: one written as a bare file name is in the phase's test_dir."""
+    name = name[2:] if name.startswith("./") else name
+    return folder + "/" + name if folder and "/" not in name.split("::")[0] else name
+
+
 def check_plans(pl: Planning, nn: str) -> tuple:
     """The plans of a phase together; returns (issues, warnings). Every contract test id in the
     Traceability table of NN-TESTS.md is turned green by a task, the requirements the plans
@@ -1114,23 +1156,18 @@ def check_plans(pl: Planning, nn: str) -> tuple:
     issues.extend(issue(name, 0, "plans", "task %s: verify is empty" % task["id"])
                   for name, plan in plans.items() for task in plan["tasks"] if not task["verify"])
     tests = pdir / (nn + "-TESTS.md")
-    text = tests.read_text(encoding="utf-8") if tests.is_file() else ""
-    table = re.search(r"^## Traceability[ \t]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
-    if not table:
+    folder, rows = traceability(tests.read_text(encoding="utf-8") if tests.is_file() else "")
+    if rows is None:
         issues.append(issue(where + nn + "-TESTS.md", 0, "plans", "no Traceability table to read the test ids from"))
-    folder = parse_frontmatter(text).get("test_dir", "").rstrip("/")
 
     def full(name):
-        """A test id with its folder: one written as a bare file name is in the phase's test_dir."""
-        name = name[2:] if name.startswith("./") else name
-        return folder + "/" + name if folder and "/" not in name.split("::")[0] else name
+        return test_path(folder, name)
 
     claimed = {full(name) for plan in plans.values() for task in plan["tasks"] for name in task["turns_green"]}
-    offset = text[:table.start(1)].count("\n") if table else 0
-    for number, line in enumerate(table.group(1).splitlines() if table else [], offset + 1):
-        if line.strip().strip("|").split("|")[-1].strip() == "guard":
+    for number, names, guard in rows or []:
+        if guard:
             continue  # green from the start by design: no task turns it green
-        for name in TEST_ID.findall(line):
+        for name in names:
             if not any(c == full(name) or (not folder and (c.endswith("/" + name) or name.endswith("/" + c)))
                        for c in claimed):
                 issues.append(issue(rel(pl.root, tests), number, "plans", "no plan task turns this test green: " + name))
@@ -1808,6 +1845,80 @@ def cmd_evidence_check(pl: Planning, args) -> dict:
     return data
 
 
+# --------------------------------------------------------------------------- facts
+
+
+# What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
+# The shape is the one `components_index.py facts` writes, so one rule checker reads both.
+FACT_VALUES = {"plan": "String", "task": "String", "test": "String", "path": "String", "requirement": "String",
+               "component": "String", "kind": "String", "key": "String", "value": "String", "wave": "Integer"}
+FACT_TYPES = {
+    "plan_in_wave": ("{Plan} is in {Wave}", (("plan", "plan"), ("wave", "wave"))),
+    "plan_depends_on": ("{Plan} names {Plan} in depends_on", (("plan", "plan"), ("earlier", "plan"))),
+    "plan_runs_after": ("{Plan} runs after {Plan}", (("plan", "plan"), ("earlier", "plan"))),
+    "plan_names_requirement": ("{Plan} names {Requirement}", (("plan", "plan"), ("requirement", "requirement"))),
+    "plan_reuses_component": ("{Plan} reuses {Component}", (("plan", "plan"), ("component", "component"))),
+    "plan_adds_component": ("{Plan} adds {Component}", (("plan", "plan"), ("component", "component"))),
+    "plan_declares": ("{Plan} declares {Key} as {Value}", (("plan", "plan"), ("key", "key"), ("value", "value"))),
+    "task_in_plan": ("{Task} is in {Plan}", (("task", "task"), ("plan", "plan"))),
+    "task_has_type": ("{Task} is of {Kind}", (("task", "task"), ("type", "kind"))),
+    "task_turns_green": ("{Task} turns green {Test}", (("task", "task"), ("test", "test"))),
+    "task_names_file": ("{Task} names {Path} in its files", (("task", "task"), ("path", "path"))),
+    "task_reads_first": ("{Task} reads {Path} first", (("task", "task"), ("path", "path"))),
+    "test_is_in_contract": ("{Test} is in the contract as {Kind}", (("test", "test"), ("kind", "kind"))),
+}
+
+
+def cmd_facts(pl: Planning, args) -> dict:
+    """The plans of a phase as rows of facts, for a rule checker (`rules_check.py check --phase`).
+
+    A fact is what a plan says, not a judgment: `check --plans` is where the plans are checked.
+    `plan_runs_after` is every plan before a plan through `depends_on`, the named ones and the
+    ones they name. A test id is written with its folder, as `check --plans` compares it.
+    `task_names_file` holds `files` and `unit_tests` as written: a path, a folder ending in /,
+    or a pattern with *. The plan file behind each plan is under `evidence`, for printing."""
+    pl.require()
+    nn = norm_phase(args.phase)
+    plans = phase_plans(pl, nn)
+    if not plans:
+        raise ToolError("NO_PLANS", "phase %s has no plan" % nn, "write the plans first (the Plan step)")
+    pdir = pl.phase_dir(nn)
+    tests = pdir / (nn + "-TESTS.md")
+    folder, table = traceability(tests.read_text(encoding="utf-8") if tests.is_file() else "")
+    after, earlier, _ = plan_order(nn, plans)
+    found = {name: [] for name in FACT_TYPES}
+    for plan in plans.values():
+        me = plan["id"]
+        if plan["wave"]:
+            found["plan_in_wave"].append((me, plan["wave"]))
+        found["plan_depends_on"].extend((me, dep) for dep in after[me])
+        found["plan_runs_after"].extend((me, dep) for dep in earlier[me] if dep != me)
+        found["plan_names_requirement"].extend((me, req) for req in plan["requirements"])
+        found["plan_reuses_component"].extend((me, name) for name in plan["reuse"])
+        found["plan_adds_component"].extend((me, name) for name in plan["new_components"])
+        found["plan_declares"].extend((me, key, value) for key, value in plan["declares"].items())
+        for task in plan["tasks"]:
+            found["task_in_plan"].append((task["id"], me))
+            if task["type"]:
+                found["task_has_type"].append((task["id"], task["type"]))
+            found["task_turns_green"].extend((task["id"], test_path(folder, test)) for test in task["turns_green"])
+            found["task_names_file"].extend((task["id"], path) for path in task["files"])
+            found["task_reads_first"].extend((task["id"], path) for path in task["read_first"])
+    found["test_is_in_contract"] = [(test_path(folder, test), "guard" if guard else "contract")
+                                    for _, names, guard in table or [] for test in names]
+    return {
+        "format": "devtools-facts/1",
+        "revision": (git(pl.root, "rev-parse", "HEAD") or "").strip(),
+        "phase": nn,
+        "types": {"values": FACT_VALUES,
+                  "facts": {name: {"reading": reading, "roles": [list(role) for role in roles]}
+                            for name, (reading, roles) in FACT_TYPES.items()}},
+        "facts": {name: [dict(zip((role for role, _ in FACT_TYPES[name][1]), row)) for row in sorted(set(rows))]
+                  for name, rows in found.items()},
+        "evidence": {"plans": {plan["id"]: name for name, plan in plans.items()}},
+    }
+
+
 # --------------------------------------------------------------------------- CLI
 
 
@@ -1815,7 +1926,7 @@ COMMANDS = {
     "setup": cmd_setup, "status": cmd_status, "init": cmd_init, "activate": cmd_activate, "roadmap": cmd_roadmap, "check": cmd_check,
     "req-coverage": cmd_req_coverage, "testlock": cmd_testlock, "advance": cmd_advance,
     "complete": cmd_complete, "branch": cmd_branch, "migration-check": cmd_migration_check,
-    "golden-diff": cmd_golden_diff, "evidence-check": cmd_evidence_check,
+    "golden-diff": cmd_golden_diff, "evidence-check": cmd_evidence_check, "facts": cmd_facts,
 }
 
 
@@ -1862,6 +1973,7 @@ def build_parser() -> Parser:
     sub.add_parser("migration-check", parents=[common])
     sub.add_parser("golden-diff", parents=[common]).add_argument("--base")
     sub.add_parser("evidence-check", parents=[common]).add_argument("--phase")
+    sub.add_parser("facts", parents=[common]).add_argument("--phase", required=True)
     return parser
 
 

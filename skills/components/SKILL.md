@@ -253,7 +253,8 @@ the user decides which suggestions become work.
 
 ## Project rules: an optional check
 
-Follow [`references/rules.md`](references/rules.md). In short: a project that wants rules
+Follow [`references/rules.md`](references/rules.md), which also covers rules about the plans of a
+phase (`check --phase NN`, for a project on the phase workflow). In short: a project that wants rules
 the index script cannot state ("the core must not import the command line", "nothing new
 joins a loop of imports") writes them in `docs/components/rules.json`, with the ranks and
 forbidden pairs of its areas in `docs/components/layers.toml`. Where the project has a

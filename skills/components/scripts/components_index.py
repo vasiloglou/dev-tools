@@ -12,7 +12,7 @@
                                              stub entries for the modules no component covers
     components_index.py list [AREA]          the component ids by area, each with its one-line description
     components_index.py changed --base REF   check the index against the files changed since REF
-    components_index.py facts [--base REF] [--out FILE]
+    components_index.py facts [--base REF] [--modules] [--out FILE]
                                              the catalog and the import graph as JSON rows, for a rule checker
     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
     components_index.py show ID              one component: its entry, its modules, what they import and what imports them
@@ -1116,8 +1116,15 @@ FACT_TYPES = {
 }
 
 
-def facts(root: Path, base: str = '') -> dict:
+# One more fact type, written only with `facts --modules`: file paths make a renamed file a new fact.
+MODULE_FACTS = {'component_has_module': ('{Component} holds {Path}', (('component', 'component'), ('path', 'path')))}
+
+
+def facts(root: Path, base: str = '', modules: bool = False) -> dict:
     """The catalog and the import graph as rows of facts, for a rule checker.
+
+    With `modules`, also which package file each component holds, for rules that start from a
+    file a plan names; only for the code as it is now, so not together with `base`.
 
     With `base`, the catalog and the code are those of the merge base with it; the ranks
     and forbidden pairs are always today's, so one set of rules judges both revisions.
@@ -1126,6 +1133,8 @@ def facts(root: Path, base: str = '') -> dict:
     """
     entries = read_components(root)
     ranks, forbidden = layers_config(root, {e['id'].split('.')[0] for e in entries if not subsystem(e)})
+    if base and modules:
+        raise ValueError('facts --modules lists the files as they are now: leave out --base')
     if base:
         _, revision, _, entries, overrides = base_snapshot(root, base)
         edges = component_graph(root, entries, overrides)
@@ -1151,13 +1160,18 @@ def facts(root: Path, base: str = '') -> dict:
         'area_has_rank': list(ranks.items()),
         'area_must_not_use': forbidden,
     }
+    types = dict(FACT_TYPES)
+    if modules:
+        types.update(MODULE_FACTS)
+        paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
+        found['component_has_module'] = [(e['id'], path) for e in components for path in paths if covers(e, path)]
     return {
         'format': 'devtools-facts/1',
         'revision': revision,
         'types': {'values': VALUE_TYPES,
                   'facts': {name: {'reading': reading, 'roles': [list(role) for role in roles]}
-                            for name, (reading, roles) in FACT_TYPES.items()}},
-        'facts': {name: [dict(zip((role for role, _ in FACT_TYPES[name][1]), row)) for row in sorted(set(rows))]
+                            for name, (reading, roles) in types.items()}},
+        'facts': {name: [dict(zip((role for role, _ in types[name][1]), row)) for row in sorted(set(rows))]
                   for name, rows in found.items()},
         # Every import behind an edge, those a package __init__ makes last.
         'evidence': {'component_uses': [
@@ -1468,6 +1482,7 @@ def main(argv: list[str] | None = None) -> int:
                       help='also fail on a new caller of a deprecated or duplicate component')
     rows = commands.add_parser('facts')
     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
+    rows.add_argument('--modules', action='store_true', help='also which package file each component holds (not with --base)')
     rows.add_argument('--out', type=Path, help='write to this file instead of printing')
     look = commands.add_parser('review')
     look.add_argument('areas', nargs='*', help='only leads that name a component whose id starts with one of these')
@@ -1553,7 +1568,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == 'changed':
             return changed(args.root, args.base, args.strict_changed)
         if args.command == 'facts':
-            text = json.dumps(facts(args.root, args.base), indent=1, sort_keys=True) + '\n'
+            text = json.dumps(facts(args.root, args.base, args.modules), indent=1, sort_keys=True) + '\n'
             if args.out:
                 args.out.write_text(text, encoding='utf-8')
             else:

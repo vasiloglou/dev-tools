@@ -799,6 +799,7 @@ def fake_gnd(project, report=None, exit_code=0, stderr=""):
 
 STARTER_IDS = ["no_forbidden_area_use", "no_use_of_a_higher_rank", "no_import_inside_a_loop",
                "canonical_component_has_a_test"]
+PLAN_RULE = "plan_names_the_components_it_touches"  # the one starter rule about plans: only `check --phase` judges it
 
 
 def gnd_report(*verdicts, exit_code=0, version=15, rules=STARTER_IDS, baseline=None, **more):
@@ -827,7 +828,7 @@ def test_rules_init_never_overwrites(project):
     layered(project)
     path = project / "docs/components/rules.json"
     starter = path.read_text()
-    assert [rule["id"] for rule in json.loads(starter)["rules"]] == STARTER_IDS
+    assert [rule["id"] for rule in json.loads(starter)["rules"]] == STARTER_IDS + [PLAN_RULE]
     path.write_text('{"rules": []}\n')
     code, out = tool(project, "init", script=RULES)
     assert code == 0 and "docs/components/rules.json exists; left as it is" in out
@@ -977,6 +978,144 @@ def test_rules_with_real_gnd(project):
     (project / "docs/components/layers.toml").write_text("[rank]\ncli = 0\ncore = 1\n")
     code, out = tool(project, "check", script=RULES)
     assert code == 1 and "fail: no_use_of_a_higher_rank:" in out and "rank=0 used=1" in out, out
+
+
+def test_plan_facts_say_what_the_plans_say(project):
+    folder = planned(project).parent
+    (folder / "01-01-PLAN.md").write_text(PLAN.replace("turns_green: [", "golden_impact: none   # nothing regenerated\nturns_green: [")
+                                          .replace("new_component:", "reuse: core.sizes, cli.run (adapt: one more command)\nnew_component:")
+                                          .replace("- **files:**", "- **read_first:** `src/widget/cli.py`\n- **files:**"))
+    (folder / "01-02-PLAN.md").write_text(plan_text("02", wave=2, depends_on="[01]", files="`src/widget/*.py`"))
+    (folder / "01-03-PLAN.md").write_text(plan_text("03", wave=3, depends_on="[01-02]", files="`docs/guide.md`"))
+    code, env = phase(project, "facts", "--phase", "1")
+    assert code == 0 and env["data"]["format"] == "devtools-facts/1" and env["data"]["phase"] == "01", env
+    rows = env["data"]["facts"]
+    assert rows["plan_in_wave"] == [{"plan": "01-01", "wave": 1}, {"plan": "01-02", "wave": 2}, {"plan": "01-03", "wave": 3}]
+    assert rows["plan_depends_on"] == [{"plan": "01-02", "earlier": "01-01"}, {"plan": "01-03", "earlier": "01-02"}]
+    assert {"plan": "01-03", "earlier": "01-01"} in rows["plan_runs_after"] and len(rows["plan_runs_after"]) == 3
+    assert {"plan": "01-01", "requirement": "REQ-CORE-001"} in rows["plan_names_requirement"]
+    assert [r["component"] for r in rows["plan_reuses_component"]] == ["cli.run", "core.sizes"]
+    assert {"plan": "01-01", "component": "fs.scan"} in rows["plan_adds_component"]
+    assert rows["plan_declares"] == [{"plan": "01-01", "key": "golden_impact", "value": "none"}]
+    assert {"task": "01-02-T1", "plan": "01-02"} in rows["task_in_plan"]
+    assert {"task": "01-01-T1", "type": "auto"} in rows["task_has_type"]
+    assert {"task": "01-01-T1", "test": "tests/acceptance/p01_scan/test_scan.py::test_lists_files"} in rows["task_turns_green"]
+    assert [r["path"] for r in rows["task_names_file"] if r["task"] == "01-01-T1"] == ["src/widget/scan.py", "tests/unit/"]
+    assert {"task": "01-02-T1", "path": "src/widget/*.py"} in rows["task_names_file"], "an entry is passed on as written"
+    assert rows["task_reads_first"] == [{"task": "01-01-T1", "path": "src/widget/cli.py"}]
+    assert {"test": "tests/acceptance/p01_scan/test_scan.py::test_skips_hidden", "kind": "contract"} in rows["test_is_in_contract"]
+    assert {"test": "tests/acceptance/p01_scan/test_scan.py::test_sizes[kb, mb]", "kind": "guard"} in rows["test_is_in_contract"]
+    assert set(env["data"]["types"]["facts"]) == set(rows), "every fact type is described"
+    assert env["data"]["evidence"]["plans"]["01-02"] == ".planning/phases/01-scan/01-02-PLAN.md"
+
+    code, env = phase(project, "facts", "--phase", "2")
+    assert code == 1 and env["error"]["code"] == "NO_PLANS"
+
+
+def test_facts_can_list_the_files_of_each_component(project):
+    layered(project)
+    (project / "src/widget/extra").mkdir()
+    (project / "src/widget/extra/more.py").write_text('"""More."""\n')
+    catalog(project, entry("core.extra", "Extra things", "src/widget/extra/"))
+    assert "component_has_module" not in facts(project)["facts"], "only on request: a file path makes a renamed file a new fact"
+    found = facts(project, "--modules")
+    assert found["facts"]["component_has_module"] == [
+        {"component": "cli.run", "path": "src/widget/cli.py"},
+        {"component": "core.extra", "path": "src/widget/extra/more.py"},
+        {"component": "core.sizes", "path": "src/widget/sizes.py"}]
+    assert found["types"]["facts"]["component_has_module"]["roles"] == [["component", "component"], ["path", "path"]]
+    code, out = tool(project, "facts", "--modules", "--base", "main", script=INDEX)
+    assert code == 1 and "leave out --base" in out
+
+
+def component_plan(reuse=""):
+    """PLAN with a task that changes sizes.py, reads cli.py first and names a file that does not exist yet;
+    `reuse` is the reuse: line of its Reuse section."""
+    return (PLAN.replace("new_component:", "reuse: %s\nnew_component:" % reuse if reuse else "new_component:")
+            .replace("- **files:** `src/widget/scan.py`, `tests/unit/`",
+                     "- **read_first:** `src/widget/cli.py`\n- **files:** `src/widget/siz*.py`, `src/widget/new.py`"))
+
+
+def planned_over_components(project):
+    """Phase 1 with the plan of `component_plan`, over the two components of `layered` and a subsystem of both."""
+    plan = planned(project)
+    layered(project)
+    catalog(project, "\n### subsystem.report\n- does: Print sizes\n- verbs: report\n- status: canonical\n"
+                     "- components: cli.run, core.sizes\n")
+    plan.write_text(component_plan())
+    return plan
+
+
+def test_rules_about_plans_are_judged_for_a_phase_only(project):
+    plan = planned_over_components(project)
+    broken = {"$task": "01-01-T1", "$component": "core.sizes", "$plan": "01-01"}
+    seen = fake_gnd(project)
+    code, out = tool(project, "check", script=RULES)
+    assert code == 0 and "rules: 4 rule(s); 0 to fix" in out, out
+    assert [c["id"] for c in json.loads((seen / "model.json").read_text())["constraints"]] == STARTER_IDS
+
+    seen = fake_gnd(project, gnd_report(verdict(PLAN_RULE, "warning", broken), rules=[PLAN_RULE]))
+    code, out = tool(project, "check", "--phase", "1", script=RULES)
+    assert code == 0 and out == (
+        "warn: plan_names_the_components_it_touches: task=01-01-T1 component=core.sizes plan=01-01 "
+        "(.planning/phases/01-scan/01-01-PLAN.md)\n"
+        "  remedy: A task changes a file of a component the plan does not name: add the component to the "
+        "plan's reuse: line, or to new_component: if the plan creates it\n"
+        "plan rules for phase 01: 1 rule(s); 0 to fix, 1 warning(s)\n"), out
+    assert tool(project, "check", "--phase", "1", "--strict", script=RULES)[0] == 1
+    model = json.loads((seen / "model.json").read_text())
+    rows = json.loads((seen / "head.facts.json").read_text())["facts"]
+    assert [c["id"] for c in model["constraints"]] == [PLAN_RULE] and "about" not in model["constraints"][0]
+    assert "--baseline" not in (seen / "argv.txt").read_text()
+    assert {f["id"] for f in model["fact_types"]} == set(rows), "the component facts, the plan facts and the joined ones"
+    assert rows["task_touches_component"] == [{"task": "01-01-T1", "component": "core.sizes"}], "a pattern names a file"
+    assert rows["task_reads_component"] == [{"task": "01-01-T1", "component": "cli.run"}]
+    assert rows["task_adds_file"] == [{"task": "01-01-T1", "path": "src/widget/new.py"}]
+    assert rows["plan_names_component"] == [{"plan": "01-01", "component": "fs.scan"}]
+    assert {"component": "core.sizes", "path": "src/widget/sizes.py"} in rows["component_has_module"]
+
+    plan.write_text(component_plan(reuse="subsystem.report"))
+    fake_gnd(project, gnd_report(rules=[PLAN_RULE]))
+    code, out = tool(project, "check", "--phase", "1", "--format", "json", script=RULES)
+    assert code == 0 and json.loads(out) == {"rows": [], "summary": "plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)"}
+    rows = json.loads((project.parent / "fake-gnd/head.facts.json").read_text())["facts"]
+    assert {"plan": "01-01", "component": "core.sizes"} in rows["plan_names_component"], "a subsystem names its members"
+
+    code, out = tool(project, "check", "--phase", "1", "--base", "main", script=RULES)
+    assert code == 2 and "leave out --base" in out
+    code, out = tool(project, "check", "--phase", "2", script=RULES)
+    assert code == 2 and "rules_check: " in out and "phase 02 has no plan" in out
+    rules = project / "docs/components/rules.json"
+    rules.write_text(rules.read_text().replace('"about": "plans"', '"about": "plan"'))
+    code, out = tool(project, "check", script=RULES)
+    assert code == 2 and 'plan_names_the_components_it_touches: "about" is components or plans' in out
+
+
+def test_plan_rules_need_the_phase_tool_and_skip_without_gnd(project):
+    planned_over_components(project)
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": "no-such-gnd"}))
+    code, out = tool(project, "check", "--phase", "1", script=RULES)
+    assert code == 0 and out.startswith("skip: gnd not found"), out
+    assert tool(project, "check", "--phase", "1", "--require", script=RULES)[0] == 1
+    seen = fake_gnd(project)
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": str(seen / "gnd"), "phase_script": "tools/phase_tool.py"}))
+    code, out = tool(project, "check", "--phase", "1", script=RULES)
+    assert code == 2 and "tools/phase_tool.py is missing (phase_script in rules_check.settings.json)" in out
+
+
+@pytest.mark.skipif(not REAL_GND, reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
+def test_plan_rules_with_real_gnd(project):
+    plan = planned_over_components(project)
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": REAL_GND}))
+    code, out = tool(project, "check", "--phase", "1", script=RULES)
+    assert code == 0, out
+    assert "warn: plan_names_the_components_it_touches: task=01-01-T1 component=core.sizes plan=01-01" in out, out
+    assert "plan rules for phase 01: 1 rule(s); 0 to fix, 1 warning(s)" in out
+    plan.write_text(component_plan(reuse="core.sizes"))
+    code, out = tool(project, "check", "--phase", "1", script=RULES)
+    assert code == 0 and out == "plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)\n", out
+    code, out = tool(project, "check", script=RULES)
+    assert "rules: 4 rule(s)" in out, out
 
 
 def test_review_lists_places_to_look(project):
