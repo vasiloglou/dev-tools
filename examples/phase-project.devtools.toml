@@ -32,6 +32,10 @@ gated_from = "context_approved"
 # true accepts a roadmap whose phase numbers do not start at 0 or 1, or skip some: a
 # project that moved from GSD keeps the numbers its phases had.
 phase_gaps = false
+# Which skills and agents `check --all` holds to the skill rules: "all" in the folders
+# above, or "synced" for only the ones this file delivers. Use "synced" when those folders
+# also hold skills or agents of the project's own, or another tool's.
+skill_check = "all"
 
 # Where the coding assistants for Implement are configured (`coder_pool.py show` reads
 # both). The team file is checked in; the local one is each developer's own: add it to

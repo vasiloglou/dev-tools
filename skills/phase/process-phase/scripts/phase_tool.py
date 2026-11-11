@@ -62,7 +62,12 @@ DEFAULT_SETTINGS = {
     # False: whole-number phases are numbered from 0 or 1 without gaps. True: any rising numbers,
     # for a roadmap whose numbers come from an earlier process (a project moved from GSD).
     "phase_gaps": False,
+    # Which skills and agents ``check`` holds to the skill rules: "all" under skill_roots and
+    # agents_dir, or "synced" for only the ones the sync delivered (read from the sync receipt),
+    # for a project whose folders also hold skills or agents written to other rules.
+    "skill_check": "all",
 }
+RECEIPT = ".devtools-receipt.json"  # written by the sync; lists every file it delivered
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
@@ -112,6 +117,8 @@ ARTIFACTS = [
     ("verified", "{nn}-VERIFICATION.md", "{nn}-VERIFICATION.md"),
 ]
 GATED_FROM = SETTINGS["gated_from"]
+if SETTINGS["skill_check"] not in ("all", "synced"):
+    raise SystemExit("%s: skill_check must be all or synced" % SETTINGS_FILE)
 if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
     raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
 IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
@@ -276,7 +283,15 @@ class Planning:
         if not path.is_file():
             raise ToolError("NO_STATE", PLANNING + "/STATE.md is missing",
                             "run 'phase_tool.py setup' to create the missing planning files")
-        return parse_frontmatter(path.read_text(encoding="utf-8"))
+        state = parse_frontmatter(path.read_text(encoding="utf-8"))
+        # When the last phase is completed the state rests on it as ``complete``. A phase added to
+        # the roadmap afterwards is then the current one, as ``complete`` would have left it had the
+        # phase been there. ``advance``, ``activate`` and ``branch`` write that down.
+        if state.get("phase_status") == "complete":
+            todo = open_phases(self, phase_list(state.get("completed_phases", "")))
+            if todo:
+                state.update(current_phase=todo[0], phase_status="not_started", active_step="null")
+        return state
 
     def roadmap_text(self) -> str:
         path = self.dir / "ROADMAP.md"
@@ -477,6 +492,20 @@ def cmd_setup(pl: Planning, args) -> dict:
     source = TEMPLATES_DIR / "planning"
     if not source.is_dir():
         raise ToolError("NO_TEMPLATES", "%s is missing" % source, "sync the whole process-phase skill directory")
+    # A plan written by something else has files of the same names. Keeping them beside new ones
+    # would leave a folder that neither process can read.
+    def text(name):
+        return (pl.dir / name).read_text(encoding="utf-8") if (pl.dir / name).is_file() else None
+    readable = {"STATE.md": lambda t: "current_phase" in parse_frontmatter(t),
+                "ROADMAP.md": lambda t: bool(parse_roadmap(t)),
+                "REQUIREMENTS.md": lambda t: any(parse_requirements(t))}
+    foreign = [name for name, ok in readable.items() if text(name) is not None and not ok(text(name))]
+    if foreign:
+        raise ToolError("FOREIGN_PLAN", "%s/ already holds %s in another format" % (PLANNING, ", ".join(foreign)),
+                        "setup is for a project with no plan. A project planned with GSD is moved with "
+                        "devtools/from_gsd.py in the dev-tools checkout (its skills/move-from-gsd/SKILL.md is the guide); "
+                        "any other plan is rewritten by hand (references/artifact-formats.md) or moved aside first",
+                        1, {"files": foreign})
     created, kept = [], []
     pl.dir.mkdir(parents=True, exist_ok=True)
     for template in sorted(source.iterdir()):
@@ -708,12 +737,20 @@ def check_skill(root: Path, skill_dir: Path) -> list:
 
 
 def check_skills(pl: Planning) -> list:
-    issues = []
+    issues, synced = [], None
+    if SETTINGS["skill_check"] == "synced":
+        try:
+            synced = set(json.loads((pl.root / RECEIPT).read_text(encoding="utf-8")).get("files", {}))
+        except (OSError, ValueError, AttributeError):
+            return [issue(RECEIPT, 0, "skill", "skill_check is \"synced\" and the sync receipt is missing or unreadable")]
     for base in [pl.root / r for r in SETTINGS["skill_roots"]]:
         for skill_md in sorted(base.glob("*/SKILL.md")) if base.is_dir() else []:
-            issues.extend(check_skill(pl.root, skill_md.parent))
+            if synced is None or rel(pl.root, skill_md) in synced:
+                issues.extend(check_skill(pl.root, skill_md.parent))
     agents = pl.root / SETTINGS["agents_dir"]
     for path in sorted(agents.glob("*.md")) if agents.is_dir() else []:
+        if synced is not None and rel(pl.root, path) not in synced:
+            continue
         front = parse_frontmatter(path.read_text(encoding="utf-8"))
         if front.get("name") != path.stem:
             issues.append(issue(rel(pl.root, path), 1, "agent", "name must equal file stem %r" % path.stem))
@@ -732,7 +769,7 @@ def acceptance_files(root: Path, nn: str) -> dict:
     base = root / SETTINGS["acceptance_dir"]
     files = []
     for pdir in sorted(base.glob("p%s_*" % nn.replace(".", "_"))) if base.is_dir() else []:
-        if "." not in nn and re.match(r"^p\d{2}_\d+_", pdir.name):
+        if "." not in nn and re.match(r"^p\d{2,}_\d+_", pdir.name):
             continue
         if pdir.is_dir():
             files.extend(p for p in pdir.rglob("*") if hashable(p))
@@ -1403,7 +1440,7 @@ def cmd_advance(pl: Planning, args) -> dict:
                         "--override DEC-NNN after a human-approved DEC",
                         1, {"phase": nn, "from": current, "to": target, "problems": problems, "hard": hard})
     update_frontmatter(pl.dir / "STATE.md", {
-        "phase_status": target, "active_step": NEXT_STEP[target], "last_activity": today()})
+        "current_phase": nn, "phase_status": target, "active_step": NEXT_STEP[target], "last_activity": today()})
     warnings = ["missing artifact: " + m for m in missing_artifacts(pl, nn, target)]
     if override:
         warnings.append("gate overridden by %s: %s" % (override, "; ".join(problems)))
@@ -1413,7 +1450,7 @@ def cmd_advance(pl: Planning, args) -> dict:
             "warnings": warnings, "override": override}
 
 
-BRANCH_NAME = re.compile("^" + re.escape(SETTINGS["branch_prefix"]) + r"(\d{2}(?:\.\d+)?)-[a-z0-9-]+$")
+BRANCH_NAME = re.compile("^" + re.escape(SETTINGS["branch_prefix"]) + r"(\d{2,}(?:\.\d+)?)-[a-z0-9-]+$")
 
 
 def cmd_branch(pl: Planning, args) -> dict:
@@ -1430,7 +1467,8 @@ def cmd_branch(pl: Planning, args) -> dict:
                         "e.g. %s01-safety-net" % SETTINGS["branch_prefix"], 2)
     if BRANCH_NAME.match(name) and BRANCH_NAME.match(name).group(1) != nn:
         raise ToolError("BAD_BRANCH", "branch %s does not match current phase %s" % (name, nn), "", 2)
-    update_frontmatter(pl.dir / "STATE.md", {"phase_branch": name, "last_activity": today()})
+    update_frontmatter(pl.dir / "STATE.md", {"current_phase": nn, "phase_status": state.get("phase_status", "not_started"),
+                                           "phase_branch": name, "last_activity": today()})
     return {"phase_branch": name, "previous": state.get("phase_branch")}
 
 

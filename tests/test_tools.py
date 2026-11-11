@@ -150,6 +150,123 @@ def test_roadmap_may_start_at_phase_one_but_not_skip_a_number(project):
     assert phase(project, "check", "--roadmap")[0] == 1
 
 
+PHASE_BLOCK = """
+## Phase %s: %s
+- **Slug:** %s
+- **Status:** %s
+- **Depends on:** none
+- **Requirements:** REQ-CORE-001
+- **Reuses:** nothing
+- **Acceptance tests (written first):** `tests/acceptance/`
+"""
+
+
+def setting(project, **values):
+    path = project / ".claude/skills/process-phase/scripts/phase_tool.settings.json"
+    path.write_text(json.dumps(dict(json.loads(path.read_text()), **values)))
+
+
+def test_a_phase_added_after_the_roadmap_was_finished_becomes_the_current_one(project):
+    phase(project, "setup")
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(ROADMAP.replace("- **Status:** not_started", "- **Status:** complete", 3))
+    state(project, current_phase='"04"', completed_phases='"01,02,03"', phase_status="verified")
+    code, env = phase(project, "complete", "--phase", "4")
+    assert code == 0 and env["data"]["current_phase"] == "04", "there is no later phase to move on to"
+    assert "phase_status: complete" in (project / ".planning/STATE.md").read_text()
+
+    road.write_text(road.read_text() + PHASE_BLOCK % (5, "Web view", "web-view", "not_started")
+                    + PHASE_BLOCK % (6, "Sync", "sync", "not_started"))
+    code, env = phase(project, "status")
+    assert env["data"]["current_phase"] == "05" and env["data"]["phase_status"] == "not_started"
+    assert env["data"]["next_step"] == "discuss"
+    assert phase(project, "check", "--roadmap", "--state")[0] == 0
+    phase(project, "init", "--phase", "5")
+    code, env = phase(project, "advance", "--to", "context_approved")
+    assert code == 0 and env["data"]["phase"] == "05", env
+    text = (project / ".planning/STATE.md").read_text()
+    assert 'current_phase: "05"' in text and "phase_status: context_approved" in text
+    assert "- **Status:** context_approved" in road.read_text().split("## Phase 5:")[1]
+
+
+def test_another_phase_can_be_activated_once_the_roadmap_was_finished(project):
+    phase(project, "setup")
+    road = project / ".planning/ROADMAP.md"
+    road.write_text(ROADMAP.replace("- **Status:** not_started", "- **Status:** complete")
+                    + PHASE_BLOCK % (5, "Web view", "web-view", "not_started")
+                    + PHASE_BLOCK % (6, "Sync", "sync", "not_started"))
+    state(project, current_phase='"04"', completed_phases='"01,02,03,04"', phase_status="complete")
+    code, env = phase(project, "activate", "--phase", "6", "--dec", "DEC-001")
+    assert code == 0 and env["data"]["phase"] == "06", env
+    assert 'current_phase: "06"' in (project / ".planning/STATE.md").read_text()
+
+
+def test_phase_numbers_above_99_work_like_any_other(project):
+    phase(project, "setup")
+    setting(project, phase_gaps=True)
+    (project / ".planning/ROADMAP.md").write_text(
+        "# Roadmap\n" + PHASE_BLOCK % (121, "Ledger", "ledger", "complete")
+        + PHASE_BLOCK % (122, "Deck", "deck", "not_started") + PHASE_BLOCK % ("122.1", "Deck fix", "deck-fix", "not_started"))
+    state(project, current_phase='"122"', completed_phases='"121"')
+    assert phase(project, "check", "--roadmap")[0] == 0
+    code, env = phase(project, "branch", "--set", "phase/122-deck")
+    assert code == 0 and env["data"]["phase_branch"] == "phase/122-deck", env
+    assert phase(project, "branch", "--set", "phase/121-ledger")[0] == 2, "a branch of another phase is still refused"
+    for name in ("p122_deck", "p122_1_deck_fix"):
+        (project / "tests/acceptance" / name).mkdir(parents=True)
+        (project / "tests/acceptance" / name / ("test_%s.py" % name)).write_text("def test_it():\n    assert True\n")
+    code, env = phase(project, "testlock", "--phase", "122")
+    assert list(env["data"]["files"]) == ["tests/acceptance/p122_deck/test_p122_deck.py"], \
+        "the tests of inserted phase 122.1 are not phase 122's"
+    code, env = phase(project, "testlock", "--phase", "122.1")
+    assert list(env["data"]["files"]) == ["tests/acceptance/p122_1_deck_fix/test_p122_1_deck_fix.py"]
+
+    def run(*args):
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+                              cwd=project, capture_output=True, text=True)
+        return proc.stdout.strip().splitlines()[-1]
+
+    assert run().startswith("2 deselected"), "neither phase is complete"
+    assert run("--phase", "122").startswith("1 passed, 1 deselected")
+    assert run("--phase", "122.1").startswith("1 passed, 1 deselected")
+    state(project, completed_phases='"121,122"')
+    assert run().startswith("1 passed, 1 deselected")
+
+
+def test_the_skill_check_can_be_limited_to_what_the_sync_delivered(project):
+    phase(project, "setup")
+    commit(project)
+    (project / ".claude/agents/README.md").write_text("# Our agents\n")
+    (project / ".claude/agents/reviewer.md").write_text("---\nname: code-reviewer\ndescription: reviews\n---\n")
+    own = project / ".claude/skills/release-notes"
+    own.mkdir()
+    (own / "SKILL.md").write_text("---\nname: release_notes\ndescription: Writes notes\n---\nRun `scripts/make.py`.\n")
+    code, env = phase(project, "check", "--all")
+    assert code == 1 and {i["rule"] for i in env["data"]["issues"]} == {"skill", "agent"}
+    assert len(env["data"]["issues"]) == 6
+    setting(project, skill_check="synced")
+    code, env = phase(project, "check", "--all")
+    assert code == 0, env
+    (project / ".claude/skills/process-phase/SKILL.md").write_text("no frontmatter\n")
+    code, env = phase(project, "check", "--all")
+    assert code == 1 and any(i["rule"] == "skill" and "process-phase" in i["file"] for i in env["data"]["issues"]), \
+        "a synced skill is still checked"
+    (project / ".devtools-receipt.json").unlink()
+    code, env = phase(project, "check", "--all")
+    assert any("receipt is missing" in i["message"] for i in env["data"]["issues"])
+
+
+def test_setup_refuses_a_plan_written_in_another_format(project):
+    planning = project / ".planning"
+    planning.mkdir()
+    (planning / "STATE.md").write_text("---\ngsd_state_version: 1.0\nstatus: executing\n---\n")
+    (planning / "ROADMAP.md").write_text("# Roadmap\n\n### Phase 1: Scan\n\n**Goal**: list files\n")
+    code, env = phase(project, "setup")
+    assert code == 1 and env["error"]["code"] == "FOREIGN_PLAN", env
+    assert env["data"]["files"] == ["STATE.md", "ROADMAP.md"] and "from_gsd.py" in env["error"]["hint"]
+    assert sorted(p.name for p in planning.iterdir()) == ["ROADMAP.md", "STATE.md"], "nothing was added"
+
+
 PLAN = """---
 phase: "01"
 plan: "01-01"

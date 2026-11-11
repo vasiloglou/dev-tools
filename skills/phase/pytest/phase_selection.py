@@ -38,7 +38,7 @@ def completed_phases(planning: Path) -> set:
 def pytest_collection_modifyitems(config, items):
     root = Path(str(config.rootdir))
     acceptance = (root / config.getini("phase_acceptance_dir")).resolve().as_posix().rstrip("/")
-    package = re.compile(re.escape(acceptance) + r"/p(\d{2})(?:_(\d+))?_")
+    package = re.compile(re.escape(acceptance) + r"/p(\d{2,})(?:_(\d+))?_")
     wanted = phase_id(config.getoption("--phase")) if config.getoption("--phase") else None
     done = completed_phases(root / config.getini("phase_planning_dir"))
     named = [Path(str(config.invocation_params.dir), arg.split("::")[0]).resolve().as_posix()

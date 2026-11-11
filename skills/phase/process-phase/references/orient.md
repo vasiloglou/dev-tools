@@ -20,6 +20,8 @@ Read these fields:
 | `branch` | Current git branch | Must equal `phase/NN-<slug>` (or the bootstrap exception); switch or create (below) |
 | `gates_applicable[]` | PG ids for this phase (from `scripts/gates.json`) | Copy them into NN-CONTEXT and NN-VERIFICATION |
 
+When the last phase of the roadmap is completed, the state rests on it with `phase_status: complete`. Add the next phase's block to `ROADMAP.md` and `status` names that phase as the current one, `not_started`; `advance` then writes it to `STATE.md`.
+
 `--step X` is honoured only when the status machine allows it. For example, `--step implement` with `phase_status: context_approved` is refused, and you must say why: Specify and Plan come first.
 
 ## 2. Reading order (load only what the phase needs)
