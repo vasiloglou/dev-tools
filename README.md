@@ -13,13 +13,19 @@ Status: prototype.
 
 - **Phase workflow.** One roadmap phase at a time, in seven steps: Orient, Discuss (with
   a timeboxed prototype), Specify (acceptance tests, locked before code is written),
-  Plan, Implement, Verify, Close. You approve at four of them.
+  Plan, Implement, Verify, Close. You approve at four of them. Two advisory checks
+  compare the plans with the agreed tests and the change with the plans.
 - **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
   independent review of each change, and numbered records that are never edited.
 - **Component index.** A searchable map of what the code already does, so existing code
   is reused instead of written again. The agent can build it for a codebase that has
   none, check it against every change, and review it from the top: repair the index and
   list the code changes it would suggest.
+- **Project rules (optional, a trial).** A project states which areas of its code may
+  use which, and other rules about its components, and every change is checked against
+  them: only what the change added is reported. The index is exported as plain facts;
+  the rules are judged by [GND](https://github.com/vasiloglou/gnd-public), which the
+  project installs separately.
 
 A project picks the workflow that fits it. Both use the component index.
 
@@ -64,12 +70,32 @@ python3 path/to/dev-tools/devtools/sync.py compare --project .
   are in no shipped file; `compare <path>` prints those lines. The skill decides what
   happens to each one before anything is overwritten.
 
+A project that was planned with GSD moves to the phase workflow with the `move-from-gsd`
+skill (`skills/move-from-gsd/SKILL.md`, read from this checkout). Both keep the plan in
+`.planning/` and name phase folders the same way, so the phase folders stay as they are;
+the roadmap, the requirements and the state are rewritten in the format the phase tool
+reads, and GSD's own files are kept in `.planning/archive/gsd/`:
+
+```bash
+python3 path/to/dev-tools/devtools/from_gsd.py survey --project .
+```
+
+```bash
+python3 path/to/dev-tools/devtools/from_gsd.py convert --project . --dry-run
+```
+
+- `survey` writes nothing. It lists every phase with the status it will get, the
+  requirements, the decisions, GSD's install inside the project, and what needs a
+  decision first (a phase that is under way, a roadmap that restarted its numbers).
+- `convert` writes the planning files and a record of every choice it made. Phase numbers
+  and requirement ids are kept (`AUTH-01` becomes `REQ-AUTH-01`).
+
 See `examples/phase-project.devtools.toml` for a complete project file, and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
-pull request. A new project follows
+pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project follows
 the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
 
-The sync command and the component index need Python 3.11 or newer; the phase state tool
+The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool
 runs on 3.9.
 
 ## What is here
@@ -81,11 +107,13 @@ runs on 3.9.
 | `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
 | `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
-| `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, and lists leads for a review. |
+| `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, lists leads for a review, and writes the index as facts. `scripts/rules_check.py` is optional and a trial: it checks a project's own rules about its components (layers, and rules it writes) with GND, and reports only what a change added. |
 | `skills/adopt-devtools/` | How an agent moves an existing project from its own process skills to these, without losing the project's rules. Read from this checkout; never copied into a project. |
+| `skills/move-from-gsd/` | How an agent moves a project planned with GSD to the phase workflow, keeping its phases, requirements, decisions and history. Read from this checkout; never copied into a project. |
 | `devtools/sync.py` | The sync command: `apply`, `check`, and for an existing project `survey` and `compare`. |
+| `devtools/from_gsd.py` | Reads a GSD planning folder (`survey`) and rewrites it in the phase workflow's format (`convert`). |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
-| `tests/` | Tests for the sync command and for the scripts a project runs after a sync. |
+| `tests/` | Tests for the sync command, the GSD converter and the scripts a project runs after a sync. |
 
 ## Tests
 

@@ -28,7 +28,7 @@ directory. Keep useful focused output and `P/NN-EVIDENCE/runs/pytest.txt`.
 | PG2 | Approved acceptance tests | Reuse current focused/default results; run only uncovered required cases, including relevant slow tests. No mandatory separate slow-critical campaign. |
 | PG3 | Test lock | `PT check --testlock NN --format json`; no dirty lock. |
 | PG5 | Declared goldens (from1) | `PT golden-diff --format json`; undeclared[]. Reuse final PG1 golden-test results. |
-| PG6 | Architecture/layering (from1; report in0) | Reuse final PG1 architecture results; retained exceptions must be explicit and applicable, not inferred from an old failing ID. |
+| PG6 | Architecture/layering (from1; report in0) | Reuse final PG1 architecture results; retained exceptions must be explicit and applicable, not inferred from an old failing ID. Where the project has `docs/components/rules.json`, also `rules_check.py check --base <base_branch>` (`components` skill): it exits 0. A `skip:` line means it did not run (the checker is not installed); say so. |
 | PG8 | Skill/planning consistency | `PT check --all`; reuse PG1 skill-fact results. No live skill evals unless requested. |
 | PG9 | Requirement mapping | `PT req-coverage --format json`;100% coverage. |
 | PG10 | Migration (from1) | `PT migration-check --format json` and check touched-module rows; no deleted-module imports. |

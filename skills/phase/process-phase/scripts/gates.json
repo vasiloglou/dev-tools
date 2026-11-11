@@ -22,7 +22,7 @@
   },
   "PG6": {
     "name": "Architecture and layering coverage",
-    "check": "Reuse final PG1 architecture results; preserve explicit baseline exceptions.",
+    "check": "Reuse final PG1 architecture results; preserve explicit baseline exceptions. Where docs/components/rules.json exists: python3 .claude/skills/components/scripts/rules_check.py check --base <base_branch>; exit 0, and a skip: line means not run.",
     "from_phase": 0,
     "reuse_from": "PG1"
   },

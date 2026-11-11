@@ -29,6 +29,9 @@ branch_prefix = "phase/"
 # First status at which `advance` blocks on missing files. A project whose earlier phases
 # ran when the first two steps only warned keeps "plan_approved".
 gated_from = "context_approved"
+# true accepts a roadmap whose phase numbers do not start at 0 or 1, or skip some: a
+# project that moved from GSD keeps the numbers its phases had.
+phase_gaps = false
 
 # Where the coding assistants for Implement are configured (`coder_pool.py show` reads
 # both). The team file is checked in; the local one is each developer's own: add it to
@@ -60,6 +63,12 @@ source = "skills/components"
 dest = ".claude/skills/components"
 exclude = ["scripts/components_index.py"]
 
+# Optional: the project's own rules about its components (references/rules.md in the
+# skill). The check needs GND; without it the check prints `skip:` and passes.
+# [sync.settings."scripts/rules_check.settings.json"]
+# index_script = "scripts/components_index.py"
+# gnd_command = "uvx --from get-nick-done==0.3.0 gnd"
+
 [[sync]]
 source = "skills/components/scripts/components_index.py"
 dest = "scripts/components_index.py"
@@ -76,3 +85,8 @@ script_path = "scripts/components_index.py"
 # [[sync]]
 # source = "examples/components-check.yml"
 # dest = ".github/workflows/components-check.yml"
+
+# Optional: a GitHub Actions job that checks the project's own rules on every pull request.
+# [[sync]]
+# source = "examples/rules-check.yml"
+# dest = ".github/workflows/rules-check.yml"

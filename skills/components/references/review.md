@@ -22,6 +22,10 @@ python3 scripts/components_index.py review
 ```
 
 The first two print nothing when all is well; fix anything they report before going on.
+In a project with rules of its own (`docs/components/rules.json`), also run
+`python3 .claude/skills/components/scripts/rules_check.py check` with no base: every
+`fail:` and `warn:` line is a lead of the kind "Rule broken" ([`rules.md`](rules.md)).
+Ten are printed for a rule; `--format json` has the rest.
 Note the commit you are reading the code at (`git rev-parse --short HEAD`) for the
 report. The third prints groups of leads (the first 40 of each group; `review --all` prints
 every one, and `review <area>` prints all the leads for the components whose id starts
@@ -36,6 +40,7 @@ a lead proves nothing either.
 | Retired components that are still called | A consolidation was started and not finished | Read each calling module the lead names: can it call the replacement? If the retired entry's `notes` names no replacement, find it and add it |
 | Retired components nothing calls | The retirement is finished and the code can go | Search for uses outside the package (`show <id>`, `git grep`), then suggest removing it |
 | Components that import each other | A module sits under the wrong entry (an index repair), or the boundary in the code is in the wrong place (a suggestion) | Read the imports the lead names, up to three each way; `graph.md` and `show <id>` have the rest. Rerun `review` after repairing the entries: what remains is in the code |
+| Loops of imports through three or more components | The same as a pair, spread over more entries: no one of them can be changed, tested or moved alone | Start from the pairs above; they are usually inside the loop. For a large group, `facts` lists every import inside it (`component_uses_in_cycle`, with the files under `evidence`): look for the few imports that point from a low-level component back up |
 | Components nothing in the package imports | An entry point (fine; the lead says when a module defines `main`), or code nothing uses | Look for a command-line entry, a plugin registration, a dynamic import, a use from tests or scripts: `git grep` the module and its public names |
 | Modules nothing imports, inside a component that is used | A file that sits under an entry it is not part of, or code nothing uses | The same search. If it is a capability of its own, give it its own entry, so the index shows nothing calls it |
 | The same public name in two or three components | The capability was written twice | Read both. Same job: record it (`SKILL.md`, "Duplicate found"). Same word for two jobs: add `distinct_from: <other id>` to one entry with the reason in `notes:`. Either way the lead stops printing |
@@ -111,6 +116,7 @@ user accepts a suggestion.
 | Unused | A module or public function with no caller and no entry point (one that only its own tests call counts) | Remove it, after the owner confirms nothing outside the repository uses it |
 | Unfinished retirement | A `deprecated` or `duplicate-of` component still has callers | The callers, and what each should call instead |
 | Tangle | Two components import each other | The function or class to move, and where |
+| Rule broken | `rules_check.py check` prints a `fail:` or `warn:` for one of the project's own rules | The import to move or remove; or, when a module sits under the wrong entry, the index repair |
 | Misplaced | A module used only by another component, or sitting in the wrong folder | Where it belongs |
 | Too large | A component or module that holds several capabilities | Where to cut it |
 | Untested | A component with no tests | The behaviour most worth pinning first |

@@ -11,6 +11,7 @@ envelope with ``--format json`` or a short human summary with ``--format md`` (d
     phase_tool.py roadmap list | roadmap get NN
     phase_tool.py check [--all] [--context F] [--plan F] [--skill DIR] [--ignored]
                         [--testlock NN] [--prove NN] [--docs] [--roadmap] [--requirements] [--state]
+                        [--plans NN] [--scope NN [--base REF]]
     phase_tool.py req-coverage
     phase_tool.py testlock --phase NN [--write [--fixture PATH ...] [--relock --dec DEC-NNN]]
     phase_tool.py advance --to STATUS [--override DEC-NNN]
@@ -26,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import fnmatch
 import hashlib
 import json
 import re
@@ -57,6 +59,9 @@ DEFAULT_SETTINGS = {
     # First status whose missing artifacts block ``advance``. "context_approved" enforces
     # every step; "plan_approved" only warns for the first two (for phases begun under that rule).
     "gated_from": "context_approved",
+    # False: whole-number phases are numbered from 0 or 1 without gaps. True: any rising numbers,
+    # for a roadmap whose numbers come from an earlier process (a project moved from GSD).
+    "phase_gaps": False,
 }
 
 
@@ -571,11 +576,12 @@ def check_roadmap(pl: Planning) -> list:
     issues = []
     nums = [p["num"] for p in phases if "." not in p["id"]]
     first = 1 if nums and nums[0] == 1 else 0
-    if nums != list(range(first, first + len(nums))):
+    gaps = SETTINGS["phase_gaps"]
+    if not gaps and nums != list(range(first, first + len(nums))):
         issues.append(issue(f, phases[0]["_line"], "roadmap", "phases not contiguous from 0: %s" % nums))
     ids = {p["id"] for p in phases}
     keys = [phase_key(p["id"]) for p in phases]
-    if any("." in p["id"] for p in phases) and (keys != sorted(keys) or len(ids) != len(phases)):
+    if (gaps or any("." in p["id"] for p in phases)) and (keys != sorted(keys) or len(ids) != len(phases)):
         issues.append(issue(f, phases[0]["_line"], "roadmap", "phases not in unique numeric order"))
     for p in phases:
         if "." in p["id"] and p["id"].split(".")[0] not in ids:
@@ -828,6 +834,182 @@ def check_plan_reuse(root: Path, text: str, filename: str) -> list:
     return [issue(filename, 0, "plan", "plan ## Reuse: " + message) for message in messages]
 
 
+TEST_ID = re.compile(r"`([^`]+\.py::[^`]+)`")
+
+
+def scalar(text: str) -> str:
+    """One YAML-ish value: the text inside its quotes, or the text before a trailing comment."""
+    text = text.strip()
+    if text[:1] in ("'", '"'):
+        end = text.find(text[0], 1)
+        return text[1:end] if end > 0 else text[1:]
+    return re.sub(r"\s+#.*$", "", text).strip()
+
+
+def frontmatter_list(text: str, key: str) -> list:
+    """A frontmatter list: inline (``key: [a, "b, c"]``) or one ``- item`` a line, indented or not."""
+    lines, _ = split_frontmatter(text)
+    items, inside = [], False
+    for line in lines or []:
+        if line.startswith(key + ":"):
+            inside = True
+            value = line.split(":", 1)[1].strip()
+            if value.startswith("["):
+                value = value[1:value.rfind("]")] if "]" in value else value[1:]
+            elif value.startswith("#"):
+                value = ""
+            items.extend(scalar(item) for item in re.findall(r'"[^"]*"|\'[^\']*\'|[^,]+', value))
+        elif inside and re.match(r"\s*- ", line):
+            items.append(scalar(line.split("- ", 1)[1]))
+        elif line.strip():
+            inside = False
+    return [item for item in items if item]
+
+
+def listed(value: str, pattern=r"`([^`]+)`") -> list:
+    """The items of a task field: what is in backticks, or without any, what commas and lines separate."""
+    found = re.findall(pattern, value)
+    if not found and "`" not in value:
+        found = [item.strip(" \t-") for item in re.split(r"[,\n]", value)]
+    return [item[2:] if item.startswith("./") else item for item in found if item]
+
+
+def parse_plan(text: str) -> dict:
+    """What a plan declares: its requirements, and for each task the files it changes, the
+    locked tests it turns green and its verify command. A task is a ``### <id>`` block between
+    <tasks> and </tasks>; a field is ``- **name:** value`` and may run on over indented lines."""
+    _, body = split_frontmatter(text)
+    section = re.search(r"<tasks>(.*?)</tasks>", body, re.S)
+    tasks = []
+    for block in re.split(r"^### ", section.group(1) if section else "", flags=re.M)[1:]:
+        fields = dict(re.findall(r"^- \*\*([a-z_]+):\*\*[ \t]*(.*(?:\n[ \t]+\S.*)*)", block, re.M))
+        tasks.append({"id": block.split(None, 1)[0] if block.strip() else "",
+                      "files": listed(fields.get("files", "")) + listed(fields.get("unit_tests", "")),
+                      "turns_green": [name for name in listed(fields.get("turns_green", ""), TEST_ID.pattern)
+                                      if "::" in name],
+                      "verify": fields.get("verify", "").strip()})
+    reuse = re.search(r"^## Reuse[ \t]*\n(.*?)(?=^#{1,2} |\Z)", text, re.M | re.S)
+    new = re.findall(r"^[ \t]*(?:- )?new_component:[ \t]*([^\n]+)$", reuse.group(1) if reuse else "", re.M | re.I)
+    return {"requirements": re.findall(r"REQ-[A-Z]+-\d+", " ".join(frontmatter_list(text, "requirements"))),
+            "new_components": re.findall(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", " ".join(new)),
+            "tasks": tasks}
+
+
+def phase_plans(pl: Planning, nn: str) -> dict:
+    """{repo-relative path: parsed plan} for every NN-MM-PLAN.md of a phase."""
+    pdir = pl.phase_dir(nn)
+    return {rel(pl.root, path): parse_plan(path.read_text(encoding="utf-8"))
+            for path in (sorted(pdir.glob(nn + "-*-PLAN.md")) if pdir else [])}
+
+
+def check_plans(pl: Planning, nn: str) -> list:
+    """The plans of a phase together: every contract test id in the Traceability table of
+    NN-TESTS.md is turned green by a task, the requirements the plans name are the phase's,
+    and every plan names a requirement and gives each task a verify command.
+    The ids are the ones the table lists, not every test in the locked files.
+    Advisory: no step of the workflow requires it yet."""
+    plans = phase_plans(pl, nn)
+    pdir = pl.phase_dir(nn)
+    where = PLANNING + "/phases/%s-*/" % nn
+    if not plans:
+        return [issue(where + nn + "-*-PLAN.md", 0, "plans", "phase %s has no plan" % nn)]
+    issues = [issue(name, 0, "plans", "no task found (a '### <id>' block between <tasks> and </tasks>)")
+              for name, plan in plans.items() if not plan["tasks"]]
+    issues.extend(issue(name, 0, "plans", "plan frontmatter: requirements names no REQ id")
+                  for name, plan in plans.items() if not plan["requirements"])
+    issues.extend(issue(name, 0, "plans", "task %s: verify is empty" % task["id"])
+                  for name, plan in plans.items() for task in plan["tasks"] if not task["verify"])
+    tests = pdir / (nn + "-TESTS.md")
+    text = tests.read_text(encoding="utf-8") if tests.is_file() else ""
+    table = re.search(r"^## Traceability[ \t]*\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    if not table:
+        issues.append(issue(where + nn + "-TESTS.md", 0, "plans", "no Traceability table to read the test ids from"))
+    folder = parse_frontmatter(text).get("test_dir", "").rstrip("/")
+
+    def full(name):
+        """A test id with its folder: one written as a bare file name is in the phase's test_dir."""
+        name = name[2:] if name.startswith("./") else name
+        return folder + "/" + name if folder and "/" not in name.split("::")[0] else name
+
+    claimed = {full(name) for plan in plans.values() for task in plan["tasks"] for name in task["turns_green"]}
+    offset = text[:table.start(1)].count("\n") if table else 0
+    for number, line in enumerate(table.group(1).splitlines() if table else [], offset + 1):
+        if line.strip().strip("|").split("|")[-1].strip() == "guard":
+            continue  # green from the start by design: no task turns it green
+        for name in TEST_ID.findall(line):
+            if not any(c == full(name) or (not folder and (c.endswith("/" + name) or name.endswith("/" + c)))
+                       for c in claimed):
+                issues.append(issue(rel(pl.root, tests), number, "plans", "no plan task turns this test green: " + name))
+    phase = pl.phase(nn) or {}
+    path = pl.dir / "REQUIREMENTS.md"
+    _, reqs = parse_requirements(path.read_text(encoding="utf-8")) if path.is_file() else ({}, [])
+    owned = set(phase.get("requirements", [])) | {r["id"] for r in reqs if nn in r["phases"]}
+    for name, plan in plans.items():
+        issues.extend(issue(name, 0, "plans", "%s is not a requirement of phase %s" % (req, nn))
+                      for req in sorted(set(plan["requirements"]) - owned))
+    served = {req for plan in plans.values() for req in plan["requirements"]}
+    issues.extend(issue(PLANNING + "/ROADMAP.md", 0, "plans", "no plan of phase %s names requirement %s" % (nn, req))
+                  for req in sorted(owned - served))
+    return issues
+
+
+INDEX_FILES = ("graph.md", "external.toml", "unassigned-baseline.txt", "layers.toml", "rules.json", "REVIEW.md")
+
+
+def check_scope(pl: Planning, nn: str, base) -> tuple:
+    """What the phase branch changed against what its plans declared; returns (issues, warnings).
+    Advisory: no step of the workflow requires it yet.
+
+    A warning: a changed file that is in no task's `files` or `unit_tests` (a path, a folder
+    ending in /, or a pattern with *) and is not named in a row of a summary's Deviations table.
+    An issue: a component new in the catalog that is on no plan's `new_component:` line (not
+    judged when the base has no component, as when the index was first built in this phase).
+    Not judged: planning files, the phase's own acceptance tests and locked fixtures (written
+    and locked before the plans), and the files of the component index."""
+    plans = phase_plans(pl, nn)
+    if not plans:
+        return [issue(PLANNING + "/phases/%s-*/%s-*-PLAN.md" % (nn, nn), 0, "scope", "phase %s has no plan" % nn)], []
+    sha = (git(pl.root, "merge-base", base, "HEAD") or "").strip() if base else merge_base(pl)[1]
+    status = git(pl.root, "diff", "--name-status", "-M", "-z", sha) if sha else None
+    untracked = git(pl.root, "ls-files", "--others", "--exclude-standard", "-z")
+    if status is None or untracked is None:
+        return [issue(PLANNING + "/STATE.md", 0, "scope", "cannot find what changed: no merge-base with %s"
+                      % (base or "the STATE.md base_branch"))], []
+    catalog = SETTINGS["components_catalog"]
+    index = catalog.rsplit("/", 1)[0] + "/" if "/" in catalog else ""
+    pdir = pl.phase_dir(nn)
+    lock = pdir / (nn + "-TESTLOCK.json")
+    try:
+        fixtures = set(json.loads(lock.read_text(encoding="utf-8")).get("fixtures", {})) if lock.is_file() else set()
+    except (ValueError, AttributeError):
+        fixtures = set()
+    settled = set(acceptance_files(pl.root, nn)) | fixtures | {catalog} | {index + name for name in INDEX_FILES}
+    declared = {path for plan in plans.values() for task in plan["tasks"] for path in task["files"]}
+    folders = tuple(path for path in declared if path.endswith("/")) + (PLANNING + "/", index + "modules/",
+                                                                         index + "external/")
+    patterns = [path for path in declared if "*" in path]
+    excused = set()
+    for path in sorted(pdir.glob(nn + "-*-SUMMARY.md")):
+        section = re.search(r"^## Deviations from plan[ \t]*\n(.*?)(?=^## |\Z)", path.read_text(encoding="utf-8"),
+                            re.M | re.S)
+        for row in (section.group(1).splitlines() if section else []):
+            if row.strip().startswith("|"):
+                excused.update(word[2:] if word.startswith("./") else word for word in re.findall(r"[^\s`|,;()]+", row))
+    changed = sorted(p for p in set(changed_paths(status)) | set(untracked.split("\0")) if p)
+    warnings = [issue(path, 0, "scope", "changed, but in no plan task's files and in no row of a summary's Deviations table")
+                for path in changed
+                if path not in settled and path not in declared and path not in excused
+                and not path.startswith(folders) and not any(fnmatch.fnmatch(path, pattern) for pattern in patterns)]
+    heading = r"^### ([a-z][a-z0-9_]*\.[a-z][a-z0-9_]*)[ \t]*$"
+    now = (pl.root / catalog).read_text(encoding="utf-8") if (pl.root / catalog).is_file() else ""
+    before = set(re.findall(heading, git(pl.root, "show", sha + ":" + catalog) or "", re.M))
+    planned = {name for plan in plans.values() for name in plan["new_components"]}
+    issues = [issue(catalog, 0, "scope", "new component %s is on no plan's new_component: line" % name)
+              for name in sorted(set(re.findall(heading, now, re.M)) - before - planned)
+              if before and not name.startswith("subsystem.")]
+    return issues, warnings
+
+
 def check_capabilities(pl: Planning) -> list:
     """Compare generated capability bytes without loading the product or writing files."""
     script = SETTINGS["capabilities_script"]
@@ -1024,7 +1206,8 @@ def check_prove(pl: Planning, nn: str) -> list:
 def cmd_check(pl: Planning, args) -> dict:
     pl.require()
     run_all = args.all or not any([args.context, args.plan, args.skill, args.ignored, args.testlock,
-                                   args.docs, args.roadmap, args.requirements, args.state, args.prove])
+                                   args.docs, args.roadmap, args.requirements, args.state, args.prove,
+                                   args.plans, args.scope])
     issues, ran = [], []
 
     def run(name, fn):
@@ -1061,7 +1244,13 @@ def cmd_check(pl: Planning, args) -> dict:
         run("prove", lambda: check_prove(pl, norm_phase(args.prove)))
     if args.plan:
         run("plan", lambda: check_doc_file(pl.root, Path(args.plan).resolve(), "plan", True))
+    if args.plans:
+        run("plans", lambda: check_plans(pl, norm_phase(args.plans)))
     data = {"checks": ran, "issues": issues}
+    if args.scope:
+        ran.append("scope")
+        found, data["warnings"] = check_scope(pl, norm_phase(args.scope), args.base)
+        issues.extend(found)
     if issues:
         raise ToolError("CHECK_FAILED", "%d issue(s) found" % len(issues), "fix the listed issues", 1, data)
     return data
@@ -1452,7 +1641,7 @@ def build_parser() -> Parser:
     p = sub.add_parser("check", parents=[common])
     for flag in ("--all", "--ignored", "--docs", "--roadmap", "--requirements", "--state"):
         p.add_argument(flag, action="store_true")
-    for flag in ("--context", "--plan", "--skill", "--testlock", "--prove"):
+    for flag in ("--context", "--plan", "--skill", "--testlock", "--prove", "--plans", "--scope", "--base"):
         p.add_argument(flag)
     sub.add_parser("req-coverage", parents=[common])
     p = sub.add_parser("testlock", parents=[common])
@@ -1480,8 +1669,9 @@ def render_md(env: dict) -> str:
         if err.get("hint"):
             lines.append("hint: " + err["hint"])
     for key, value in env.get("data", {}).items():
-        if key == "issues":
-            lines.extend("- %s:%s [%s] %s" % (i["file"], i["line"], i["rule"], i["message"]) for i in value)
+        if key == "issues" or (key == "warnings" and value and isinstance(value[0], dict)):
+            mark = "- " if key == "issues" else "- warning: "
+            lines.extend(mark + "%s:%s [%s] %s" % (i["file"], i["line"], i["rule"], i["message"]) for i in value)
         elif key == "block":
             lines.append(value)
         elif isinstance(value, (list, dict)):

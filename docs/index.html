@@ -204,7 +204,7 @@ phase_status: not_started</pre></div>
       <span class="num">05</span>
       <h3>One process for every project, and for both agents</h3>
       <p>The skills are kept in one place and copied into each project. An update never overwrites a file you changed without telling you.</p>
-      <p><a href="adopt.html">How a project takes it →</a></p>
+      <p><a href="adopt.html">How a project takes it →</a> · <a href="adopt.html#from-gsd">Coming from GSD →</a></p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a synced file was edited by hand</b><em>captured</em></div>
@@ -259,7 +259,7 @@ phase_status: not_started</pre></div>
     </a>
     <a class="card" href="components.html">
       <h3>Component index</h3>
-      <p>A searchable map of what the code already does, part written by people and part generated from the source. The agent can build it for existing code, check it with every change, and review it from the top.</p>
+      <p>A searchable map of what the code already does, part written by people and part generated from the source. The agent can build it for existing code, check it with every change, and review it from the top. Optionally, the project's own rules about what may use what are checked with every change.</p>
       <span class="more">Read about the index →</span>
     </a>
   </div>
@@ -272,6 +272,8 @@ phase_status: not_started</pre></div>
     <li><strong>Run end to end.</strong> The phase workflow built one real feature in the demo project shown on this site. Each workflow was also tried inside an existing project in mid-flight, by swapping in the shared skills and carrying a small mock piece of work from start to finish.</li>
     <li><strong>Approvals were simulated</strong> in all of those runs. No person sat at the gates.</li>
     <li><strong>Found and fixed.</strong> Those runs turned up 44 defects in the tools and the skill text. Most are fixed. A project in mid-flight keeps its old behaviour through one setting, and a brand-new project is set up with one command.</li>
+    <li><strong>On trial.</strong> The project-rules check (<a href="components.html">component index</a>, "Project rules") has run on two codebases and no project has adopted it yet. It needs GND 0.2.0 or newer. Two checks of the plans against the agreed tests and of a change against the plans are advisory until they have run on real projects.</li>
+    <li><strong>Moving from GSD</strong> was tried on copies of nine real GSD projects; each passed the phase tool&#39;s check afterwards. No project has made the move for real yet. <a href="adopt.html#from-gsd">What the move does</a>.</li>
     <li><strong>Planned:</strong> running independent phases as parallel tracks with their own state, and a skill that finds what agentic work leaves on your disk (old working copies, caches, downloaded models).</li>
   </ul>
   <div class="next">

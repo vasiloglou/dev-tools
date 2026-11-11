@@ -77,7 +77,7 @@
     </li>
     <li>
       <h3>Plan <span class="gate">you approve</span></h3>
-      <p>Before planning new code, the agent searches the <a href="components.html">component index</a> for every capability the phase needs and writes down what it found. Each task in the plan names the tests it turns green and the files it may touch.</p>
+      <p>Before planning new code, the agent searches the <a href="components.html">component index</a> for every capability the phase needs and writes down what it found. Each task in the plan names the tests it turns green and the files it may touch. An advisory check reads the plans of the phase together and lists any agreed test that no task turns green and any requirement the plans and the roadmap disagree on.</p>
       <p class="leaves"><strong>Leaves behind:</strong> one or more plans, each with a Reuse section.</p>
     </li>
     <li>
@@ -87,12 +87,12 @@
     </li>
     <li>
       <h3>Verify</h3>
-      <p>The full test suite runs <strong>once</strong>, on the finished code. Results from earlier focused runs are reused, not repeated. A gap is a real failing test or an unmet exit criterion, and it sends the phase back to planning for that gap only.</p>
+      <p>The full test suite runs <strong>once</strong>, on the finished code. Results from earlier focused runs are reused, not repeated. A gap is a real failing test or an unmet exit criterion, and it sends the phase back to planning for that gap only. An advisory check compares what the branch changed with what the plans declared: a file no plan named is a warning to record as a deviation, and a new component no plan named is a finding.</p>
       <p class="leaves"><strong>Leaves behind:</strong> the verification report and the log of the full run.</p>
     </li>
     <li>
       <h3>Close <span class="gate">you approve</span></h3>
-      <p>The agent records the lessons, updates the component index with any new code, and marks the phase complete. Merging to your base branch and releasing stay your decisions.</p>
+      <p>The agent records the lessons, updates the component index with any new code, checks the change against the index and, where the project has them, against its own <a href="components.html">rules</a>, and marks the phase complete. Merging to your base branch and releasing stay your decisions.</p>
       <p class="leaves"><strong>Leaves behind:</strong> an updated roadmap and project state, ready for the next session, which may be a different agent on a different day.</p>
     </li>
   </ol>

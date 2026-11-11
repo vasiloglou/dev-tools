@@ -286,7 +286,12 @@ python scripts/components_index.py changed --base <the phase's base commit> --st
 Fix every `fail:`. For a `warn:` (a new caller of a retired component), call the
 replacement or record the reason in the boundary section and rerun without
 `--strict`, saying so. For each `reread:` line, read the entry beside the diff
-and either edit it or state in the record that it is still accurate. Duplicates
+and either edit it or state in the record that it is still accurate. In a
+project with rules of its own (`docs/components/rules.json`), also run
+`python .claude/skills/components/scripts/rules_check.py check --base <the phase's base commit>`
+and list it the same way: fix every `fail:`, record the reason for a `warn:`
+that stays, and record a `skip:` (the checker is not installed) or an exit 2
+(the check did not run) as not run, never as passed. Duplicates
 and tangles the phase exposed in code it did not touch go to the step 5 answer
 as deferred refactors, not into this phase.
 

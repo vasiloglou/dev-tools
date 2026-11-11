@@ -60,7 +60,8 @@ JOURNAL = ".devtools-sync.journal"
 SKIP_DIRS = {"__pycache__"}
 TOKEN = re.compile(r"\{\{devtools:([a-z_]+)\}\}")
 TODO = "TODO"  # a value the starter config could not know; apply and compare refuse it
-NOT_FOR_PROJECTS = {"skills/adopt-devtools"}  # read from this checkout, never copied into a project
+# Read from this checkout, never copied into a project.
+NOT_FOR_PROJECTS = {"skills/adopt-devtools", "skills/move-from-gsd"}
 PRUNE = {".git", "node_modules", ".venv", "venv", "site-packages", ".tox", ".cache",
          ".mypy_cache", ".pytest_cache", ".ruff_cache"} | SKIP_DIRS
 

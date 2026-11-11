@@ -187,5 +187,7 @@ Details: `references/close.md`.
 - `migration-check`: no imports of modules marked deleted.
 - `req-coverage`: requirements remain mapped.
 - `evidence-check --phase NN`: cited result paths exist; no reviewer or rerun.
+- `check --plans NN` (advisory, no step requires it): lists a contract test in the Traceability table that no plan task turns green, and plan requirements that are not the phase's.
+- `check --scope NN` (advisory, no step requires it): lists a changed file that is in no plan task's `files` and no summary's Deviations table, and a new component no plan declared.
 
 These are bookkeeping checks, not triggers for another validation cycle.
