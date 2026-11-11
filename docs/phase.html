@@ -439,6 +439,36 @@ parallel:
   capacity: 12
   effective_tracks: 6</pre></div>
   <p class="caption">Three places to send work, and at most six tasks at once. An empty model means the assistant's own default. Gemini is marked for medium-risk tasks only.</p>
+  <h2 id="parallel">Plans that run side by side</h2>
+  <p>Independent plans share a wave and run at the same time, each in its own working copy. That only works when they touch different files. Before you approve the plans, one check reads them together. It lists two plans of one wave that name the same file, a plan that depends on one in a later wave, and a plan whose list of tests differs from what its tasks claim.</p>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>a scratch project · two plans in one wave</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">cd .planning/phases/01-export &amp;&amp; grep -E &quot;^(wave|depends_on):|files&quot; 01-01-PLAN.md 01-02-PLAN.md</span>
+01-01-PLAN.md:wave: 1
+01-01-PLAN.md:depends_on: []
+01-01-PLAN.md:- **files:** `src/shelf/export.py`, `src/shelf/cli.py`
+01-02-PLAN.md:wave: 1
+01-02-PLAN.md:depends_on: []
+01-02-PLAN.md:- **files:** `src/shelf/cli.py`, `docs/usage.md`
+
+<span class="p">$</span> <span class="cmd">phase-tool check --plans 01</span>
+<span class="bad">phase_tool.check: FAILED</span>
+<span class="bad">error CHECK_FAILED: 1 issue(s) found</span>
+<span class="warn">hint: fix the listed issues</span>
+checks: [&quot;plans&quot;]
+<span class="bad">- .planning/phases/01-export/01-01-PLAN.md:0 [plans] plans 01-01 and 01-02 are both in wave 1, neither depends on the other, and both name src/shelf/cli.py</span>
+warnings: []
+<span class="dim">exit code 1</span>
+
+<span class="p">$</span> <span class="cmd">grep -E &quot;^(wave|depends_on):&quot; .planning/phases/01-export/01-02-PLAN.md</span>
+wave: 2
+depends_on: [01-01]
+
+<span class="p">$</span> <span class="cmd">phase-tool check --plans 01</span>
+<span class="ok">phase_tool.check: ok</span>
+checks: [&quot;plans&quot;]
+warnings: []</pre></div>
+  <p class="caption">Two plans written for this capture, in a scratch project built the way the tests build one. Both name <code>cli.py</code> and neither waits for the other. Once the second plan depends on the first, the check is clean.</p>
+  <p>This check is advisory. It has run on plans written to test it and on no real project's plans yet, so the agent reads each line as a place to look and no step waits on it. A generated file, such as the component index, may be named by both plans.</p>
   <h2>Your project's own rules</h2>
   <p>The shared skill knows nothing about your product. Rules that only make sense in your project (an invariant that must never break, an extra check before release, the command that runs your tests) go in one file your project owns, <code>references/project.md</code>, beside the skill. The agent reads it in Orient, and it wins over the shared text on anything project-specific. Updating the shared skill never touches it.</p>
   <div class="next">

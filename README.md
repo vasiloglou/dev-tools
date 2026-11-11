@@ -24,7 +24,8 @@ prompt. The reasoning is on the site:
 - **Phase workflow.** One roadmap phase at a time, in seven steps: Orient, Discuss (with
   a timeboxed prototype), Specify (acceptance tests, locked before code is written),
   Plan, Implement, Verify, Close. You approve at four of them. Two advisory checks
-  compare the plans with the agreed tests and the change with the plans.
+  compare the plans with the agreed tests and with each other (two plans meant to run side
+  by side that name the same file), and the change with the plans.
 - **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
   independent review of each change, and numbered records that are never edited.
 - **Component index.** A searchable map of what the code already does, so existing code

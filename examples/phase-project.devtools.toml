@@ -36,6 +36,9 @@ phase_gaps = false
 # above, or "synced" for only the ones this file delivers. Use "synced" when those folders
 # also hold skills or agents of the project's own, or another tool's.
 skill_check = "all"
+# Generated files that two plans of one wave may both name (a path, a folder ending in /, or
+# a pattern with *), beside the component index, which always is one. `check --plans` reads it.
+shared_files = []
 
 # Where the coding assistants for Implement are configured (`coder_pool.py show` reads
 # both). The team file is checked in; the local one is each developer's own: add it to
