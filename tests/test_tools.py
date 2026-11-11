@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("sync", ROOT / "devtools/sync.py")
 sync = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(sync)
+GIT = shutil.which("git")  # found once: a test that replaces PATH still needs the real one
 
 ROADMAP = """# Roadmap
 
@@ -309,6 +310,8 @@ def test_setup_refuses_a_plan_written_in_another_format(project):
 PLAN = """---
 phase: "01"
 plan: "01-01"
+wave: 1
+depends_on: []
 requirements: [REQ-CORE-001]
 turns_green: [tests/acceptance/p01_scan/test_scan.py::test_lists_files]
 ---
@@ -397,19 +400,25 @@ def test_every_listed_test_is_turned_green_by_some_plan(project):
     plan.write_text(PLAN.replace("[tests/acceptance/p01_scan/test_scan.py::test_lists_files]",
                                  "[test_scan.py::test_lists_files, test_scan.py::test_skips_hidden]"))
     code, env = phase(project, "check", "--plans", "1")
-    assert code == 1 and len(messages(env)) == 1, "a test listed in the frontmatter is claimed only by a task"
-    plan.write_text(PLAN.replace("`tests/acceptance/p01_scan/test_scan.py::test_lists_files`",
+    assert code == 1 and messages(env) == [
+        "no plan task turns this test green: test_scan.py::test_skips_hidden",
+        "plan frontmatter: turns_green lists tests/acceptance/p01_scan/test_scan.py::test_skips_hidden, "
+        "which no task of the plan claims"], "a test listed in the frontmatter is claimed only by a task"
+    both = PLAN.replace("[tests/acceptance/p01_scan/test_scan.py::test_lists_files]",
+                        "[test_scan.py::test_lists_files, test_scan.py::test_skips_hidden]")
+    plan.write_text(both.replace("`tests/acceptance/p01_scan/test_scan.py::test_lists_files`",
                                  "\n  `test_scan.py::test_lists_files`,\n  `tests/acceptance/p01_scan/test_scan.py::test_skips_hidden`"))
     assert phase(project, "check", "--plans", "1")[0] == 0, "a bare file name and a full path name the same test"
     plan.write_text(PLAN.replace("p01_scan/test_scan.py::test_lists_files`", "p09_other/test_scan.py::test_skips_hidden`"))
     code, env = phase(project, "check", "--plans", "1")
-    assert code == 1 and len(messages(env)) == 2, "the same file name in another folder is another test"
+    assert code == 1 and sum(m.startswith("no plan task turns this test green") for m in messages(env)) == 2, \
+        "the same file name in another folder is another test"
     plan.write_text(PLAN.split("<tasks>")[0])
     code, env = phase(project, "check", "--plans", "1")
     assert code == 1 and "no task found (a '### <id>' block between <tasks> and </tasks>)" in messages(env)
     plan.write_text(PLAN)
 
-    second = PLAN.replace("01-01", "01-02").replace("test_lists_files", "test_skips_hidden")
+    second = PLAN.replace("01-01", "01-02").replace("test_lists_files", "test_skips_hidden").replace("wave: 1", "wave: 2")
     (plan.parent / "01-02-PLAN.md").write_text(second.replace("[REQ-CORE-001]", "[REQ-CORE-001, REQ-CORE-009]"))
     code, env = phase(project, "check", "--plans", "1")
     assert code == 1 and messages(env) == ["REQ-CORE-009 is not a requirement of phase 01"]
@@ -423,6 +432,108 @@ def test_every_listed_test_is_turned_green_by_some_plan(project):
         "no plan of phase 01 names requirement REQ-CORE-001"]
     code, env = phase(project, "check", "--plans", "2")
     assert code == 1 and messages(env) == ["phase 02 has no plan"]
+
+
+def plan_text(number, wave=1, depends_on="[]", files="`src/widget/scan.py`", test="test_skips_hidden"):
+    """PLAN as plan 01-<number>: its wave, what it depends on, its task's files and the test it turns green."""
+    return (PLAN.replace("01-01", "01-" + number).replace("wave: 1", "wave: %s" % wave)
+            .replace("depends_on: []", "depends_on: " + depends_on)
+            .replace("`src/widget/scan.py`, `tests/unit/`", files).replace("test_lists_files", test))
+
+
+def second_plan(folder, **how):
+    """Write plan 01-02 beside 01-01 (whose task names src/widget/scan.py and tests/unit/); return the messages."""
+    (folder / "01-02-PLAN.md").write_text(plan_text("02", **how))
+    return messages(phase(folder.parents[2], "check", "--plans", "1")[1])
+
+
+def test_two_plans_of_one_wave_do_not_name_the_same_file(project):
+    folder = planned(project).parent
+    together = "plans 01-01 and 01-02 are both in wave 1, neither depends on the other, and both name "
+    assert second_plan(folder) == [together + "src/widget/scan.py"]
+    assert second_plan(folder, files="`tests/unit/test_scan.py`") == [together + "tests/unit/ and tests/unit/test_scan.py"], \
+        "a file inside a folder the other plan names"
+    assert second_plan(folder, files="`src/widget/*.py`, `docs/guide.md`") == [together + "src/widget/scan.py and src/widget/*.py"], \
+        "a pattern that matches the other plan's file"
+    assert second_plan(folder, files="`src/*/scan.py`, `tests/unit/sizes/`") == [
+        together + "src/widget/scan.py and src/*/scan.py, tests/unit/ and tests/unit/sizes/"]
+
+    assert second_plan(folder, files="`src/widget/dupes.py`") == [], "different files"
+    many = ", ".join("`src/widget/m%d.py`" % number for number in range(7))
+    (folder / "01-01-PLAN.md").write_text(PLAN.replace("`src/widget/scan.py`, `tests/unit/`", many))
+    assert second_plan(folder, files=many) == [together + ", ".join("src/widget/m%d.py" % n for n in range(5)) + " and 2 more"]
+    (folder / "01-01-PLAN.md").write_text(PLAN)
+    assert second_plan(folder, wave=2) == [], "another wave"
+    for written in ('["01-01"]', "[01]", "\n  - 01-01-PLAN.md"):
+        assert second_plan(folder, depends_on=written) == [], "one runs after the other: " + written
+    assert second_plan(folder, depends_on="none", files="`src/widget/dupes.py`") == [], "none, written out"
+
+    # A generated file is regenerated after the merge, so two plans may both name it.
+    shared = "`src/widget/%s.py`, `docs/components/COMPONENTS.md`, `docs/components/modules/widget.md`, `.planning/todos/x.md`"
+    (folder / "01-01-PLAN.md").write_text(PLAN.replace("`src/widget/scan.py`, `tests/unit/`", shared % "scan"))
+    assert second_plan(folder, files=shared % "dupes") == [], "the component index and the planning folder"
+    (folder / "01-01-PLAN.md").write_text(PLAN)
+    assert second_plan(folder, files="`tests/unit/`, `build/report.html`") == [together + "tests/unit/"]
+    setting(project, shared_files=["tests/unit/", "build/*.html"])
+    assert second_plan(folder, files="`tests/unit/`, `build/report.html`") == [], "the project's own shared files"
+    assert second_plan(folder) == [together + "src/widget/scan.py"], "which excuse nothing else"
+    setting(project, shared_files="tests/unit/")
+    code, out = tool(project, "check", "--plans", "1")
+    assert code == 1 and "shared_files must be a list of paths" in out
+
+
+def test_a_plan_depends_only_on_plans_that_come_before_it(project):
+    folder = planned(project).parent
+    other = dict(files="`src/widget/dupes.py`")
+    assert second_plan(folder, depends_on='["01-07"]', **other) == ["depends_on names 01-07, which is no plan of phase 01"]
+    assert second_plan(folder, depends_on="[01-02]", **other) == ["depends_on names 01-02, which is this plan"]
+
+    (folder / "01-01-PLAN.md").write_text(PLAN.replace("depends_on: []", "depends_on: [01-02]"))
+    assert second_plan(folder, depends_on="[01-01]", **other) == [
+        "depends_on forms a loop: 01-01 depends on itself through 01-02",
+        "depends_on forms a loop: 01-02 depends on itself through 01-01"]
+    assert second_plan(folder, wave=2, **other) == [
+        "depends_on names 01-02, which is in a later wave (2) than this plan (1)"]
+    (folder / "01-01-PLAN.md").write_text(PLAN)
+
+    for written in ("soon", "0", "1.5", '""'):
+        assert second_plan(folder, wave=written, **other) == [
+            "plan frontmatter: wave is missing or not a whole number from 1 up"], written
+    (folder / "01-02-PLAN.md").unlink()
+    (folder / "01-01-PLAN.md").write_text(PLAN.replace("wave: 1\n", ""))
+    assert messages(phase(project, "check", "--plans", "1")[1]) == [
+        "no plan task turns this test green: test_scan.py::test_skips_hidden"], "one plan needs no wave"
+
+
+def test_a_plans_frontmatter_lists_the_tests_its_tasks_turn_green(project):
+    plan = planned(project)
+    uncovered = "no plan task turns this test green: test_scan.py::test_skips_hidden"
+    listed = "[tests/acceptance/p01_scan/test_scan.py::test_lists_files]"
+    plan.write_text(PLAN.replace(listed, "[]"))
+    assert messages(phase(project, "check", "--plans", "1")[1]) == [uncovered, (
+        "plan frontmatter: turns_green does not list tests/acceptance/p01_scan/test_scan.py::test_lists_files, "
+        "which its tasks claim")]
+    plan.write_text(PLAN.replace(listed, "\n  - test_scan.py::test_lists_files   # the bare file name"))
+    assert messages(phase(project, "check", "--plans", "1")[1]) == [uncovered], "one test, written two ways"
+    plan.write_text(PLAN.replace(listed, "[test_scan.py::test_lists_files[a, b]]"))
+    assert messages(phase(project, "check", "--plans", "1")[1]) == [uncovered], "one test whatever its parameters"
+
+
+def test_a_wave_wider_than_the_coder_pool_is_a_warning(project, monkeypatch):
+    folder = planned(project).parent
+    (folder / "01-02-PLAN.md").write_text(plan_text("02", files="`src/widget/dupes.py`"))
+    coders(project, '[roles]\ncoders = ["codex"]\n\n[parallel]\nmax_tracks = 1\n')
+    monkeypatch.setenv("PATH", str(stand_ins(project, ["codex"])))
+    code, env = phase(project, "check", "--plans", "1")
+    assert code == 0 and [w["message"] for w in env["data"]["warnings"]] == [
+        "wave 1 has 2 plans that can start at once (01-01, 01-02); the coder pool here runs 1"], env
+    assert "- warning: .planning/phases/01-scan/01-01-PLAN.md:0 [plans] wave 1 has 2 plans" in tool(project, "check", "--plans", "1")[1]
+
+    (folder / "01-02-PLAN.md").write_text(plan_text("02", files="`src/widget/dupes.py`", depends_on="[01-01]"))
+    assert phase(project, "check", "--plans", "1")[1]["data"]["warnings"] == [], "one of the two waits for the other"
+    (folder / "01-02-PLAN.md").write_text(plan_text("02", files="`src/widget/dupes.py`"))
+    stand_ins(project, [])
+    assert phase(project, "check", "--plans", "1")[1]["data"]["warnings"] == [], "no coder here: nothing to compare with"
 
 
 def test_a_change_outside_the_plans_is_named(project):
@@ -1034,16 +1145,21 @@ effort = "medium"
 """
 
 
-def pool(project, on_path, *args, cwd=None):
-    """Run the coder-pool command with nothing on PATH but git and an empty stand-in for each named assistant."""
+def stand_ins(project, on_path):
+    """A folder to use as PATH: git, and an empty stand-in for each named assistant."""
     bin_dir = project.parent / "bin"
     shutil.rmtree(bin_dir, ignore_errors=True)
     bin_dir.mkdir()
-    for name, body in [(name, "") for name in on_path] + [("git", 'exec "%s" "$@"\n' % shutil.which("git"))]:
+    for name, body in [(name, "") for name in on_path] + [("git", 'exec "%s" "$@"\n' % GIT)]:
         (bin_dir / name).write_text("#!/bin/sh\n" + body)
         (bin_dir / name).chmod(0o755)
+    return bin_dir
+
+
+def pool(project, on_path, *args, cwd=None):
+    """Run the coder-pool command with nothing on PATH but git and an empty stand-in for each named assistant."""
     proc = subprocess.run([sys.executable, POOL, "show", *args], cwd=cwd or project, capture_output=True, text=True,
-                          env={**os.environ, "PATH": str(bin_dir)})
+                          env={**os.environ, "PATH": str(stand_ins(project, on_path))})
     return proc.returncode, proc.stdout + proc.stderr
 
 

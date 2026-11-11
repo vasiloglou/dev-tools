@@ -66,6 +66,9 @@ DEFAULT_SETTINGS = {
     # agents_dir, or "synced" for only the ones the sync delivered (read from the sync receipt),
     # for a project whose folders also hold skills or agents written to other rules.
     "skill_check": "all",
+    # Generated files that two plans of one wave may both name (a path, a folder ending in /, or a
+    # pattern with *), beside the component index, which is always one. ``check --plans`` reads it.
+    "shared_files": [],
 }
 RECEIPT = ".devtools-receipt.json"  # written by the sync; lists every file it delivered
 
@@ -119,6 +122,8 @@ ARTIFACTS = [
 GATED_FROM = SETTINGS["gated_from"]
 if SETTINGS["skill_check"] not in ("all", "synced"):
     raise SystemExit("%s: skill_check must be all or synced" % SETTINGS_FILE)
+if not isinstance(SETTINGS["shared_files"], list) or not all(isinstance(p, str) and p for p in SETTINGS["shared_files"]):
+    raise SystemExit("%s: shared_files must be a list of paths" % SETTINGS_FILE)
 if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
     raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
 IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
@@ -930,10 +935,12 @@ def listed(value: str, pattern=r"`([^`]+)`") -> list:
 
 
 def parse_plan(text: str) -> dict:
-    """What a plan declares: its requirements, and for each task the files it changes, the
-    locked tests it turns green and its verify command. A task is a ``### <id>`` block between
-    <tasks> and </tasks>; a field is ``- **name:** value`` and may run on over indented lines."""
+    """What a plan declares: its wave, the plans it depends on, its requirements and the tests
+    its frontmatter lists, and for each task the files it changes, the locked tests it turns
+    green and its verify command. A task is a ``### <id>`` block between <tasks> and </tasks>;
+    a field is ``- **name:** value`` and may run on over indented lines."""
     _, body = split_frontmatter(text)
+    wave = scalar(parse_frontmatter(text).get("wave", ""))
     section = re.search(r"<tasks>(.*?)</tasks>", body, re.S)
     tasks = []
     for block in re.split(r"^### ", section.group(1) if section else "", flags=re.M)[1:]:
@@ -945,29 +952,161 @@ def parse_plan(text: str) -> dict:
                       "verify": fields.get("verify", "").strip()})
     reuse = re.search(r"^## Reuse[ \t]*\n(.*?)(?=^#{1,2} |\Z)", text, re.M | re.S)
     new = re.findall(r"^[ \t]*(?:- )?new_component:[ \t]*([^\n]+)$", reuse.group(1) if reuse else "", re.M | re.I)
-    return {"requirements": re.findall(r"REQ-[A-Z]+-\d+", " ".join(frontmatter_list(text, "requirements"))),
+    return {"wave": int(wave) if wave.isdigit() and int(wave) else None,
+            "depends_on": frontmatter_list(text, "depends_on"),
+            "claims": [name for name in frontmatter_list(text, "turns_green") if "::" in name],
+            "requirements": re.findall(r"REQ-[A-Z]+-\d+", " ".join(frontmatter_list(text, "requirements"))),
             "new_components": re.findall(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", " ".join(new)),
             "tasks": tasks}
 
 
 def phase_plans(pl: Planning, nn: str) -> dict:
-    """{repo-relative path: parsed plan} for every NN-MM-PLAN.md of a phase."""
+    """{repo-relative path: parsed plan} for every NN-MM-PLAN.md of a phase. A plan's id is the
+    NN-MM its file name starts with, whatever its frontmatter says."""
     pdir = pl.phase_dir(nn)
-    return {rel(pl.root, path): parse_plan(path.read_text(encoding="utf-8"))
-            for path in (sorted(pdir.glob(nn + "-*-PLAN.md")) if pdir else [])}
+    plans = {}
+    for path in (sorted(pdir.glob(nn + "-*-PLAN.md")) if pdir else []):
+        plans[rel(pl.root, path)] = dict(parse_plan(path.read_text(encoding="utf-8")), id=path.name[:-len("-PLAN.md")])
+    return plans
 
 
-def check_plans(pl: Planning, nn: str) -> list:
-    """The plans of a phase together: every contract test id in the Traceability table of
-    NN-TESTS.md is turned green by a task, the requirements the plans name are the phase's,
-    and every plan names a requirement and gives each task a verify command.
+def overlap(a: str, b: str) -> bool:
+    """Whether two entries of tasks' `files` can name the same file. An entry is a path, a
+    folder ending in /, or a pattern with *. Two patterns, or a pattern and a folder, are taken
+    to overlap when the text before the first * of one starts the other's: this errs towards
+    saying yes."""
+    if a == b:
+        return True
+    for one, other in ((a, b), (b, a)):
+        if "*" in one:
+            if "*" in other or other.endswith("/"):
+                fixed, rest = one.split("*", 1)[0], other.split("*", 1)[0]
+                if fixed.startswith(rest) or rest.startswith(fixed):
+                    return True
+            elif fnmatch.fnmatch(other, one):
+                return True
+        elif one.endswith("/") and other.startswith(one):
+            return True
+    return False
+
+
+def index_paths() -> tuple:
+    """The component index as (files, folders): the catalog and what is generated beside it."""
+    catalog = SETTINGS["components_catalog"]
+    index = catalog.rsplit("/", 1)[0] + "/" if "/" in catalog else ""
+    return {catalog} | {index + name for name in INDEX_FILES}, (index + "modules/", index + "external/")
+
+
+def inside(entry: str, entries) -> bool:
+    """Whether everything an entry names is named by one of `entries` too."""
+    return any(entry == other or (other.endswith("/") and entry.startswith(other))
+               or ("*" in other and "*" not in entry and fnmatch.fnmatch(entry, other)) for other in entries)
+
+
+def track_cap(root: Path):
+    """How many tracks the coder pool runs at once here (coder_pool.py beside this script), or
+    None when the script is missing, fails, or finds no coder at all."""
+    script = SCRIPT_DIR / "coder_pool.py"
+    if not script.is_file():
+        return None
+    try:
+        proc = subprocess.run([sys.executable, str(script), "show", "--json", "--root", str(root)],
+                              capture_output=True, text=True, timeout=30)
+        cap = json.loads(proc.stdout)["coders"]["effective_tracks"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return None
+    return cap if proc.returncode == 0 and type(cap) is int and cap > 0 else None
+
+
+SHOWN_FILES = 5  # the files named in one line about two plans; the line counts the rest
+
+
+def check_plan_order(pl: Planning, nn: str, plans: dict) -> tuple:
+    """How the plans of a phase are ordered and what they share; returns (issues, warnings).
+
+    An issue: a `depends_on` that names no plan of the phase, forms a loop, or points to a
+    later wave; a `wave` that is not a whole number when the phase has several plans; and two
+    plans of one wave, neither after the other through `depends_on`, that both name a file.
+    A generated file is excepted: the component index, the capabilities file, the planning
+    folder and the `shared_files` setting. A warning: a wave with more plans that can start at
+    once than the coder pool runs here."""
+    by_id = {plan["id"]: (name, plan) for name, plan in plans.items()}
+    issues, warnings, after = [], [], {}
+    for name, plan in plans.items():
+        wanted = []
+        for raw in plan["depends_on"]:
+            if raw.lower() in ("none", "null", "~"):
+                continue  # written out instead of an empty list
+            dep = raw[:-len("-PLAN.md")] if raw.endswith("-PLAN.md") else raw
+            dep = nn + "-" + dep if re.fullmatch(r"\d\d", dep) else dep
+            if dep in by_id and dep != plan["id"]:
+                wanted.append(dep)
+            else:
+                issues.append(issue(name, 0, "plans", "depends_on names %s, which is %s"
+                                    % (raw, "this plan" if dep == plan["id"] else "no plan of phase " + nn)))
+        after[plan["id"]] = wanted
+        if plan["wave"] is None and len(plans) > 1:
+            issues.append(issue(name, 0, "plans", "plan frontmatter: wave is missing or not a whole number from 1 up"))
+
+    def reach(start):
+        seen, todo = set(), list(after[start])
+        while todo:
+            dep = todo.pop()
+            if dep not in seen:
+                seen.add(dep)
+                todo.extend(after[dep])
+        return seen
+
+    earlier = {plan_id: reach(plan_id) for plan_id in after}
+    for plan_id in sorted(after):
+        name, plan = by_id[plan_id]
+        if plan_id in earlier[plan_id]:
+            issues.append(issue(name, 0, "plans", "depends_on forms a loop: %s depends on itself through %s"
+                                % (plan_id, ", ".join(sorted(earlier[plan_id] - {plan_id})) or "its own line")))
+        for dep in after[plan_id]:
+            if plan["wave"] and by_id[dep][1]["wave"] and by_id[dep][1]["wave"] > plan["wave"]:
+                issues.append(issue(name, 0, "plans", "depends_on names %s, which is in a later wave (%d) than this plan (%d)"
+                                    % (dep, by_id[dep][1]["wave"], plan["wave"])))
+    files, folders = index_paths()
+    shared = sorted(files) + list(folders) + [PLANNING + "/", SETTINGS["capabilities_target"]] + list(SETTINGS["shared_files"])
+    waves = {}
+    for plan_id in sorted(after):
+        waves.setdefault(by_id[plan_id][1]["wave"], []).append(plan_id)
+    for wave, members in sorted((w, m) for w, m in waves.items() if w):
+        for i, first in enumerate(members):
+            for second in members[i + 1:]:
+                if first in earlier[second] or second in earlier[first]:
+                    continue
+                named = sorted({a if a == b else "%s and %s" % (a, b)
+                                for task in by_id[first][1]["tasks"] for a in task["files"]
+                                for other in by_id[second][1]["tasks"] for b in other["files"]
+                                if overlap(a, b) and not inside(a, shared) and not inside(b, shared)})
+                if named:
+                    more = " and %d more" % (len(named) - SHOWN_FILES) if len(named) > SHOWN_FILES else ""
+                    issues.append(issue(by_id[first][0], 0, "plans",
+                                        "plans %s and %s are both in wave %d, neither depends on the other, and both name %s"
+                                        % (first, second, wave, ", ".join(named[:SHOWN_FILES]) + more)))
+        cap = track_cap(pl.root) if len(members) > 1 else None
+        free = [m for m in members if not earlier[m] & set(members)]
+        if cap and len(free) > cap:
+            warnings.append(issue(by_id[free[0]][0], 0, "plans", "wave %d has %d plans that can start at once (%s); "
+                                  "the coder pool here runs %d" % (wave, len(free), ", ".join(free), cap)))
+    return issues, warnings
+
+
+def check_plans(pl: Planning, nn: str) -> tuple:
+    """The plans of a phase together; returns (issues, warnings). Every contract test id in the
+    Traceability table of NN-TESTS.md is turned green by a task, the requirements the plans
+    name are the phase's, every plan names a requirement and gives each task a verify command,
+    a plan's frontmatter lists the tests its tasks claim, and the plans are ordered and share
+    files as `check_plan_order` says.
     The ids are the ones the table lists, not every test in the locked files.
     Advisory: no step of the workflow requires it yet."""
     plans = phase_plans(pl, nn)
     pdir = pl.phase_dir(nn)
     where = PLANNING + "/phases/%s-*/" % nn
     if not plans:
-        return [issue(where + nn + "-*-PLAN.md", 0, "plans", "phase %s has no plan" % nn)]
+        return [issue(where + nn + "-*-PLAN.md", 0, "plans", "phase %s has no plan" % nn)], []
     issues = [issue(name, 0, "plans", "no task found (a '### <id>' block between <tasks> and </tasks>)")
               for name, plan in plans.items() if not plan["tasks"]]
     issues.extend(issue(name, 0, "plans", "plan frontmatter: requirements names no REQ id")
@@ -995,6 +1134,14 @@ def check_plans(pl: Planning, nn: str) -> list:
             if not any(c == full(name) or (not folder and (c.endswith("/" + name) or name.endswith("/" + c)))
                        for c in claimed):
                 issues.append(issue(rel(pl.root, tests), number, "plans", "no plan task turns this test green: " + name))
+    for name, plan in plans.items():
+        # One test whatever its parameters: an id is compared up to its first [.
+        listed = {full(test).split("[")[0] for test in plan["claims"]}
+        by_tasks = {full(test).split("[")[0] for task in plan["tasks"] for test in task["turns_green"]}
+        for message, tests_named in (("plan frontmatter: turns_green does not list %s, which its tasks claim", by_tasks - listed),
+                                     ("plan frontmatter: turns_green lists %s, which no task of the plan claims", listed - by_tasks)):
+            if tests_named:
+                issues.append(issue(name, 0, "plans", message % ", ".join(sorted(tests_named))))
     phase = pl.phase(nn) or {}
     path = pl.dir / "REQUIREMENTS.md"
     _, reqs = parse_requirements(path.read_text(encoding="utf-8")) if path.is_file() else ({}, [])
@@ -1005,7 +1152,8 @@ def check_plans(pl: Planning, nn: str) -> list:
     served = {req for plan in plans.values() for req in plan["requirements"]}
     issues.extend(issue(PLANNING + "/ROADMAP.md", 0, "plans", "no plan of phase %s names requirement %s" % (nn, req))
                   for req in sorted(owned - served))
-    return issues
+    ordered, warnings = check_plan_order(pl, nn, plans)
+    return issues + ordered, warnings
 
 
 INDEX_FILES = ("graph.md", "external.toml", "unassigned-baseline.txt", "layers.toml", "rules.json", "REVIEW.md")
@@ -1031,17 +1179,16 @@ def check_scope(pl: Planning, nn: str, base) -> tuple:
         return [issue(PLANNING + "/STATE.md", 0, "scope", "cannot find what changed: no merge-base with %s"
                       % (base or "the STATE.md base_branch"))], []
     catalog = SETTINGS["components_catalog"]
-    index = catalog.rsplit("/", 1)[0] + "/" if "/" in catalog else ""
+    index_files, index_folders = index_paths()
     pdir = pl.phase_dir(nn)
     lock = pdir / (nn + "-TESTLOCK.json")
     try:
         fixtures = set(json.loads(lock.read_text(encoding="utf-8")).get("fixtures", {})) if lock.is_file() else set()
     except (ValueError, AttributeError):
         fixtures = set()
-    settled = set(acceptance_files(pl.root, nn)) | fixtures | {catalog} | {index + name for name in INDEX_FILES}
+    settled = set(acceptance_files(pl.root, nn)) | fixtures | index_files
     declared = {path for plan in plans.values() for task in plan["tasks"] for path in task["files"]}
-    folders = tuple(path for path in declared if path.endswith("/")) + (PLANNING + "/", index + "modules/",
-                                                                         index + "external/")
+    folders = tuple(path for path in declared if path.endswith("/")) + (PLANNING + "/",) + index_folders
     patterns = [path for path in declared if "*" in path]
     excused = set()
     for path in sorted(pdir.glob(nn + "-*-SUMMARY.md")):
@@ -1299,13 +1446,14 @@ def cmd_check(pl: Planning, args) -> dict:
         run("prove", lambda: check_prove(pl, norm_phase(args.prove)))
     if args.plan:
         run("plan", lambda: check_doc_file(pl.root, Path(args.plan).resolve(), "plan", True))
-    if args.plans:
-        run("plans", lambda: check_plans(pl, norm_phase(args.plans)))
     data = {"checks": ran, "issues": issues}
-    if args.scope:
-        ran.append("scope")
-        found, data["warnings"] = check_scope(pl, norm_phase(args.scope), args.base)
-        issues.extend(found)
+    for name, wanted, fn in (("plans", args.plans, lambda: check_plans(pl, norm_phase(args.plans))),
+                             ("scope", args.scope, lambda: check_scope(pl, norm_phase(args.scope), args.base))):
+        if wanted:
+            ran.append(name)
+            found, noted = fn()
+            issues.extend(found)
+            data.setdefault("warnings", []).extend(noted)
     if issues:
         raise ToolError("CHECK_FAILED", "%d issue(s) found" % len(issues), "fix the listed issues", 1, data)
     return data
