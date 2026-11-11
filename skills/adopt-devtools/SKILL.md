@@ -70,6 +70,11 @@ python3 <dev-tools>/devtools/sync.py survey --project .
 | Symlinked skill folders | Skills installed by something else | Nothing |
 | `[not tracked by git]` | The folder is ignored or was never added | Leave it out of the config unless the user wants it committed |
 | To find what reads these copies | A `git grep` line with the names that point at the copies | Used in step 2 |
+| A planning folder written by GSD | `.planning/` holds a GSD plan | This skill covers the project's copies of the skills only. The plan is moved with the `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`); never run `phase_tool.py setup` on it |
+
+In a git project the survey reads the files git tracks or would track, plus the skill and
+agent folders at the top (`.claude/skills`, `.codex/agents`, `skills` …) whatever git
+says. A copy kept in an ignored folder anywhere else is not found: name it yourself.
 
 A project that serves more than one agent runtime has one counterpart per runtime
 folder (`.claude/skills`, `.codex/skills`, `.agents/skills`). Confirm the copies are
@@ -128,6 +133,14 @@ own copies had written into them, so every setting is a decision about this proj
   of the same name, or a shipped line with the value filled in). **"from the survey"**
   means it follows from where things are. Check both: `skill_roots`, for example, holds
   only the folders with a counterpart, and the project's check may have covered more.
+- **`skill_check`** says which skills and agents `check --all` holds to the skill
+  rules. `"all"` checks every skill under `skill_roots` and every file in `agents_dir`;
+  that is right only if the project's own skills and agents were written to those rules
+  (a name equal to the folder or file name, a description, every referenced file
+  present). Otherwise write `"synced"`: only what the sync delivered is checked.
+- **A folder that is a link.** The sync refuses a destination that passes through a link
+  out of the project, and two destinations that are one file (one runtime's skills
+  folder linked to another's). Deliver to one of the two; the link serves the other.
 - **`values`** fill `{{devtools:<name>}}` in shipped text. The milestone workflow needs
   only these; it ships no script and has no settings.
 - **`replaces`** names an old copy under another name, so that `compare` reads it.

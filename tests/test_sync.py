@@ -229,6 +229,28 @@ def test_value_that_matches_no_token_is_an_error(source, project):
     assert apply(source, project) == 2
 
 
+def test_a_destination_reached_through_a_link_out_of_the_project_is_refused(source, project, tmp_path, capsys):
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    (project / ".claude/skills").mkdir(parents=True)
+    (project / ".claude/skills/demo").symlink_to(outside)
+    assert apply(source, project) == 2
+    assert "would be written outside the project" in capsys.readouterr().err
+    assert list(outside.iterdir()) == [], "nothing was written through the link"
+
+
+def test_two_destinations_that_are_one_file_are_refused(source, project, capsys):
+    (project / ".claude/skills").mkdir(parents=True)
+    (project / ".codex").mkdir()
+    (project / ".codex/skills").symlink_to("../.claude/skills")
+    (project / ".devtools.toml").write_text(CONFIG + '[[sync]]\nsource = "skills/demo"\ndest = ".codex/skills/demo"\n')
+    assert apply(source, project) == 2
+    assert "are one file" in capsys.readouterr().err
+    (project / ".devtools.toml").write_text(CONFIG.replace(".claude/skills/demo", ".codex/skills/demo"))
+    assert apply(source, project) == 0, "a link that stays inside the project is fine when it is used once"
+    assert (project / ".claude/skills/demo/SKILL.md").is_file() and run("check", "--project", project) == 0
+
+
 # --------------------------------------------------------------------------- a project that has its own copies
 
 @pytest.fixture
@@ -276,6 +298,31 @@ def grown(tmp_path):
     (root / "node_modules/x/skills/process").mkdir(parents=True)
     (root / "node_modules/x/skills/process/SKILL.md").write_text("Orient before anything else.\n")
     return root
+
+
+def test_in_a_git_project_the_survey_does_not_walk_what_git_ignores(shipped, grown, capsys, monkeypatch):
+    import subprocess
+    (grown / ".gitignore").write_text("runs/\n.codex/\n")
+    (grown / "runs/2026/skills/process").mkdir(parents=True)
+    (grown / "runs/2026/skills/process/SKILL.md").write_text("Orient before anything else.\n")
+    (grown / "runs/2026/tool.py").write_text("print('a copy in ignored output')\n")
+    subprocess.run(["git", "init", "-q", str(grown)], check=True)
+    walked = []
+    real_walk = sync.walk
+    monkeypatch.setattr(sync, "walk", lambda top: walked.append(top) or real_walk(top))
+    assert run("survey", "--project", grown, "--source", shipped) == 0
+    out = capsys.readouterr().out
+    assert "runs/" not in out, "ignored output is not read"
+    assert "  .codex/skills/process" in out, "a skills folder is read even when git ignores it"
+    assert "  .claude/skills/acme-index" in out and "skills/flow/process/scripts/tool.py\n  tools/tool.py" in out
+    assert grown not in walked and all(top.name in ("skills", "agents") for top in walked)
+
+
+def test_the_survey_says_when_the_planning_folder_is_gsds(shipped, grown, capsys):
+    (grown / ".planning").mkdir()
+    (grown / ".planning/STATE.md").write_text("---\ngsd_state_version: 1.0\n---\n")
+    run("survey", "--project", grown, "--source", shipped)
+    assert "## A planning folder written by GSD" in capsys.readouterr().out
 
 
 def starter(shipped, grown, capsys):

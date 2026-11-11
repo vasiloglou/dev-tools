@@ -46,6 +46,13 @@ Always run from `.venv`. In a worktree without one, use the repository venv's
 Python with worktree `src` first on PYTHONPATH, for example
 `PYTHONPATH=src /path/to/.venv/bin/python -m pytest <test>`.
 
+The commands here and in the references are for a Python project with pytest.
+In a project in another language, `project.md` in this skill's `references/`
+directory names the test command, how one phase's tests are run, and what a
+failing run looks like. The rest holds as written: the acceptance tests of
+phase NN live under the phase's acceptance folder, and the test lock hashes
+whatever files that folder holds.
+
 ## Status and artifacts
 
 | Step | Requires | Leaves with | Human gate |

@@ -96,11 +96,13 @@ python3 .claude/skills/process-phase/scripts/phase_tool.py setup [--name NAME] [
 
 `setup` writes the eleven top-level files from `templates/planning/` with one placeholder phase, one requirement and a `DEC-001` row for adopting the workflow. It never overwrites a file that exists. Fill in the first phase, commit, and `check --all` is clean.
 
+`setup` is for a project with no plan. It stops, writing nothing, when `STATE.md`, `ROADMAP.md` or `REQUIREMENTS.md` is already there in another format. A project planned with GSD is moved with `devtools/from_gsd.py` in the dev-tools checkout (the `move-from-gsd` skill there is the guide); any other plan is rewritten by hand in the formats above, or moved aside first.
+
 `check --all` asks for a decision row whenever the skill's rule text changes against the base branch. That includes the first sync of the skill (covered by `DEC-001`), a later sync that brings changed text, and edits to the project's own `references/project.md`: add one DEC row for each such change.
 
 ## Settings
 
-`scripts/phase_tool.settings.json` (written by the sync from `.devtools.toml`) holds the project's paths and names. `gated_from` sets the first status at which `advance` blocks on missing files: `context_approved` (default, every step enforced), or `tests_approved` / `plan_approved` for a project whose earlier phases were run when the first steps only warned. `phase_gaps = true` accepts a roadmap whose phase numbers do not start at 0 or 1 or skip some, for a project whose numbers come from an earlier process (one moved from GSD).
+`scripts/phase_tool.settings.json` (written by the sync from `.devtools.toml`) holds the project's paths and names. `gated_from` sets the first status at which `advance` blocks on missing files: `context_approved` (default, every step enforced), or `tests_approved` / `plan_approved` for a project whose earlier phases were run when the first steps only warned. `skill_check` says which skills and agents `check` holds to the skill rules: `"all"` under `skill_roots` and `agents_dir` (default), or `"synced"` for only the ones the sync delivered, read from `.devtools-receipt.json`, for a project whose folders also hold skills or agents written to other rules. `phase_gaps = true` accepts a roadmap whose phase numbers do not start at 0 or 1 or skip some, for a project whose numbers come from an earlier process (one moved from GSD).
 
 ## Identifier formats
 

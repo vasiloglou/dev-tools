@@ -155,6 +155,17 @@ def desired_files(source_root: Path, config: dict, project: Path) -> dict[str, d
         for name, values in entry.get("settings", {}).items():
             data = (json.dumps(values, indent=2, sort_keys=True) + "\n").encode("utf-8")
             add((settings_base / name).as_posix(), data, 0o644, "settings")
+    # A folder on the way may be a link: to somewhere outside the project, or to another folder the
+    # config also delivers to (one runtime's skills folder linked to another's).
+    root, real = project.resolve(), {}
+    for dest in files:
+        target = (project / dest).parent.resolve() / Path(dest).name
+        if root not in target.parents:
+            raise SyncError(f"{dest} would be written outside the project, through a link to {target.parent}")
+        if target in real:
+            raise SyncError(f"{dest} and {real[target]} are one file: a folder on the way is a link to the other. "
+                            f"Deliver to one of them only")
+        real[target] = dest
     return files
 
 
@@ -348,16 +359,51 @@ def shipped_units(source_root: Path) -> list[dict]:
     return [unit for unit in units if unit["source"] not in NOT_FOR_PROJECTS]
 
 
-def walk_project(project: Path):
-    """(regular files, symlinked directories), skipping caches and checkouts nested in the project."""
+def walk(top: Path):
+    """(regular files, symlinked directories) under a folder, skipping caches and nested checkouts."""
     files, links = [], []
-    for current, folders, names in os.walk(project):
+    for current, folders, names in os.walk(top):
         here = Path(current)
         links.extend(here / d for d in folders if (here / d).is_symlink())
         folders[:] = sorted(d for d in folders if d not in PRUNE and not (here / d).is_symlink()
                             and not (here / d / ".git").exists())
         files.extend(here / name for name in sorted(names) if not (here / name).is_symlink())
     return files, links
+
+
+def walk_project(project: Path):
+    """(regular files, symlinked directories), skipping caches and checkouts nested in the project.
+
+    In a git work tree the list comes from git, so what git ignores is not walked: a working tree
+    can hold a hundred times more ignored files (run outputs, data) than tracked ones. The skill and
+    agent folders at the top (``.claude/skills``, ``.codex/agents``, ``skills`` ...) are walked
+    whatever git says, because a project may keep its copies of the skills out of git.
+    """
+    try:
+        done = subprocess.run(["git", "-C", str(project), "ls-files", "-co", "--exclude-standard", "-z"],
+                              capture_output=True, text=True)
+    except OSError:
+        done = None
+    if done is None or done.returncode != 0:
+        return walk(project)
+    files, links = set(), set()
+    for name in done.stdout.split("\0"):
+        path = project / name
+        if not name or PRUNE & set(Path(name).parts):
+            continue
+        if path.is_symlink():
+            links.update([path] if path.is_dir() else [])
+        elif path.is_file():
+            files.add(path)
+    tops = [project] + sorted(d for d in project.iterdir() if d.is_dir() and not d.is_symlink() and d.name not in PRUNE)
+    for folder in (top / kind for top in tops for kind in ("skills", "agents")):
+        if folder.is_symlink():
+            links.add(folder)
+        elif folder.is_dir() and not (folder / ".git").exists():
+            found, linked = walk(folder)
+            files.update(found)
+            links.update(linked)
+    return sorted(files), sorted(links)
 
 
 def related(name: str, shipped: str) -> bool:
@@ -478,6 +524,15 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
     lines = []
     have = [unit for unit in result["units"] if result["found"][unit["source"]]]
     lines.append(f"dev-tools ships {len(result['units'])} unit(s); {len(have)} have a counterpart in this project.")
+    planning = project / ".planning"
+    try:
+        gsd = (planning / "PROJECT.md").is_file() or "gsd_state_version" in (planning / "STATE.md").read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        gsd = False
+    if gsd:
+        lines += ["", "## A planning folder written by GSD",
+                  ".planning/: its plan is moved with devtools/from_gsd.py (skills/move-from-gsd/SKILL.md), "
+                  "not by the sync and not by `phase_tool.py setup`"]
     lines += ["", "## Counterparts: the project's copy of something dev-tools ships"]
     for unit in have:
         lines.append(unit["source"])

@@ -72,9 +72,9 @@ python3 path/to/dev-tools/devtools/sync.py compare --project .
 
 A project that was planned with GSD moves to the phase workflow with the `move-from-gsd`
 skill (`skills/move-from-gsd/SKILL.md`, read from this checkout). Both keep the plan in
-`.planning/` and name phase folders the same way, so the phase folders stay as they are;
-the roadmap, the requirements and the state are rewritten in the format the phase tool
-reads, and GSD's own files are kept in `.planning/archive/gsd/`:
+`.planning/` and name phase folders the same way, so the folder of a finished phase stays
+as it is; the roadmap, the requirements and the state are rewritten in the format the
+phase tool reads, and GSD's own files are kept in `.planning/archive/gsd/`:
 
 ```bash
 python3 path/to/dev-tools/devtools/from_gsd.py survey --project .
@@ -84,11 +84,15 @@ python3 path/to/dev-tools/devtools/from_gsd.py survey --project .
 python3 path/to/dev-tools/devtools/from_gsd.py convert --project . --dry-run
 ```
 
-- `survey` writes nothing. It lists every phase with the status it will get, the
-  requirements, the decisions, GSD's install inside the project, and what needs a
-  decision first (a phase that is under way, a roadmap that restarted its numbers).
+- `survey` writes nothing. It lists the plans GSD keeps (the root plan and any
+  workstreams), every phase with the status it will get, the requirements, the decisions,
+  GSD's install inside the project, and what needs a decision first: which plan to move,
+  a phase GSD did not finish, phases it had put off, a roadmap that restarted its numbers.
 - `convert` writes the planning files and a record of every choice it made. Phase numbers
-  and requirement ids are kept (`AUTH-01` becomes `REQ-AUTH-01`).
+  are kept, and a requirement keeps its id with `REQ-` in front (`AUTH-01` becomes
+  `REQ-AUTH-01`). A phase GSD did not finish is taken up again from its discussion, with
+  GSD's plans for it kept as input in a `gsd/` folder inside the phase folder. Phases GSD
+  had paused or left in its backlog are listed, not queued.
 
 See `examples/phase-project.devtools.toml` for a complete project file, and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
