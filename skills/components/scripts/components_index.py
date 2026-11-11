@@ -630,8 +630,9 @@ def resolve_imports(tree: ast.AST | list, path: str, available: set[str]) -> set
     return imported
 
 
-def component_graph(root: Path, entries: list[dict], overrides=None) -> dict:
-    """Map component pairs to sorted module evidence, optionally at a base revision."""
+def module_graph(root: Path, entries: list[dict], overrides=None) -> tuple[dict, dict]:
+    """The files of the package, optionally at a base revision: the components that hold each
+    one, and for each file a component holds, the files it imports."""
     overrides = overrides or {}
     paths = {p.relative_to(root).as_posix() for p in (root / PACKAGE_DIR).rglob('*.py')}
     for entry in entries:
@@ -644,16 +645,33 @@ def component_graph(root: Path, entries: list[dict], overrides=None) -> dict:
     paths.update(overrides)
     paths = {p for p in paths if overrides.get(p, '') is not None}
     owners = {p: {e['id'] for e in entries if covers(e, p)} for p in paths}
-    edges = {}
+    imports = {}
     for path in sorted(paths):
         if not owners[path]:
             continue
         rows = text_imports(overrides[path], path) if path in overrides else file_facts(root, path)[3]
-        for target in sorted(resolve_imports(rows, path, paths)):
+        imports[path] = sorted(resolve_imports(rows, path, paths))
+    return owners, imports
+
+
+def component_graph(root: Path, entries: list[dict], overrides=None, files=None) -> dict:
+    """Map component pairs to sorted module evidence, optionally at a base revision.
+    `files` is what `module_graph` returned for the same arguments, when the caller has it."""
+    owners, imports = files or module_graph(root, entries, overrides)
+    edges = {}
+    for path, targets in imports.items():
+        for target in targets:
             for caller in sorted(owners[path] - owners[target]):
                 for callee in sorted(owners[target]):
                     edges.setdefault((caller, callee), []).append((path, target))
     return {edge: sorted(set(pairs)) for edge, pairs in sorted(edges.items())}
+
+
+def private(path: str) -> bool:
+    """Whether a package file is private by its name: the file, or a folder above it inside the
+    package, starts with one underscore. `__init__.py` and `__main__.py` are not."""
+    parts = Path(path).relative_to(PACKAGE_DIR).parts if path.startswith(PACKAGE_DIR + '/') else Path(path).parts
+    return any(part.startswith('_') and not part.startswith('__') for part in parts)
 
 
 def relations(entries: list[dict], edges: dict) -> dict:
@@ -1116,34 +1134,38 @@ FACT_TYPES = {
 }
 
 
-# One more fact type, written only with `facts --modules`: file paths make a renamed file a new fact.
-MODULE_FACTS = {'component_has_module': ('{Component} holds {Path}', (('component', 'component'), ('path', 'path')))}
+# More fact types, written only with `facts --modules`: file paths make a renamed file a new fact.
+MODULE_FACTS = {
+    'component_has_module': ('{Component} holds {Path}', (('component', 'component'), ('path', 'path'))),
+    'module_imports': ('{Path} imports {Path}', (('importer', 'path'), ('imported', 'path'))),
+    'module_is_private': ('{Path} is private', (('path', 'path'),)),
+}
 
 
 def facts(root: Path, base: str = '', modules: bool = False) -> dict:
     """The catalog and the import graph as rows of facts, for a rule checker.
 
-    With `modules`, also which package file each component holds, for rules that start from a
-    file a plan names; only for the code as it is now, so not together with `base`.
-
     With `base`, the catalog and the code are those of the merge base with it; the ranks
     and forbidden pairs are always today's, so one set of rules judges both revisions.
     Module paths stay out of the facts (a renamed file is not a new fact); the imports
     behind each edge are under `evidence`, for printing.
+
+    With `modules`, the files come in as well, for rules that name one: which file each
+    component holds, which file imports which (both held by a component), and which files
+    are private by their name. A renamed file is then a new fact.
     """
     entries = read_components(root)
     ranks, forbidden = layers_config(root, {e['id'].split('.')[0] for e in entries if not subsystem(e)})
-    if base and modules:
-        raise ValueError('facts --modules lists the files as they are now: leave out --base')
+    overrides = None
     if base:
         _, revision, _, entries, overrides = base_snapshot(root, base)
-        edges = component_graph(root, entries, overrides)
     else:
         try:
             revision = git(root, 'rev-parse', 'HEAD', check=False).strip()
         except ValueError:  # no git here
             revision = ''
-        edges = component_graph(root, entries)
+    owners, imports = module_graph(root, entries, overrides)
+    edges = component_graph(root, entries, overrides, files=(owners, imports))
     components = [e for e in entries if not subsystem(e)]
     direct = [edge for edge, pairs in direct_edges(edges).items() if pairs]  # a loop is judged without __init__ imports
     groups = cycle_groups(direct)
@@ -1163,8 +1185,10 @@ def facts(root: Path, base: str = '', modules: bool = False) -> dict:
     types = dict(FACT_TYPES)
     if modules:
         types.update(MODULE_FACTS)
-        paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
-        found['component_has_module'] = [(e['id'], path) for e in components for path in paths if covers(e, path)]
+        found['component_has_module'] = [(name, path) for path in imports for name in owners[path]]
+        found['module_imports'] = [(path, target) for path, targets in imports.items()
+                                   for target in targets if target in imports and target != path]
+        found['module_is_private'] = [(path,) for path in imports if private(path)]
     return {
         'format': 'devtools-facts/1',
         'revision': revision,
@@ -1482,7 +1506,7 @@ def main(argv: list[str] | None = None) -> int:
                       help='also fail on a new caller of a deprecated or duplicate component')
     rows = commands.add_parser('facts')
     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
-    rows.add_argument('--modules', action='store_true', help='also which package file each component holds (not with --base)')
+    rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')
     rows.add_argument('--out', type=Path, help='write to this file instead of printing')
     look = commands.add_parser('review')
     look.add_argument('areas', nargs='*', help='only leads that name a component whose id starts with one of these')

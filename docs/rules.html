@@ -182,8 +182,28 @@ reuse: cli.commands (adapt: one more sub-command), format.sizes
       <p class="caption">A plan written for this capture, in a scratch project with three components, judged by GND 0.3.0. Its task names <code>units.py</code>, which the <code>format.sizes</code> component holds, and the plan names only <code>cli.commands</code>. A file that does not exist yet, <code>export.py</code>, belongs to no component and draws no line. <code>rules</code> is short for <code>python3 .claude/skills/components/scripts/rules_check.py</code>.</p>
     </div>
   </div>
+  <div class="feature" id="files">
+    <div>
+      <span class="num">Rules about files</span>
+      <h3>A private file stays inside its component</h3>
+      <p>A rule can also name a single file: which component holds it, which file imports which, and which files are private by their name. One such rule ships: no file imports a file whose name starts with <code>_</code> from another component.</p>
+      <p>These facts are asked for only when a rule names one. A file path is part of them, so a renamed file counts as a new one; a project whose rules name no file is judged on the component facts alone.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>a scratch project · a branch that reaches into a private file</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git diff -U0 src/shelf/report.py | tail -1</span>
++from shelf import _rounding
+
+<span class="p">$</span> <span class="cmd">rules check --base main</span>
+<span class="warn">warn: private_module_stays_in_its_component: a=src/shelf/report.py b=src/shelf/_rounding.py c=format.sizes</span>
+  remedy: A file imports a private file (its name starts with _) of another component: import what that component offers, or move the file to the component that uses it
+rules against main (cf2e89d): 5 rule(s); 0 to fix, 1 warning(s), 2 standing
+<span class="dim">exit code 0</span></pre></div>
+      <p class="caption">A scratch project made for this capture, judged by GND 0.3.0. <code>_rounding.py</code> belongs to the <code>format.sizes</code> component, whose own <code>units.py</code> imports it without a line. The two standing items are components that list no test.</p>
+    </div>
+  </div>
   <div class="callout">
-    <p><strong>What has and has not been shown.</strong> These rules have run on plans written to test them and on no real project's plans, and no step of the workflow requires the check. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
+    <p><strong>What has and has not been shown.</strong> The rules about plans and about files have run on projects made to test them and on no real project, and no step of the workflow requires them. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
   </div>
 </div></section>
 
@@ -220,7 +240,7 @@ python3 .claude/skills/components/scripts/rules_check.py check --base main</pre>
 <section class="band"><div class="wrap">
   <div class="section-head">
     <h2>The facts a rule can name</h2>
-    <p>A rule about components is a statement over these nine kinds of fact. Rules about plans have more, listed in the guide that ships with the skill.</p>
+    <p>A rule about components is a statement over the first nine kinds of fact. The last three are about single files. Rules about plans have more, listed in the guide that ships with the skill.</p>
   </div>
   <div class="table-scroll"><table>
     <tr><th>Fact</th><th>Roles</th><th>Meaning</th></tr>
@@ -233,6 +253,9 @@ python3 .claude/skills/components/scripts/rules_check.py check --base main</pre>
     <tr><td><code>subsystem_has_member</code></td><td><code>subsystem</code>, <code>component</code></td><td>A component that belongs to a subsystem</td></tr>
     <tr><td><code>area_has_rank</code></td><td><code>area</code>, <code>rank</code></td><td>From the ranks in <code>layers.toml</code></td></tr>
     <tr><td><code>area_must_not_use</code></td><td><code>source</code>, <code>target</code></td><td>From a forbidden pair in <code>layers.toml</code></td></tr>
+    <tr><td><code>component_has_module</code></td><td><code>component</code>, <code>path</code></td><td>A package file the component holds</td></tr>
+    <tr><td><code>module_imports</code></td><td><code>importer</code>, <code>imported</code></td><td>One file imports another</td></tr>
+    <tr><td><code>module_is_private</code></td><td><code>path</code></td><td>The file's name, or a folder above it, starts with <code>_</code></td></tr>
   </table></div>
 </div></section>
 

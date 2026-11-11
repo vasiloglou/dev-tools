@@ -798,7 +798,7 @@ def fake_gnd(project, report=None, exit_code=0, stderr=""):
 
 
 STARTER_IDS = ["no_forbidden_area_use", "no_use_of_a_higher_rank", "no_import_inside_a_loop",
-               "canonical_component_has_a_test"]
+               "canonical_component_has_a_test", "private_module_stays_in_its_component"]
 PLAN_RULE = "plan_names_the_components_it_touches"  # the one starter rule about plans: only `check --phase` judges it
 
 
@@ -863,7 +863,7 @@ def test_rules_names_rule_id_and_import_evidence(project):
             "  remedy: This area must not use that one (a [[forbid]] pair in layers.toml): move the import, "
             "or the module to the component it belongs to\n") in out
     assert "warn: canonical_component_has_a_test: a=cli.run\n  remedy: A canonical component lists no test" in out
-    assert "rules: 4 rule(s); 1 to fix, 1 warning(s)" in out
+    assert "rules: 5 rule(s); 1 to fix, 1 warning(s)" in out
 
     model = json.loads((seen / "model.json").read_text())
     facts_seen = json.loads((seen / "head.facts.json").read_text())
@@ -871,7 +871,7 @@ def test_rules_names_rule_id_and_import_evidence(project):
     assert argv.startswith("check ") and "--rule-ids --allow-vacuous --format json" in argv and "--baseline" not in argv
     assert [c["id"] for c in model["constraints"]] == STARTER_IDS
     assert all("level" not in c and c["remedy"] for c in model["constraints"])
-    assert [c["modality"] for c in model["constraints"]] == ["alethic", "alethic", "deontic", "deontic"]
+    assert [c["modality"] for c in model["constraints"]] == ["alethic", "alethic", "deontic", "deontic", "deontic"]
     assert {f["id"] for f in model["fact_types"]} == set(facts_seen["facts"]) == set(facts_seen["population"]["covers"])
     assert facts_seen["population"]["source"] == "tool-output"
     assert facts_seen["population"]["producer"].startswith("components_index.py facts @ ")
@@ -1024,8 +1024,24 @@ def test_facts_can_list_the_files_of_each_component(project):
         {"component": "core.extra", "path": "src/widget/extra/more.py"},
         {"component": "core.sizes", "path": "src/widget/sizes.py"}]
     assert found["types"]["facts"]["component_has_module"]["roles"] == [["component", "component"], ["path", "path"]]
-    code, out = tool(project, "facts", "--modules", "--base", "main", script=INDEX)
-    assert code == 1 and "leave out --base" in out
+    assert found["facts"]["module_imports"] == [{"importer": "src/widget/cli.py", "imported": "src/widget/sizes.py"}]
+    assert found["facts"]["module_is_private"] == []
+
+    commit(project)
+    (project / "src/widget/_impl.py").write_text('"""Private."""\n')
+    (project / "src/widget/extra/_inner").mkdir()
+    (project / "src/widget/extra/_inner/deep.py").write_text('"""In a private folder."""\nfrom widget import _impl\n')
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\nfrom widget import _impl\n')
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- modules: src/widget/sizes.py", "- modules: src/widget/sizes.py, src/widget/_impl.py"))
+    rows = facts(project, "--modules")["facts"]
+    assert rows["module_is_private"] == [{"path": "src/widget/_impl.py"}, {"path": "src/widget/extra/_inner/deep.py"}], \
+        "by the file's name or a folder's; __init__.py is not private"
+    assert {"importer": "src/widget/extra/_inner/deep.py", "imported": "src/widget/_impl.py"} in rows["module_imports"]
+    assert {"component": "core.sizes", "path": "src/widget/_impl.py"} in rows["component_has_module"]
+    before = facts(project, "--modules", "--base", "main")["facts"]
+    assert before["module_is_private"] == [] and "_impl" not in json.dumps(before), "the files as they were at the base"
+    assert before["module_imports"] == [{"importer": "src/widget/cli.py", "imported": "src/widget/sizes.py"}]
 
 
 def component_plan(reuse=""):
@@ -1046,12 +1062,54 @@ def planned_over_components(project):
     return plan
 
 
+def test_rules_ask_for_the_files_only_when_a_rule_names_one(project):
+    layered(project)
+    commit(project)
+    seen = fake_gnd(project)
+    assert tool(project, "check", "--base", "main", script=RULES)[0] == 0
+    model = json.loads((seen / "model.json").read_text())
+    rows = json.loads((seen / "head.facts.json").read_text())["facts"]
+    assert {"module_imports", "module_is_private", "component_has_module"} <= {f["id"] for f in model["fact_types"]}
+    assert rows["module_imports"] == [{"importer": "src/widget/cli.py", "imported": "src/widget/sizes.py"}]
+
+    rules = project / "docs/components/rules.json"
+    kept = [rule for rule in json.loads(rules.read_text())["rules"] if rule["id"] != "private_module_stays_in_its_component"]
+    rules.write_text(json.dumps({"rules": kept}))
+    fake_gnd(project, gnd_report(rules=STARTER_IDS[:4]))
+    code, out = tool(project, "check", "--base", "main", script=RULES)
+    assert code == 0 and "rules against main" in out and "4 rule(s)" in out, out
+    rows = json.loads((seen / "head.facts.json").read_text())["facts"]
+    assert "module_imports" not in rows and "src/widget" not in json.dumps(rows), "no rule names a file: no file is a fact"
+
+
+@pytest.mark.skipif(not REAL_GND, reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
+def test_a_private_file_is_used_inside_its_component_with_real_gnd(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\nfrom widget import _impl\n')
+    (project / "src/widget/_impl.py").write_text('"""Private."""\n')
+    (project / "src/widget/cli.py").write_text('"""Cli."""\n')
+    (project / "src/widget/old.py").write_text('"""Old."""\nfrom widget import _impl\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py, src/widget/_impl.py"),
+            entry("cli.run", "Run commands", "src/widget/cli.py"), entry("cli.old", "Old commands", "src/widget/old.py"))
+    assert tool(project, "init", script=RULES)[0] == 0
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": REAL_GND}))
+    commit(project)
+    code, out = tool(project, "check", "--base", "main", "--strict", script=RULES)
+    assert "private_module_stays_in_its_component" not in out, out  # sizes.py is in the component; old.py was there before
+    (project / "src/widget/cli.py").write_text('"""Cli."""\nfrom widget import _impl\n')
+    code, out = tool(project, "check", "--base", "main", script=RULES)
+    assert code == 0 and ("warn: private_module_stays_in_its_component: a=src/widget/cli.py b=src/widget/_impl.py "
+                          "c=core.sizes\n  remedy: A file imports a private file") in out, out
+    assert out.count("warn: private_module_stays_in_its_component") == 1, "the import that was already there is standing"
+    code, out = tool(project, "check", script=RULES)
+    assert out.count("warn: private_module_stays_in_its_component") == 2, "with no base, both are listed"
+
+
 def test_rules_about_plans_are_judged_for_a_phase_only(project):
     plan = planned_over_components(project)
     broken = {"$task": "01-01-T1", "$component": "core.sizes", "$plan": "01-01"}
     seen = fake_gnd(project)
     code, out = tool(project, "check", script=RULES)
-    assert code == 0 and "rules: 4 rule(s); 0 to fix" in out, out
+    assert code == 0 and "rules: 5 rule(s); 0 to fix" in out, out
     assert [c["id"] for c in json.loads((seen / "model.json").read_text())["constraints"]] == STARTER_IDS
 
     seen = fake_gnd(project, gnd_report(verdict(PLAN_RULE, "warning", broken), rules=[PLAN_RULE]))
@@ -1115,7 +1173,7 @@ def test_plan_rules_with_real_gnd(project):
     code, out = tool(project, "check", "--phase", "1", script=RULES)
     assert code == 0 and out == "plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)\n", out
     code, out = tool(project, "check", script=RULES)
-    assert "rules: 4 rule(s)" in out, out
+    assert "rules: 5 rule(s)" in out, out
 
 
 def test_review_lists_places_to_look(project):

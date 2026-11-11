@@ -108,6 +108,7 @@ says nothing about what was already broken: the summary line counts it as `stand
 | `no_use_of_a_higher_rank` | must | No component uses a component of a higher rank |
 | `no_import_inside_a_loop` | should | No import between components is part of a loop of imports |
 | `canonical_component_has_a_test` | should | Every `canonical` component lists a test |
+| `private_module_stays_in_its_component` | should | No file imports a private file (its name, or a folder above it, starts with `_`) that another component holds |
 | `plan_names_the_components_it_touches` | should | A [rule about plans](#rules-about-plans): only `check --phase` judges it |
 
 The first two say nothing until `layers.toml` has pairs or ranks. Delete a rule the
@@ -177,6 +178,13 @@ The facts a rule can name (`python3 scripts/components_index.py facts` prints th
 | `subsystem_has_member` | `subsystem`, `component` | A component on a subsystem's `components:` line |
 | `area_has_rank` | `area`, `rank` | From `[rank]` in `layers.toml` |
 | `area_must_not_use` | `source`, `target` | From a `[[forbid]]` in `layers.toml` |
+| `component_has_module` | `component`, `path` | A package file the component holds |
+| `module_imports` | `importer`, `imported` | One file imports another; a component holds each |
+| `module_is_private` | `path` | The file's name, or a folder above it inside the package, starts with one `_` (`__init__.py` and `__main__.py` are not private) |
+
+The last three are facts about files (`facts --modules` prints them). `check` asks for them
+only when a rule it judges names one, so a project whose rules name no file is judged on
+the component facts alone, as before.
 
 After adding a rule, run `check --format json` with no base and read what it reports: a
 rule that reports nothing may be right, or may name a fact that never matches, and one
@@ -276,6 +284,9 @@ What a pass here does not show, beside the limits below:
 - **Only what the index script sees.** The facts come from the catalog and from `import`
   statements. An import made at run time from a name in a string breaks no rule. Neither
   does a call through a registry.
+- **A renamed file is a new fact.** A rule that names a file fact sees a moved or renamed
+  file as another file. Against a base, a line that was standing can come back as new
+  after a rename; say so in the PR body and go on. Rules over components are not affected.
 - **Component ids, not folders.** A module that sits in `tools/` and is listed under a
   `platform.*` component counts as `platform`. If a line looks wrong, check which entry
   owns the two files before changing the code.
