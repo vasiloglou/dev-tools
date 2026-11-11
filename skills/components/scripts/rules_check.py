@@ -90,6 +90,14 @@ STARTER_RULES = {'rules': [
      'antecedent': [{'fact_type': 'component_has_status', 'bind': {'component': '$a', 'status': 'canonical'}}],
      'consequent': {'exists': {'atoms': [{'fact_type': 'component_has_test',
                                           'bind': {'component': '$a', 'path': '$test'}}]}}},
+    {'id': 'private_module_stays_in_its_component', 'level': 'should',
+     'remedy': 'A file imports a private file (its name starts with _) of another component: import what '
+               'that component offers, or move the file to the component that uses it',
+     'type': 'guarded',
+     'antecedent': [{'fact_type': 'module_imports', 'bind': {'importer': '$a', 'imported': '$b'}},
+                    {'fact_type': 'module_is_private', 'bind': {'path': '$b'}},
+                    {'fact_type': 'component_has_module', 'bind': {'component': '$c', 'path': '$b'}}],
+     'consequent': {'atom': {'fact_type': 'component_has_module', 'bind': {'component': '$c', 'path': '$a'}}}},
     {'id': 'plan_names_the_components_it_touches', 'about': 'plans', 'level': 'should',
      'remedy': 'A task changes a file of a component the plan does not name: add the component to the '
                "plan's reuse: line, or to new_component: if the plan creates it",
@@ -204,6 +212,13 @@ def population(doc: dict) -> dict:
     return {'format_version': 2, 'facts': doc['facts'], 'population': header}
 
 
+def named_facts(value) -> set:
+    """Every fact type a rule names, wherever in it."""
+    if isinstance(value, dict):
+        return {v for k, v in value.items() if k == 'fact_type' and isinstance(v, str)} | named_facts(list(value.values()))
+    return set().union(*map(named_facts, value)) if isinstance(value, list) else set()
+
+
 def run(command: list, what: str, **options) -> subprocess.CompletedProcess:
     try:
         return subprocess.run(command, capture_output=True, text=True, **options)
@@ -311,9 +326,14 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
         return int(require)
     rules = [rule for rule in load_rules(root) if rule.get('about', 'components') == 'components']
     head = read_facts(root)
+    # The facts about files are asked for only when a rule names one: a file path in a fact
+    # makes a renamed file a new fact, which a project whose rules name no file is spared.
+    modules = bool(named_facts(rules) - set(head['types']['facts']))
+    if modules:
+        head = read_facts(root, modules=True)
     notes, before, old = [], None, None
     if base:
-        before = read_facts(root, base)
+        before = read_facts(root, base, modules)
         if before['facts']['component_is_listed']:
             old = {(row['caller'], row['callee']): row['imports'] for row in before['evidence']['component_uses']}
         else:
