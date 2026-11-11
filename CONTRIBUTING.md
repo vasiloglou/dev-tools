@@ -38,6 +38,11 @@ project that takes the next update. The bar is the same for prose as for code.
 - **The page that describes it is updated too.** The site is plain HTML in `docs/`, with
   no build step. A change in behaviour and its description go in the same pull request.
 
+## License
+
+The project is under the [Apache License 2.0](LICENSE). A contribution you submit is
+taken under the same license, as its section 5 says, with no separate agreement to sign.
+
 ## How `main` is protected
 
 - Changes arrive by pull request with an approving review.
