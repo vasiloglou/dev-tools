@@ -142,3 +142,9 @@ uv run --no-project --with pytest python -m pytest tests -q
 Contributions come in as pull requests from a fork. `main` takes changes only through a
 pull request, and the maintainer reviews and merges each one. See
 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[Apache License 2.0](LICENSE). You may copy the skills and scripts into your own
+project, change them and redistribute them; keep a copy of the license and of the
+[NOTICE](NOTICE) file with what you redistribute.
