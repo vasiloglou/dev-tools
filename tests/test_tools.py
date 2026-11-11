@@ -256,6 +256,45 @@ def test_the_skill_check_can_be_limited_to_what_the_sync_delivered(project):
     assert any("receipt is missing" in i["message"] for i in env["data"]["issues"])
 
 
+def test_a_slug_that_starts_with_a_digit_is_reported(project):
+    phase(project, "setup")
+    road = project / ".planning/ROADMAP.md"
+    road.write_text("# Roadmap\n" + PHASE_BLOCK % (1, "Two factor", "2-factor-auth", "not_started"))
+    code, env = phase(project, "check", "--roadmap")
+    assert code == 1 and "p01_2_factor_auth reads as the tests of an inserted phase" in env["data"]["issues"][0]["message"]
+    road.write_text("# Roadmap\n" + PHASE_BLOCK % (1, "Two factor", "two-factor-auth", "not_started"))
+    assert phase(project, "check", "--roadmap")[0] == 0
+
+
+def test_status_asks_nothing_of_a_phase_finished_under_another_process(project):
+    phase(project, "setup")
+    block = PHASE_BLOCK % (1, "Scan", "scan", "complete")
+    road = project / ".planning/ROADMAP.md"
+    road.write_text("# Roadmap\n" + block + PHASE_BLOCK % (2, "Report", "report", "not_started"))
+    state(project, current_phase='"02"', completed_phases='"01"')
+    code, env = phase(project, "status", "--phase", "1")
+    assert len(env["data"]["missing"]) == 6, "a phase of this process is asked for its files"
+    road.write_text(road.read_text().replace(
+        "- **Acceptance tests (written first):** `tests/acceptance/`",
+        "- **Acceptance tests:** none: the phase was finished under GSD", 1))
+    code, env = phase(project, "status", "--phase", "1")
+    assert env["data"]["phase_status"] == "complete" and env["data"]["missing"] == []
+
+
+def test_every_plan_needs_its_own_summary(project):
+    phase(project, "setup")
+    phase(project, "init", "--phase", "1")
+    folder = next((project / ".planning/phases").glob("01-*"))
+    for name in ("01-01-PLAN.md", "01-02-PLAN.md", "01-01-SUMMARY.md"):
+        (folder / name).write_text("# x\n")
+    state(project, phase_status="implemented")
+    code, env = phase(project, "status")
+    assert "01-02-SUMMARY.md" in env["data"]["missing"], "one summary does not stand for two plans"
+    (folder / "01-02-SUMMARY.md").write_text("# x\n")
+    code, env = phase(project, "status")
+    assert not [name for name in env["data"]["missing"] if "SUMMARY" in name]
+
+
 def test_setup_refuses_a_plan_written_in_another_format(project):
     planning = project / ".planning"
     planning.mkdir()

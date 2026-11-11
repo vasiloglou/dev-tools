@@ -284,8 +284,8 @@ def test_requirements_become_rows_with_the_old_id_inside_the_new_one(project):
     assert "| REQ-SCAN-02 | A folder that cannot be read is reported / not skipped | U01 | 1 | Validated |" in text, \
         "a '|' in the text would shift the row's cells"
     assert "| REQ-DUPE-02 | A second run reuses the hashes of unchanged files | U02 | 2.1 | Planned |" in text
-    assert "| REQ-OUT-04 | User can export the result as JSON | U03 | 4 | Planned |" in text, \
-        "an id the phase tool cannot read (OUT-02a) gets the next free number of its family"
+    assert "| REQ-OUT-04 | User can export the result as JSON (GSD id: OUT-02a) | U03 | 4 | Planned |" in text, \
+        "an id the phase tool cannot read (OUT-02a) gets the next free number of its family, and the row names the old id"
     assert "- **REQ-OUT-03** (open) User can choose the columns" in text, "no phase names it: not a table row"
     assert "- **SYNC-01** User can delete duplicates in place" in text
 
@@ -624,3 +624,156 @@ def test_the_survey_names_the_skill_check_setting_when_other_skills_are_there(pr
     install(project)
     code, out = run("survey", "--project", str(project))
     assert "(1 skill or agent file(s) here" in out, "what the sync delivered is not counted"
+
+
+def edit(project, name, old, new):
+    path = project / ".planning" / name
+    assert old in path.read_text(), old
+    path.write_text(path.read_text().replace(old, new))
+
+
+def test_a_folder_slug_that_starts_with_a_digit_is_not_the_phases_slug(project):
+    write(project / ".planning", "phases/04-2-way-export/04-CONTEXT.md", "# Context\n")
+    install(project)
+    code, out = run("convert", "--project", str(project))
+    assert code == 0, out
+    block = (project / ".planning/ROADMAP.md").read_text().split("## Phase 4:")[1]
+    assert "- **Slug:** export\n" in block and "p04_export/" in block, \
+        "tests/acceptance/p04_2_way_export would be read as the tests of phase 4.2"
+    assert "phase 4: the slug is 'export'" in (project / ".planning/archive/gsd/CONVERSION.md").read_text()
+    git(project, "add", "-A")
+    assert phase(project, "check", "--all")[0] == 0
+
+
+def test_only_requirement_ids_are_read_from_a_roadmap_line(project):
+    edit(project, "ROADMAP.md", "**Requirements**: OUT-02a",
+         "**Requirements**: OUT-01 through OUT-03, as the v1-2 notes for gpt-5 say; and GHOST-07")
+    edit(project, "REQUIREMENTS.md", "- [ ] **OUT-03**", "- [ ] **OUT-02**: User can page the result\n- [ ] **OUT-03**")
+    code, out = run("survey", "--project", str(project))
+    assert "1 requirement id(s) are named by the GSD roadmap and defined in no GSD file (GHOST-07)" in out
+    run("convert", "--project", str(project))
+    block = (project / ".planning/ROADMAP.md").read_text().split("## Phase 4:")[1]
+    assert "- **Requirements:** REQ-OUT-01, REQ-OUT-02, REQ-OUT-03, REQ-GHOST-07\n" in block, \
+        "'through' names the id in between; v1-2 and gpt-5 are not ids"
+    assert "REQ-V-" not in block and "REQ-GPT-" not in block
+
+
+def test_a_list_of_plans_is_not_read_as_exit_criteria(project):
+    edit(project, "ROADMAP.md", "**Goal:** A user can read the result\n",
+         "**Goal:** A user can read the result\n**Success Criteria**:\n  1. The report prints\n"
+         "- [ ] 03-01-PLAN.md — the printer\n- [ ] 03-02: the pager\n")
+    report = next(p for p in gsd.build(project)["phases"] if p["id"] == "03")
+    assert report["criteria"] == ["The report prints"]
+
+
+def test_a_heading_with_a_word_before_phase_is_not_that_phase(project):
+    edit(project, "ROADMAP.md", "### Phase 3: Report\n",
+         "### Workstream Phase 2: Something Else\n\n**Goal**: Not this\n\n### ✅ Phase 3: Report\n")
+    phases = {p["id"]: p for p in gsd.build(project)["phases"]}
+    assert phases["02"]["title"] == "Find Duplicates" and phases["02"]["goal"] == "A user can see which files are copies"
+    assert phases["03"]["goal"] == "A user can read the result", "a mark before 'Phase' is still read"
+
+
+def test_a_requirement_goes_on_only_on_its_very_next_lines(project):
+    edit(project, "REQUIREMENTS.md", "- [ ] **OUT-03**: User can choose the columns\n",
+         "- [ ] **OUT-03**: User can choose the columns\n  and their order\n\n  Indented remark about the whole list.\n")
+    rows = gsd.build(project)["rows"] + gsd.build(project)["loose"]
+    assert next(r for r in rows if r["gsd"] == "OUT-03")["text"] == "User can choose the columns and their order"
+
+
+def test_a_phase_listed_twice_in_other_words_is_not_a_restart(project):
+    edit(project, "ROADMAP.md", "## Phase Details\n",
+         "### Milestone v1.1\n\n- [ ] **Phase 3: Report the Findings** - listed again\n\n## Phase Details\n")
+    code, out = run("survey", "--project", str(project))
+    assert code == 0 and "uses phase numbers twice" not in out, out
+    assert len(gsd.build(project)["phases"]) == 5
+
+    edit(project, "ROADMAP.md", "- [ ] **Phase 3: Report the Findings**", "- [ ] **Phase 3: Cloud Upload**")
+    code, out = run("survey", "--project", str(project))
+    assert code == 2 and 'phase 3 is "Report" and later "Cloud Upload"' in out and "--numbering same" in out, out
+    code, out = run("survey", "--project", str(project), "--numbering", "same")
+    assert code == 0 and "Phases: 5" in out, "the owner says they are one run: no phase is left out"
+
+
+def test_a_move_that_stopped_half_way_says_so(project):
+    archive = project / ".planning/archive/gsd"
+    archive.mkdir(parents=True)
+    for name in ("STATE.md", "ROADMAP.md", "PROJECT.md", "config.json"):
+        shutil.move(str(project / ".planning" / name), str(archive / name))
+    code, out = run("convert", "--project", str(project))
+    assert code == 2 and "an earlier run stopped half way" in out and "git checkout -- .planning" in out, out
+    assert "not a GSD project" not in out
+
+
+def test_state_is_the_last_file_the_move_writes(project, monkeypatch):
+    order = []
+    real = Path.write_text
+
+    def spy(self, *args, **kwargs):
+        order.append(self.name)
+        return real(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", spy)
+    gsd.convert(gsd.build(project))
+    assert order[-1] == "STATE.md" and "CONVERSION.md" in order, \
+        "a run that stops early leaves no dev-tools state, so the next run can tell"
+
+
+def test_the_survey_finds_gsd_in_any_tools_folder_and_the_settings_that_call_it(project):
+    write(project, ".cursor/skills/gsd-plan-phase/SKILL.md", "---\nname: gsd-plan-phase\n---\n")
+    write(project, ".claude/settings.json", '{"hooks": {"Stop": [{"command": "node .claude/hooks/gsd-check-update.js"}]}}')
+    write(project, ".claude/settings.local.json",
+          '{"statusLine": {"command": "node .claude/hooks/gsd-statusline.js"}, "x": "gsd-context-monitor.js"}')
+    write(project, ".gitignore", "settings.local.json\n")
+    git(project, "add", "-A")
+    code, out = run("survey", "--project", str(project))
+    assert "  .cursor/: 1 file(s), found by name (skills)" in out
+    assert "  .claude/settings.json calls GSD 1 time(s): take those lines out with the files" in out
+    assert "  .claude/settings.local.json calls GSD 2 time(s) and git does not track it" in out
+    assert "Tell the team to take the GSD lines out of theirs" in out
+    assert run("survey", "--project", str(project), "--installed")[1].strip() == ".cursor/skills/gsd-plan-phase/SKILL.md"
+
+
+def test_what_gsd_says_elsewhere_is_carried(project):
+    edit(project, "REQUIREMENTS.md", "| OUT-01 | Phase 3 | Pending |\n",
+         "| OUT-01 | Phase 3 | Pending |\n| OUT-03 | Phase 4 | Pending |\n\n## Out of Scope\n\n"
+         "| Feature | Reason |\n|---------|--------|\n| Cloud sync | Local files only |\n")
+    edit(project, "ROADMAP.md", "# Roadmap: Widget\n", "# Roadmap: Widget v9.9\n")
+    run("convert", "--project", str(project))
+    road = (project / ".planning/ROADMAP.md").read_text()
+    assert "- **Requirements:** REQ-OUT-04, REQ-OUT-03\n" in road.split("## Phase 4:")[1], \
+        "OUT-03 is phase 4's by GSD's traceability table only"
+    assert "v9.9" not in road, "the roadmap's title is not a milestone"
+    text = (project / ".planning/REQUIREMENTS.md").read_text()
+    assert "## Out of scope under GSD" in text and "- Cloud sync: Local files only\n" in text
+
+
+def test_a_phase_nobody_has_cannot_be_named_complete_or_open(project):
+    code, out = run("survey", "--project", str(project), "--complete", "3,9")
+    assert code == 2 and "--complete names phase 9" in out, out
+    code, out = run("survey", "--project", str(project), "--open", "12")
+    assert code == 2 and "--open names phase 12" in out, out
+
+
+def test_the_phase_gsd_names_as_current_is_the_current_one(project):
+    edit(project, "ROADMAP.md", "**Depends on**: Phase 3\n", "**Depends on**: Phase 1\n")
+    assert gsd.build(project)["current"]["id"] == "02.1", "by the roadmap alone"
+    edit(project, "STATE.md", "# Project State\n", "# Project State\n\n## Current Position\n\nPhase: 4 of 4 (Export)\n")
+    model = gsd.build(project)
+    assert model["current"]["id"] == "04"
+    assert any("GSD's STATE.md names phase 4 as the current one" in note for note in model["notes"])
+    edit(project, "ROADMAP.md", "**Depends on**: Phase 1\n**Requirements**: OUT-02a", "**Depends on**: Phase 3\n**Requirements**: OUT-02a")
+    model = gsd.build(project)
+    assert model["current"]["id"] == "02.1" and any("depends on a phase that is not finished" in n for n in model["notes"])
+
+
+def test_a_plan_of_another_tool_is_named_and_not_sent_to_setup(tmp_path):
+    root = tmp_path / "other"
+    write(root, ".planning/ROADMAP.md", "# Plan\n\n1. Build it\n")
+    write(root, ".specify/memory/constitution.md", "# Constitution\n")
+    code, out = run("survey", "--project", str(root))
+    assert code == 2 and "this is not a GSD project" in out
+    assert "It holds ROADMAP.md in another format" in out and "Coming from another planning tool" in out
+    assert "Spec Kit keeps a plan here (.specify/)" in out and "phase_tool.py setup" not in out
+    write(tmp_path / "bare", ".planning/notes.txt", "x")
+    assert "starts with 'phase_tool.py setup'" in run("survey", "--project", str(tmp_path / "bare"))[1]

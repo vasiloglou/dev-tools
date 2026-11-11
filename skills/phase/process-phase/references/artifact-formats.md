@@ -26,7 +26,7 @@ These formats are parsed by `phase_tool.py`. Keep them exact.
 tests/acceptance/pNN_<slug_with_underscores>/   test_<capability>.py, pNN_helpers.py, conftest.py
 ```
 
-Acceptance directories replace `-` with `_` in the phase slug: slug `data-import` in phase 4 gives `p04_data_import`. Give test files names that are unique across phases (for example `test_p04_import.py`), or give each package an `__init__.py`: pytest otherwise refuses two test files with the same base name.
+Acceptance directories replace `-` with `_` in the phase slug: slug `data-import` in phase 4 gives `p04_data_import`. A slug starts with a letter: `p04_2_way` would read as the tests of inserted phase 4.2, and `check` reports such a slug. Give test files names that are unique across phases (for example `test_p04_import.py`), or give each package an `__init__.py`: pytest otherwise refuses two test files with the same base name.
 
 ## STATE.md
 

@@ -287,7 +287,9 @@ def cmd_apply(args) -> int:
                 print(error, file=sys.stderr)
                 code = 1
             if code != 0:
-                print(f"after_apply failed: {command}", file=sys.stderr)
+                print(f"after_apply failed: {command}\n"
+                      f"If the entry that delivered what it runs is no longer in the config, take the line out too.",
+                      file=sys.stderr)
                 print("the files and the receipt are written; run the command by hand once it works", file=sys.stderr)
                 return 4
     return 0
@@ -404,6 +406,34 @@ def walk_project(project: Path):
             files.update(found)
             links.update(linked)
     return sorted(files), sorted(links)
+
+
+# Signs of a plan kept by a planning tool other than GSD: (what to look for, the tool).
+OTHER_PLANS = [(".specify", "Spec Kit"), ("specs/*/spec.md", "Spec Kit"), ("openspec", "OpenSpec"),
+               (".kiro/specs", "Kiro"), (".bmad-core", "BMAD"), ("bmad", "BMAD"), (".taskmaster", "Task Master"),
+               (".agent-os", "Agent OS")]
+
+
+def other_plans(project: Path, planning: Path | None = None) -> list[tuple[str, str]]:
+    """(path, tool) for each other planning tool whose files are here, and for a planning
+    folder that holds a roadmap or a state the phase tool did not write."""
+    found = {}
+    for pattern, tool in OTHER_PLANS:
+        hit = next(iter(sorted(project.glob(pattern))), None)
+        if hit is not None:
+            found.setdefault(tool, hit.relative_to(project).as_posix() + ("/" if hit.is_dir() else ""))
+    out = [(sign, tool) for tool, sign in found.items()]
+    if planning is not None:
+        try:
+            state = (planning / "STATE.md").read_text(encoding="utf-8") if (planning / "STATE.md").is_file() else None
+            roadmap = (planning / "ROADMAP.md").read_text(encoding="utf-8") if (planning / "ROADMAP.md").is_file() else None
+        except (OSError, UnicodeDecodeError):
+            state = roadmap = None
+        foreign = (state is not None and not re.search(r"(?m)^current_phase:", state)) or \
+            (roadmap is not None and not re.search(r"(?m)^## Phase \d", roadmap))
+        if foreign:
+            out.append((planning.relative_to(project).as_posix() + "/", "a plan in a format the phase tool does not read"))
+    return out
 
 
 def related(name: str, shipped: str) -> bool:
@@ -533,6 +563,12 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
         lines += ["", "## A planning folder written by GSD",
                   ".planning/: its plan is moved with devtools/from_gsd.py (skills/move-from-gsd/SKILL.md), "
                   "not by the sync and not by `phase_tool.py setup`"]
+    others = other_plans(project, planning if not gsd else None)
+    if others:
+        lines += ["", "## A plan kept by another planning tool"]
+        lines += [f"{sign}: {tool}" for sign, tool in others]
+        lines.append("No tool moves such a plan, and `phase_tool.py setup` refuses a folder that holds one. "
+                     "skills/adopt-devtools/SKILL.md, \"Coming from another planning tool\", says how it is carried by hand")
     lines += ["", "## Counterparts: the project's copy of something dev-tools ships"]
     for unit in have:
         lines.append(unit["source"])

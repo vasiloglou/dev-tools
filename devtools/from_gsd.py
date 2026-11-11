@@ -39,8 +39,15 @@ RUNTIMES = [".claude", ".codex", ".opencode", ".gemini", ".agents"]
 INSTALLED = ["get-shit-done", "gsd-core", "commands/gsd", "commands/gsd-*", "agents/gsd-*", "hooks/gsd-*",
              "skills/gsd-*", "GSD-SETUP.md", "gsd-file-manifest.json"]
 INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"]
+# Folders at the top of a project that are never a coding tool's own.
+NOT_A_TOOL = {".git", ".planning", ".venv", ".tox", ".idea", ".vscode", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+HOOK_FILES = ["settings.json", "settings.local.json", "hooks.json"]
+# Signs of a plan kept by another tool: (what to look for, the tool).
+OTHER_PLANS = [(".specify", "Spec Kit"), ("specs/*/spec.md", "Spec Kit"), ("openspec", "OpenSpec"),
+               (".kiro/specs", "Kiro"), (".bmad-core", "BMAD"), ("bmad", "BMAD"), (".taskmaster", "Task Master"),
+               (".agent-os", "Agent OS")]
 
-HEAD = re.compile(r"^(#{2,4})\s+(?:\S+\s+)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\s*$")
+HEAD = re.compile(r"^(#{2,4})\s+(?:[^\w\s]+\s+)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\s*$")
 ITEM = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(\*\*)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+)$")
 FIELD = re.compile(r"^\*\*([A-Za-z ]+?)(?:\*\*\s*:|:\*\*)\s*(.*)$")
 VERSION = re.compile(r"\bv\d+(?:\.\d+)+\b")
@@ -48,6 +55,8 @@ REQ_BULLET = re.compile(r"^\s*[-*]\s+(?:\[([ xX])\]\s+)?\*\*([A-Za-z][A-Za-z0-9-
 TRACE_ROW = re.compile(r"^\|\s*([A-Za-z][A-Za-z0-9-]*-\d+[a-z]?)\s*\|\s*([^|]*)\|")
 SIMPLE_ID = re.compile(r"^(?:REQ-)?([A-Za-z][A-Za-z0-9-]*?)-(\d+)$")
 FOLDER = re.compile(r"^(\d+(?:\.\d+)?)-(.+)$")
+REQ_ID = r"[A-Za-z][A-Za-z0-9-]*-\d+[a-z]?"
+GSD_ID = re.compile(r"[A-Z][A-Z0-9]*(?:-[A-Z][A-Z0-9]*)*-\d+[a-z]?")  # the way GSD writes an id: AUTH-01
 NUMBER = r"\d+(?:\.\d+)?"
 # Words by which a GSD roadmap says a phase is not in the queue.
 PARKED_WORDS = "paused|deferred|backlog|parked|on hold|superseded|cancell?ed|dropped|abandoned|postponed"
@@ -167,17 +176,37 @@ def dependencies(text: str) -> tuple:
     return carried, [n for n in phase_numbers(text) if n not in carried]
 
 
+def same_phase(one: str, other: str) -> bool:
+    """Two titles of one phase number name the same phase: equal, or sharing half their words.
+    A roadmap may list a phase twice in other words; a restarted numbering gives another phase."""
+    def words(title):
+        return {w for w in re.findall(r"[a-z0-9]+", title.lower()) if len(w) > 2}
+    a, b = words(one), words(other)
+    return one.lower() == other.lower() or (bool(a & b) and 2 * len(a & b) >= min(len(a), len(b)))
+
+
 def runs(found: list) -> list:
     """Split phases in file order into numbering runs: a run ends where a number comes back
-    with another title, which is how a milestone that restarted its numbering shows."""
+    as another phase, which is how a milestone that restarted its numbering shows."""
     out, current = [], {}
     for entry in found:
         old = current.get(entry["id"])
-        if old is not None and old["title"].lower() != entry["title"].lower():
+        if old is not None and not same_phase(old["title"], entry["title"]):
             out.append(current)
             current = {}
         current[entry["id"]] = entry
     return out + [current] if current else out
+
+
+def one_run(groups: list) -> dict:
+    """Every run read as one: the owner said the repeated numbers are the same phases."""
+    merged = {}
+    for run in groups:
+        for nn, entry in run.items():
+            if nn in merged and "done" in entry:
+                merged[nn] = dict(merged[nn], done=merged[nn]["done"] or entry["done"])
+            merged.setdefault(nn, entry)
+    return merged
 
 
 def read_roadmap(text: str) -> tuple:
@@ -185,7 +214,7 @@ def read_roadmap(text: str) -> tuple:
     lines = text.splitlines()
     items, heads, milestone, scope = [], [], "", ""
     for i, line in enumerate(lines):
-        if (line.startswith("#") or line.startswith("**") or "<summary>" in line) and not HEAD.match(line):
+        if (line.startswith("##") or line.startswith("**") or "<summary>" in line) and not HEAD.match(line):
             found = VERSION.search(line)
             milestone = found.group(0) if found else milestone
         if "<summary>" in line or (line.startswith("#") and not HEAD.match(line)):
@@ -213,15 +242,17 @@ def read_roadmap(text: str) -> tuple:
             if re.match(r"^#{1,%d}\s" % level, body) or HEAD.match(body):
                 break
             fm = FIELD.match(body)
-            if body.lower().startswith("**success criteria"):
+            if re.match(r"^\s*[-*]\s+\[[ xX]\]\s+\S*(?:PLAN\.md|\d+-\d+\b)", body):
+                plans, in_criteria = plans + 1, False  # GSD's list of plans, wherever it stands
+            elif body.lower().startswith("**success criteria"):
                 in_criteria = True
             elif fm:
                 in_criteria = fm.group(1).strip().lower().startswith("success criteria")
                 fields.setdefault(fm.group(1).strip().lower(), fm.group(2).strip())
             elif in_criteria and re.match(r"^\s*(?:\d+\.|[-*])\s+\S", body):
                 criteria.append(plain(re.sub(r"^\s*(?:\d+\.|[-*])\s+", "", body)))
-            elif re.match(r"^\s*[-*]\s+\[[ xX]\]\s+\S*PLAN\.md", body):
-                plans += 1
+            elif in_criteria and body.strip() and not body[0].isspace():
+                in_criteria = False  # "Plans:" or a paragraph: the list is over
         heads.append({"id": norm(m.group(2)), "title": plain(m.group(3)), "fields": fields,
                       "criteria": criteria, "plans": plans, "parked": parked(line) or scope, "line": i + 1})
     return runs(items), runs(heads)
@@ -266,19 +297,23 @@ def left_by_gsd(folder) -> str:
 
 def read_requirements(planning: Path) -> dict:
     """Requirements GSD tracks now, those it put off, and every definition in the archives."""
-    current, later, where, group = [], [], {}, ""
+    current, later, where, group, last = [], [], {}, "", None
     text = read(planning / "REQUIREMENTS.md")
     for line in text.splitlines():
         if line.startswith("#"):
-            group = plain(line.lstrip("#"))
+            group, last = plain(line.lstrip("#")), None
             continue
         m = REQ_BULLET.match(line)
         if m and m.group(1) is not None:
             current.append({"gsd": m.group(2), "text": plain(m.group(3)), "done": m.group(1) != " ", "group": group})
+            last = current[-1]
         elif m:
             later.append({"gsd": m.group(2), "text": plain(m.group(3)), "group": group})
-        elif current and line.startswith("  ") and line.strip() and not later:
-            current[-1]["text"] += " " + plain(line)
+            last = None
+        elif last is not None and line.startswith("  ") and line.strip():
+            last["text"] += " " + plain(line)  # the requirement goes on, on the very next line
+        else:
+            last = None
         t = TRACE_ROW.match(line)
         if t and "---" not in line:
             where.setdefault(t.group(1), []).extend(norm(n) for n in re.findall(r"Phase\s+(\d+(?:\.\d+)?)", t.group(2)))
@@ -288,7 +323,44 @@ def read_requirements(planning: Path) -> dict:
             m = REQ_BULLET.match(line)
             if m:
                 archived.setdefault(m.group(2), {"text": plain(m.group(3)), "file": path.name})
-    return {"current": current, "later": later, "where": where, "archived": archived, "exists": bool(text)}
+    return {"current": current, "later": later, "where": where, "archived": archived, "exists": bool(text),
+            "out": out_of_scope(text)}
+
+
+def out_of_scope(text: str) -> list:
+    """What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section."""
+    body = next((part for head, part in sections(text).items() if head.lower().startswith("out of scope")), "")
+    out = []
+    for line in body.splitlines():
+        if line.lstrip().startswith("|"):
+            cells = [plain(c) for c in row_cells(line)]
+            if cells[0] and not re.fullmatch(r":?-{2,}:?", cells[0]) and cells[0].lower() not in ("feature", "item", "what"):
+                out.append(": ".join(c for c in cells[:2] if c))
+        elif re.match(r"^[-*]\s+\S", line):
+            out.append(plain(re.sub(r"^[-*]\s+", "", line)))
+    return out
+
+
+def named_ids(text: str, defined: set) -> list:
+    """The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one
+    written as GSD writes them (AUTH-01): "v1-2" and "gpt-5" in a sentence are not ids.
+    "OUT-01 through OUT-03" names OUT-02 as well."""
+    out, before = [], None
+
+    def add(name):
+        if name not in out and (name in defined or GSD_ID.fullmatch(name)):
+            out.append(name)
+
+    for found in re.finditer(REQ_ID, text):
+        name = found.group(0)
+        if before and re.fullmatch(r"\s*(?:through|thru|to|–|—|\.\.+)\s*", text[before.end():found.start()], re.I):
+            low, high = before.group(0).rpartition("-"), name.rpartition("-")
+            if low[0] == high[0] and low[2].isdigit() and high[2].isdigit() and int(low[2]) < int(high[2]) <= int(low[2]) + 50:
+                for number in range(int(low[2]) + 1, int(high[2])):
+                    add("%s-%0*d" % (low[0], len(low[2]), number))
+        add(name)
+        before = found
+    return out
 
 
 def row_cells(line: str) -> list:
@@ -361,11 +433,54 @@ def git(project: Path, *args: str) -> str:
     return done.stdout.strip() if done.returncode == 0 else ""
 
 
+def tool_folders(project: Path) -> list:
+    """The folders a coding tool may keep at the top of the project: the ones the skills go to,
+    and every other folder whose name starts with a dot (.cursor, .github, .windsurf ...)."""
+    try:
+        dotted = sorted(p.name for p in project.iterdir() if p.is_dir() and p.name.startswith(".")
+                        and p.name not in NOT_A_TOOL and p.name not in RUNTIMES)
+    except OSError:
+        dotted = []
+    return RUNTIMES + dotted
+
+
+def hook_files(project: Path) -> list:
+    """Settings files that still call GSD: its hooks and status line are wired there, and the
+    files they name go when GSD is taken out. One that git does not track is each developer's own."""
+    out = []
+    for runtime in tool_folders(project):
+        for name in HOOK_FILES:
+            calls = len(re.findall(r"gsd-[a-z0-9-]+|get-shit-done", read(project / runtime / name)))
+            if calls:
+                where = "%s/%s" % (runtime, name)
+                inside = git(project, "rev-parse", "--is-inside-work-tree") == "true"
+                out.append({"file": where, "calls": calls,
+                            "tracked": bool(git(project, "ls-files", "--", where)) if inside else None})
+    return out
+
+
+def other_plans(project: Path) -> list:
+    """Other planning tools whose files are in the project. The move does not read them."""
+    found = {}
+    for pattern, tool in OTHER_PLANS:
+        hit = next(iter(sorted(project.glob(pattern))), None)
+        if hit is not None:
+            found.setdefault(tool, hit.relative_to(project).as_posix() + ("/" if hit.is_dir() else ""))
+    return [{"tool": tool, "sign": sign} for tool, sign in found.items()]
+
+
+def gsd_pointer(state: dict, text: str) -> str:
+    """The phase GSD's STATE.md names as the current one, or ''."""
+    said = re.fullmatch(NUMBER, state.get("current_phase", "").strip())
+    said = said or re.search(r"(?m)^\**Phase\**\s*:\**\s*(%s)\b(?!\s*%%)" % NUMBER, text)
+    return norm(said.group(said.lastindex or 0)) if said else ""
+
+
 def installed(project: Path) -> list:
-    """GSD's own files inside the project, one entry per runtime folder that has any.
+    """GSD's own files inside the project, one entry per tool folder that has any.
     GSD's manifest names them exactly; without one they are found by name."""
     out = []
-    for runtime in RUNTIMES:
+    for runtime in tool_folders(project):
         base = project / runtime
         manifest = base / "gsd-file-manifest.json"
         paths, version = set(), ""
@@ -494,24 +609,48 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
     if "current_phase" in state and "phase_status" in state and "gsd_state_version" not in state:
         raise Stop("%s/STATE.md is already in the dev-tools format: this project has been moved "
                    "(GSD's files, if it had any, are in %s/%s/)" % (planning_dir, planning_dir, ARCHIVE))
+    half = [name for name in MOVED if (planning / ARCHIVE / name).is_file()]
+    if half:
+        raise Stop("%s/%s/ already holds %s and %s/STATE.md is not in the dev-tools format: an earlier run "
+                   "stopped half way. Restore the planning folder from git ('git checkout -- %s' and 'git clean -fd "
+                   "%s', after a look at what they would undo) and run again"
+                   % (planning_dir, ARCHIVE, ", ".join(half), planning_dir, planning_dir, planning_dir))
     if not signs:
-        raise Stop("%s/ has no PROJECT.md, no config.json and no GSD state: this is not a GSD project. "
-                   "A project with no plan starts with 'phase_tool.py setup'" % planning_dir)
+        plan = [name for name in ("ROADMAP.md", "STATE.md", "REQUIREMENTS.md") if (planning / name).is_file()]
+        others = other_plans(project)
+        raise Stop("%s/ has no PROJECT.md, no config.json and no GSD state: this is not a GSD project. %s%s"
+                   % (planning_dir,
+                      ("It holds %s in another format, and no tool moves that: rewrite the plan by hand, as "
+                       "'Coming from another planning tool' in skills/adopt-devtools/SKILL.md says"
+                       % ", ".join(plan)) if plan else "A project with no plan starts with 'phase_tool.py setup'",
+                      "".join(". %s keeps a plan here (%s): the same section covers it" % (o["tool"], o["sign"])
+                              for o in others)))
 
     item_runs, head_runs = read_roadmap(read(planning / "ROADMAP.md"))
+    if numbering == "same":
+        item_runs, head_runs = [one_run(item_runs)] * bool(item_runs), [one_run(head_runs)] * bool(head_runs)
     restarts = max(len(item_runs), len(head_runs)) > 1
     if restarts and numbering not in ("first", "last"):
-        again = sorted({shown(nn) for group in (item_runs, head_runs) for run in group[1:] for nn in run}, key=float)
+        twice = {}
+        for group in (item_runs, head_runs):
+            for i, run in enumerate(group[1:], 1):
+                for nn, entry in run.items():
+                    earlier = next((r[nn] for r in group[:i] if nn in r), None)
+                    if earlier and not same_phase(earlier["title"], entry["title"]):
+                        twice.setdefault(nn, (earlier["title"], entry["title"]))
         raise Stop("the GSD roadmap uses phase numbers twice (%s): a milestone restarted its numbering. "
                    "The phase tool needs each number once. Pass --numbering first or --numbering last to say "
                    "which run of numbers is the roadmap; the other run stays in the archived roadmap. Choose the "
-                   "run whose folders are in %s/phases/" % (", ".join(again[:8]), planning_dir))
+                   "run whose folders are in %s/phases/. If these are the same phases written twice in other "
+                   "words, pass --numbering same"
+                   % ("; ".join("phase %s is \"%s\" and later \"%s\"" % (shown(nn), a[:50], b[:50])
+                                for nn, (a, b) in sorted(twice.items(), key=lambda pair: key(pair[0]))[:6]), planning_dir))
     pick = 0 if numbering == "first" else -1
     items = item_runs[pick] if item_runs else {}
     heads = head_runs[pick] if head_runs else {}
     folders, odd = read_folders(planning)
     if restarts:  # details and folders of the other run of numbers must not be read as this run's
-        heads = {nn: h for nn, h in heads.items() if nn not in items or h["title"].lower() == items[nn]["title"].lower()}
+        heads = {nn: h for nn, h in heads.items() if nn not in items or same_phase(h["title"], items[nn]["title"])}
         if items:
             heads = {nn: h for nn, h in heads.items() if nn in items}
         for nn in sorted(folders):
@@ -521,13 +660,19 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
     reqs = read_requirements(planning)
 
     named = [r["gsd"] for r in reqs["current"]]
+    defined = set(named) | {r["gsd"] for r in reqs["later"]} | set(reqs["archived"]) | set(reqs["where"])
     for head in heads.values():
-        for name in re.findall(r"[A-Za-z][A-Za-z0-9-]*-\d+[a-z]?", head["fields"].get("requirements", "")):
+        for name in named_ids(head["fields"].get("requirements", ""), defined):
             if name not in named:
                 named.append(name)
     ids = map_ids(named)
 
     phases, notes = [], list(odd)
+    for flag, numbers in (("--complete", finished), ("--open", wanted)):  # 25: a number nobody has
+        missing = sorted(numbers - set(items) - set(heads) - set(folders), key=key)
+        if missing:
+            raise Stop("%s names phase %s, and the GSD roadmap and %s/phases/ have no such phase"
+                       % (flag, ", ".join(shown(nn) for nn in missing), planning_dir))
     for nn in sorted(set(items) | set(heads) | set(folders), key=key):
         item, head, folder = items.get(nn), heads.get(nn), folders.get(nn)
         fields = head["fields"] if head else {}
@@ -546,16 +691,21 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
             (item or {}).get("parked") or (head or {}).get("parked") or ("backlog" if key(nn)[0] == 999 else ""))
         title = (head or item or {}).get("title") or folder["slug"].replace("-", " ").capitalize()
         depends, also_named = dependencies(fields.get("depends on", ""))
+        slug = folder["slug"] if folder else slugify(title)
+        if slug[:1].isdigit():  # p07_2_factor_auth would be read as the tests of phase 7.2
+            slug = slugify(title) if slugify(title)[:1].isalpha() else "phase-" + slug
+            notes.append("phase %s: the slug is '%s', because one that starts with a digit would make its tests look "
+                         "like those of an inserted phase%s" % (shown(nn), slug, (
+                             ". The folder phases/%s keeps its name" % folder["name"]) if folder else ""))
         phases.append({
-            "id": nn, "title": title, "slug": folder["slug"] if folder else slugify(title),
+            "id": nn, "title": title, "slug": slug,
             "status": "complete" if done else "not_started", "reason": why if done else left_by_gsd(folder),
             "folder": folder, "source": "roadmap" if head or item else "folder only",
             "milestone": item["milestone"] if item else "", "date": item["date"] if item else "",
             "goal": plain(fields.get("goal", "")) or (item["note"] if item else ""),
             "depends": depends, "also_named": also_named, "depends_text": fields.get("depends on", ""),
             "criteria": head["criteria"] if head else [],
-            "requirements": [ids[n] for n in re.findall(r"[A-Za-z][A-Za-z0-9-]*-\d+[a-z]?",
-                                                        fields.get("requirements", "")) if n in ids],
+            "requirements": [ids[n] for n in named_ids(fields.get("requirements", ""), defined) if n in ids],
             "placeholder": False, "parked": put_off, "moves": [],
         })
     # What GSD put off is not a phase of the new roadmap: the phase tool would make it the next one.
@@ -579,6 +729,11 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
                      "or 'check' reports the roadmap" % ("start at %d" % whole[0] if whole[0] > 1 else "have gaps"))
     phases.sort(key=lambda p: key(p["id"]))
     known, parked_ids = {p["id"] for p in phases}, {p["id"] for p in put_off}
+    by_id = {p["id"]: p for p in phases}
+    for name, places in reqs["where"].items():
+        for nn in places:
+            if name in ids and nn in by_id and ids[name] not in by_id[nn]["requirements"]:
+                by_id[nn]["requirements"].append(ids[name])
     for p in phases:
         lost = [d for d in p["depends"] if d in parked_ids]
         extra = [d for d in p["also_named"] if d in known and key(d) < key(p["id"])]
@@ -599,6 +754,15 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
                                                     or p["folder"]["summaries"])]
     ready = {p["id"] for p in open_ if all(d in done_ids for d in p["depends"])}
     order = [p for p in started if p["id"] in ready] + [p for p in open_ if p["id"] in ready] + started + open_
+    pointer = gsd_pointer(state, read(planning / "STATE.md"))
+    pointed = [p for p in open_ if p["id"] == pointer]
+    if pointed and pointed[0]["id"] in ready and order[0] is not pointed[0]:
+        notes.append("GSD's STATE.md names phase %s as the current one, so it is the current phase here; by the "
+                     "roadmap alone it would have been phase %s" % (shown(pointer), shown(order[0]["id"])))
+        order = pointed + order
+    elif pointed and pointed[0]["id"] not in ready:
+        notes.append("GSD's STATE.md names phase %s as the current one, and it depends on a phase that is not "
+                     "finished: phase %s is the current phase here" % (shown(pointer), shown(order[0]["id"])))
     current = (order or phases[-1:] or [None])[0]
     if current and current["status"] != "complete" and current["folder"] and current["folder"]["context"]:
         current["status"] = "context_approved"
@@ -648,11 +812,13 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
             groups.append(r["group"])
         (rows if where else loose).append(entry)
     seen = {r["id"] for r in rows} | {r["id"] for r in loose}
+    undefined = []
     for name in named:
         if ids[name] in seen or ids[name] not in by_phase:
             continue
-        old = reqs["archived"].get(name)
+        old = reqs["archived"].get(name) or next((r for r in reqs["later"] if r["gsd"] == name), None)
         text = old["text"] if old else "Named by the GSD roadmap; its text is not in the GSD requirement files"
+        undefined += [] if old else [name]
         group = "Carried from earlier GSD milestones"
         if group not in groups:
             groups.append(group)
@@ -660,6 +826,16 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
         rows.append({"gsd": name, "id": ids[name], "text": text, "done": done, "group": group,
                      "phases": sorted(set(by_phase[ids[name]]), key=key)})
     used_groups = [g for g in groups if any(r["group"] == g for r in rows)]
+    if undefined:
+        notes.append("%d requirement id(s) are named by the GSD roadmap and defined in no GSD file (%s%s). Each has a "
+                     "row that says so: write its text, or delete the row and the id from its phase"
+                     % (len(undefined), ", ".join(undefined[:8]), ", ..." if len(undefined) > 8 else ""))
+    hooks = hook_files(project)
+    private = [h["file"] for h in hooks if h["tracked"] is False]
+    if private:
+        notes.append("%s call(s) GSD and git does not track %s: each developer has their own copy, and it goes on "
+                     "calling GSD's files after they are removed. Tell the team to take the GSD lines out of theirs"
+                     % (", ".join(private), "it" if len(private) == 1 else "them"))
 
     # GSD may keep more than one plan in a project, and the move reads one.
     streams = read_workstreams(root)
@@ -712,6 +888,7 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
         "signs": signs, "state": state, "phases": phases, "parked": put_off, "current": current, "notes": notes,
         "restarts": restarts, "numbering": numbering, "ids": ids, "rows": rows, "loose": loose,
         "later": reqs["later"], "groups": used_groups, "has_requirements": reqs["exists"],
+        "out": reqs["out"], "hooks": hooks, "undefined": undefined, "elsewhere": other_plans(project),
         "info": read_project(planning, root if in_workstream else None), "plans": plans, "other_plans": others,
         "base": base, "ignored": ignored, "code": code,
         "install": installed(project), "mentions": {k: v for k, v in mentions.items() if v},
@@ -789,7 +966,8 @@ def requirements_text(model: dict) -> str:
     out += ["", "## What the project must do", "",
             "The **Phase** column names the roadmap phase that delivers the requirement. The last",
             "column is `Planned` until that phase is complete, then `Validated`. Ids are GSD's with",
-            "`REQ-` in front, so a search for the old id still finds the row.", "",
+            "`REQ-` in front, so a search for the old id still finds the row; an id GSD wrote another",
+            "way has the old id at the end of its row.", "",
             "| Id | Requirement | Need | Phase | Status |", "|---|---|---|---|---|"]
     if not model["rows"]:
         first = model["phases"][0]["id"] if model["phases"] else "01"
@@ -799,7 +977,8 @@ def requirements_text(model: dict) -> str:
                    "what was built is in the archived roadmaps | U01 | %s | %s |"
                    % (shown(first), "Validated" if model["phases"] and model["phases"][0]["status"] == "complete" else "Planned"))
     for r in model["rows"]:
-        out.append("| %s | %s | %s | %s | %s |" % (r["id"], cell(r["text"]), u_of[r["group"]],
+        was = "" if r["gsd"].upper() in r["id"] else " (GSD id: %s)" % r["gsd"]
+        out.append("| %s | %s | %s | %s | %s |" % (r["id"], cell(r["text"]) + was, u_of[r["group"]],
                                                    ", ".join(shown(nn) for nn in r["phases"]),
                                                    "Validated" if r["done"] else "Planned"))
     if model["loose"]:
@@ -810,6 +989,9 @@ def requirements_text(model: dict) -> str:
     if model["later"]:
         out += ["", "## Put off under GSD", "", "Kept as GSD wrote them. They are not requirements until a phase takes them.", ""]
         out += ["- **%s** %s" % (r["gsd"], r["text"]) for r in model["later"]]
+    if model["out"]:
+        out += ["", "## Out of scope under GSD", "", "What GSD's `REQUIREMENTS.md` ruled out, as it wrote it.", ""]
+        out += ["- " + line for line in model["out"]]
     return "\n".join(out) + "\n"
 
 
@@ -1023,14 +1205,16 @@ def convert(model: dict, owner: str = "", base: str = "", release: str = "", too
         target = planning / "phases" / phase_folder / "gsd"
         target.mkdir(exist_ok=True)
         shutil.move(str(planning / "phases" / phase_folder / filename), str(target / filename))
-    for filename, text in files.items():
-        (planning / filename).write_text(text, encoding="utf-8")
     for filename, text in drafts.items():
         if filename not in kept:
             (planning / filename).write_text(text, encoding="utf-8")
     for filename, draft in merged:
         (planning / draft).write_text(drafts[filename], encoding="utf-8")
     (archive / "CONVERSION.md").write_text(record_text(model, written, kept, merged, today), encoding="utf-8")
+    # STATE.md goes last: it is what says the move was made. A run that stops before it leaves
+    # GSD's files in the archive and no state, which the next run reports as a move half made.
+    for filename in sorted(files, key=lambda name: name == "STATE.md"):
+        (planning / filename).write_text(files[filename], encoding="utf-8")
     result["written"].append("%s/CONVERSION.md" % ARCHIVE)
     return result
 
@@ -1080,6 +1264,8 @@ def survey_lines(model: dict) -> list:
             "Needs (U rows), one per GSD group: %d" % (len(model["groups"]) or 1),
             "Decisions carried from PROJECT.md: %d" % len(model["info"]["decisions"]),
             "Constraints carried into MANIFESTO.md: %d" % len(model["info"]["constraints"])]
+    if model["out"]:
+        out.append("Out-of-scope items carried into REQUIREMENTS.md: %d" % len(model["out"]))
     changed = sorted(pair for pair in model["ids"].items())[:3]
     if changed:
         out.append("Requirement ids: " + ", ".join("%s -> %s" % pair for pair in changed) + (", ..." if len(model["ids"]) > 3 else ""))
@@ -1109,6 +1295,12 @@ def survey_lines(model: dict) -> list:
             "named by GSD's manifest" if found["by_manifest"] else "found by name", ", ".join(tops[:8])))
     if model["install"]:
         out.append("  'survey --installed' prints every path")
+    for hook in model["hooks"]:
+        out.append("  %s calls GSD %d time(s)%s" % (hook["file"], hook["calls"], {
+            True: ": take those lines out with the files", None: "",
+            False: " and git does not track it: each developer has their own copy"}[hook["tracked"]]))
+    for other in model["elsewhere"]:
+        out.append("  %s also keeps a plan here (%s). The move does not read it" % (other["tool"], other["sign"]))
     for name, n in model["mentions"].items():
         out.append("  %s mentions GSD or .planning/PROJECT.md %d time(s): read and update it" % (name, n))
     out += ["", "Settings for the phase tool in .devtools.toml:", "  phase_gaps = %s" % ("true" if model["gaps"] else "false")]
@@ -1130,8 +1322,9 @@ def main(argv=None) -> int:
         p.add_argument("--project", default=".")
         p.add_argument("--planning-dir", default=".planning",
                        help="the plan to read: .planning, or .planning/workstreams/<name> for a GSD workstream")
-        p.add_argument("--numbering", choices=["first", "last"], default="",
-                       help="which run of phase numbers is the roadmap, when GSD restarted the numbering")
+        p.add_argument("--numbering", choices=["first", "last", "same"], default="",
+                       help="which run of phase numbers is the roadmap, when GSD restarted the numbering; "
+                            "'same' when the repeated numbers are the same phases written twice")
         p.add_argument("--complete", default="", metavar="N,N",
                        help="phases GSD left unticked that the owner says are finished")
         p.add_argument("--open", default="", metavar="N,N",
@@ -1156,7 +1349,8 @@ def main(argv=None) -> int:
         if args.command == "survey":
             if args.format == "json":
                 keep = ("signs", "state", "phases", "parked", "gaps", "notes", "ids", "rows", "loose", "later", "groups",
-                        "install", "mentions", "history", "plans", "base", "ignored", "code", "own_skills")
+                        "install", "mentions", "history", "plans", "base", "ignored", "code", "own_skills", "out", "hooks",
+                        "undefined", "elsewhere")
                 print(json.dumps({k: model[k] for k in keep}, indent=2, default=str))
             else:
                 print("\n".join(survey_lines(model)))
