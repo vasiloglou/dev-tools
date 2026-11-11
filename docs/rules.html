@@ -152,6 +152,41 @@ rules against develop (f8ca93c): 4 rule(s); 1 to fix, 2 warning(s), 4 standing
   </div>
 </div></section>
 
+<section id="plans"><div class="wrap">
+  <div class="feature">
+    <div>
+      <span class="num">Rules about plans · a trial</span>
+      <h3>The same rules file can judge a phase's plans</h3>
+      <p>For a project on the <a href="phase.html">phase workflow</a>. Before you approve the plans of a phase, the plans are read as facts too: which task names which file, which components a plan says it reuses, what kind each task is. Joined with the component index, a rule can then say what a plan may do.</p>
+      <p>One such rule ships: a task that changes a file of a component the plan's Reuse section does not name. A project adds its own, for example that a task changing the billing area must be one a person checks.</p>
+      <p>The checks the workflow fixes for every project, such as <a href="phase.html#parallel">two parallel plans that name the same file</a>, are not here. They are plain Python and need no GND. This is only for rules a project writes itself.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>a scratch project · a plan that changes more than it names</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">grep -E &quot;^(reuse|new_component):|files&quot; .planning/phases/01-export/01-01-PLAN.md</span>
+reuse: cli.commands (adapt: one more sub-command)
+new_component: report.csv because no component writes CSV
+- **files:** `src/shelf/export.py`, `src/shelf/cli.py`, `src/shelf/units.py`
+
+<span class="p">$</span> <span class="cmd">rules check --phase 01</span>
+<span class="warn">warn: plan_names_the_components_it_touches: task=01-01-T1 component=format.sizes plan=01-01 (.planning/phases/01-export/01-01-PLAN.md)</span>
+  remedy: A task changes a file of a component the plan does not name: add the component to the plan&#x27;s reuse: line, or to new_component: if the plan creates it
+plan rules for phase 01: 1 rule(s); 0 to fix, 1 warning(s)
+<span class="dim">exit code 0</span>
+
+<span class="p">$</span> <span class="cmd">grep -E &quot;^reuse:&quot; .planning/phases/01-export/01-01-PLAN.md</span>
+reuse: cli.commands (adapt: one more sub-command), format.sizes
+
+<span class="p">$</span> <span class="cmd">rules check --phase 01</span>
+<span class="ok">plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)</span></pre></div>
+      <p class="caption">A plan written for this capture, in a scratch project with three components, judged by GND 0.3.0. Its task names <code>units.py</code>, which the <code>format.sizes</code> component holds, and the plan names only <code>cli.commands</code>. A file that does not exist yet, <code>export.py</code>, belongs to no component and draws no line. <code>rules</code> is short for <code>python3 .claude/skills/components/scripts/rules_check.py</code>.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>What has and has not been shown.</strong> These rules have run on plans written to test them and on no real project's plans, and no step of the workflow requires the check. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
+  </div>
+</div></section>
+
 <section><div class="wrap">
   <div class="two">
     <div class="prose">
@@ -185,7 +220,7 @@ python3 .claude/skills/components/scripts/rules_check.py check --base main</pre>
 <section class="band"><div class="wrap">
   <div class="section-head">
     <h2>The facts a rule can name</h2>
-    <p>This is the whole vocabulary. A rule is a statement over these nine kinds of fact.</p>
+    <p>A rule about components is a statement over these nine kinds of fact. Rules about plans have more, listed in the guide that ships with the skill.</p>
   </div>
   <div class="table-scroll"><table>
     <tr><th>Fact</th><th>Roles</th><th>Meaning</th></tr>

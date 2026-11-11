@@ -20,7 +20,7 @@ no rule.
 |---|---|---|
 | `docs/components/layers.toml` | A rank for each area and the forbidden pairs of areas | By hand |
 | `docs/components/rules.json` | The rules. `init` writes four starter rules | By hand |
-| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND) and `index_script` (where the index script is) | In `.devtools.toml` |
+| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` |
 
 Both files live beside the catalog, in the index script's `docs_dir`; a project that
 moved the catalog finds them there.
@@ -108,6 +108,7 @@ says nothing about what was already broken: the summary line counts it as `stand
 | `no_use_of_a_higher_rank` | must | No component uses a component of a higher rank |
 | `no_import_inside_a_loop` | should | No import between components is part of a loop of imports |
 | `canonical_component_has_a_test` | should | Every `canonical` component lists a test |
+| `plan_names_the_components_it_touches` | should | A [rule about plans](#rules-about-plans): only `check --phase` judges it |
 
 The first two say nothing until `layers.toml` has pairs or ranks. Delete a rule the
 project does not want, or change its `level`.
@@ -132,6 +133,8 @@ A rule is one object in the `rules` list of `rules.json`:
 
 - `id`: lower-case letters, digits and `_`; unique, and not the name of a fact type.
 - `level`: `must` (a `fail:`) or `should` (a `warn:`). Default `must`.
+- `about`: `components` (the default) or `plans`. A rule about plans is judged by `check --phase NN` and
+  left out of every other `check`; see [Rules about plans](#rules-about-plans).
 - `remedy`: what to do when the rule is broken; printed under each line. GND keeps it
   on the rule and repeats it in its own reports.
 - Everything else is a GND constraint as GND writes it, of a kind GND allows at the top
@@ -178,6 +181,95 @@ The facts a rule can name (`python3 scripts/components_index.py facts` prints th
 After adding a rule, run `check --format json` with no base and read what it reports: a
 rule that reports nothing may be right, or may name a fact that never matches, and one
 that reports hundreds may say more than was meant.
+
+## Rules about plans
+
+For a project that uses the phase workflow. The same rules file can hold rules about the
+plans of a phase: which components a task may change, what a plan has to name, what kind
+of task an area needs. They are judged while the plans can still be edited, before the
+plan gate:
+
+```bash
+python3 .claude/skills/components/scripts/rules_check.py check --phase NN
+```
+
+- It judges the rules marked `"about": "plans"` and no others. There is no `--base`: a plan
+  is judged as written, and every line is about it.
+- A line reads `warn: <rule id>: <what the rule bound> (<the plan file>)`, then `remedy:`.
+  Fix the plan, or say at the plan gate why the line stands. Exit codes are those of `check`.
+- It is not `phase_tool.py check --plans NN`. That check holds the rules the workflow fixes
+  for every project (two plans of one wave that name a file, a `depends_on` that cannot
+  hold) and needs nothing installed. This one holds the rules a project writes for itself.
+- **Status: a trial**, like the rest of this file. It has run on plans written to test it
+  and on no real project's plans. No step of the workflow requires it.
+
+`init` writes one such rule, `plan_names_the_components_it_touches` (should): a task that
+names a file of a component, in a plan whose Reuse section names neither that component
+nor a subsystem it belongs to.
+
+The facts such a rule can name are the component facts above and these. The first group is
+what the plans say (`phase_tool.py facts --phase NN` prints them); the second is added by
+`check --phase`, from the plans and the index together.
+
+| Fact | Roles | Meaning |
+|---|---|---|
+| `plan_in_wave` | `plan`, `wave` | The plan's `wave`, a whole number |
+| `plan_depends_on` | `plan`, `earlier` | A plan its `depends_on` names |
+| `plan_runs_after` | `plan`, `earlier` | Every plan before it through `depends_on` |
+| `plan_names_requirement` | `plan`, `requirement` | A REQ id in its `requirements` |
+| `plan_reuses_component` | `plan`, `component` | An id on the `reuse:` line of its Reuse section |
+| `plan_adds_component` | `plan`, `component` | An id on a `new_component:` line |
+| `plan_declares` | `plan`, `key`, `value` | `golden_impact`, `llm_dependency`, `gap_closure`, `autonomous` or `prove_method`, as written |
+| `task_in_plan` | `task`, `plan` | The plan a task is in |
+| `task_has_type` | `task`, `type` | `auto`, `checkpoint:decision` or `checkpoint:human-verify` |
+| `task_turns_green` | `task`, `test` | A test id, with its folder |
+| `task_names_file` | `task`, `path` | An entry of `files` or `unit_tests`, as written: a path, a folder ending in `/`, or a pattern with `*` |
+| `task_reads_first` | `task`, `path` | An entry of `read_first`, as written |
+| `test_is_in_contract` | `test`, `kind` | A test of the Traceability table: `contract` or `guard` |
+| `task_touches_component` | `task`, `component` | An entry of the task's files names a file the component holds |
+| `task_reads_component` | `task`, `component` | The same, for `read_first` |
+| `task_adds_file` | `task`, `path` | A plain path among the task's files that does not exist yet |
+| `plan_names_component` | `plan`, `component` | The plan reuses or adds the component, or reuses a subsystem it is in |
+| `component_has_module` | `component`, `path` | A package file the component holds (`components_index.py facts --modules`) |
+
+Three rules a project might write. Each was run through GND 0.3.0 before it was put here.
+
+```json
+{"id": "no_task_changes_a_retired_component", "about": "plans", "level": "should",
+ "remedy": "A task changes a deprecated component: change the component that replaces it, or say in the plan why this one",
+ "type": "guarded",
+ "antecedent": [{"fact_type": "task_touches_component", "bind": {"task": "$task", "component": "$c"}}],
+ "consequent": {"absence": {"fact_type": "component_has_status", "bind": {"component": "$c", "status": "deprecated"}}}}
+```
+
+```json
+{"id": "billing_changes_are_checked_by_a_person", "about": "plans", "level": "must",
+ "remedy": "A task changes the billing area: make it a checkpoint:human-verify task",
+ "type": "guarded",
+ "antecedent": [{"fact_type": "task_touches_component", "bind": {"task": "$task", "component": "$c"}},
+                {"fact_type": "component_in_area", "bind": {"component": "$c", "area": "billing"}}],
+ "consequent": {"atom": {"fact_type": "task_has_type", "bind": {"task": "$task", "type": "checkpoint:human-verify"}}}}
+```
+
+```json
+{"id": "a_task_reads_the_callers_of_what_it_changes", "about": "plans", "level": "should",
+ "remedy": "A task changes a component and does not read one that uses it: add a file of the caller to read_first",
+ "type": "guarded",
+ "antecedent": [{"fact_type": "task_touches_component", "bind": {"task": "$task", "component": "$c"}},
+                {"fact_type": "component_uses", "bind": {"caller": "$d", "callee": "$c"}}],
+ "consequent": {"atom": {"fact_type": "task_reads_component", "bind": {"task": "$task", "component": "$d"}}}}
+```
+
+The third is what the Plan step asks for in words. It is loud for a component many others
+use, which is why it is an example and not a starter: add a rule only when its lines are
+ones someone will act on.
+
+What a pass here does not show, beside the limits below:
+- **Only what the plan writes down.** A task that changes a file its `files` does not name
+  breaks no rule here; `phase_tool.py check --scope NN` looks for that after the work.
+- **Only files a component holds.** A file no component has claimed gives no
+  `task_touches_component`, so run the index checks first, as for any rule.
+- **A new file has no component yet.** It gives `task_adds_file` and nothing else.
 
 ## What a pass does not show
 

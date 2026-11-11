@@ -3,6 +3,7 @@
 
     rules_check.py init [--print]     write a starter rules file and layers.toml (never overwrites one)
     rules_check.py check [--base REF] [--strict] [--require] [--format json]
+    rules_check.py check --phase NN [--strict] [--require] [--format json]
 
 ``check`` asks ``components_index.py facts`` for the catalog and the import graph as
 facts, adds the rules in ``rules.json``, and has ``gnd check`` judge them
@@ -19,6 +20,11 @@ with ``--base``, what was broken before still is, and an import the script canno
 printed (with ``--strict`` also a ``warn:``), 2 when the check did not run. Without GND
 it prints ``skip:`` and exits 0 (1 with ``--require``).
 
+``check --phase NN`` judges the plans of one phase of the phase workflow, before they are
+approved: the rules marked ``"about": "plans"``, over what ``phase_tool.py facts`` reads from
+the plans and the component facts together. Plain ``check`` leaves those rules out. There is
+no base to compare with: every line is about the plans as written.
+
 ``rules.json`` and ``layers.toml`` live beside the catalog, in the index script's
 ``docs_dir``. Settings live beside this script, in rules_check.settings.json. Needs
 Python 3.11 or newer, and GND 0.2.0 or newer (get-nick-done on PyPI), the first release
@@ -28,6 +34,7 @@ version 15).
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import itertools
 import json
 import re
@@ -42,6 +49,8 @@ DEFAULT_SETTINGS = {
     'index_script': 'scripts/components_index.py',
     # The command that runs GND, for example "uvx --from get-nick-done==0.3.0 gnd".
     'gnd_command': 'gnd',
+    # The phase tool, for `check --phase`: it writes what the plans of a phase say, as facts.
+    'phase_script': '.claude/skills/process-phase/scripts/phase_tool.py',
 }
 SHOWN = 10  # lines printed for one rule; --format json has them all
 REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, and new or standing
@@ -81,7 +90,22 @@ STARTER_RULES = {'rules': [
      'antecedent': [{'fact_type': 'component_has_status', 'bind': {'component': '$a', 'status': 'canonical'}}],
      'consequent': {'exists': {'atoms': [{'fact_type': 'component_has_test',
                                           'bind': {'component': '$a', 'path': '$test'}}]}}},
+    {'id': 'plan_names_the_components_it_touches', 'about': 'plans', 'level': 'should',
+     'remedy': 'A task changes a file of a component the plan does not name: add the component to the '
+               "plan's reuse: line, or to new_component: if the plan creates it",
+     'type': 'guarded',
+     'antecedent': [{'fact_type': 'task_touches_component', 'bind': {'task': '$task', 'component': '$component'}},
+                    {'fact_type': 'task_in_plan', 'bind': {'task': '$task', 'plan': '$plan'}}],
+     'consequent': {'atom': {'fact_type': 'plan_names_component',
+                             'bind': {'plan': '$plan', 'component': '$component'}}}},
 ]}
+# What `check --phase` adds to the plan facts and the component facts: each needs both.
+JOINED = {
+    'task_touches_component': ('{Task} names a file of {Component}', (('task', 'task'), ('component', 'component'))),
+    'task_reads_component': ('{Task} reads a file of {Component} first', (('task', 'task'), ('component', 'component'))),
+    'task_adds_file': ('{Task} names {Path}, which does not exist yet', (('task', 'task'), ('path', 'path'))),
+    'plan_names_component': ('{Plan} names {Component} in its Reuse section', (('plan', 'plan'), ('component', 'component'))),
+}
 
 STARTER_LAYERS = """# Which areas may use which. An area is the first part of a component id: core.sizes is in core.
 # `components_index.py facts` turns these lines into facts, and the rules in rules.json judge them.
@@ -145,6 +169,8 @@ def load_rules(root: Path) -> list[dict]:
         seen.add(name)
         if rule.get('level', 'must') not in {'must', 'should'}:
             problems.append(f'{name}: "level" is must or should')
+        if rule.get('about', 'components') not in {'components', 'plans'}:
+            problems.append(f'{name}: "about" is components or plans')
         if not isinstance(rule.get('remedy', ''), str) or 'type' not in rule:
             problems.append(f'{name}: needs a "type", and "remedy" is text')
     if problems:
@@ -156,7 +182,7 @@ def model(types: dict, rules: list[dict]) -> dict:
     """The GND model: fact types as the facts file describes them, and the project's rules."""
     constraints = []
     for rule in rules:
-        body = {key: value for key, value in rule.items() if key != 'level' and (key != 'remedy' or value)}
+        body = {key: value for key, value in rule.items() if key not in ('level', 'about') and (key != 'remedy' or value)}
         body.update(modality='alethic' if rule.get('level', 'must') == 'must' else 'deontic', source='explicit',
                     status='confirmed', provenance={'user_quote': rule.get('remedy') or rule['id']})
         constraints.append(body)
@@ -185,12 +211,12 @@ def run(command: list, what: str, **options) -> subprocess.CompletedProcess:
         raise Problem(f'{what} could not start: {exc}')
 
 
-def read_facts(root: Path, base: str = '') -> dict:
+def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
     script = root / SETTINGS['index_script']
     if not script.is_file():
         raise Problem(f'{SETTINGS["index_script"]} is missing (index_script in rules_check.settings.json)')
-    done = run([sys.executable, str(script), '--root', str(root), 'facts', *(['--base', base] if base else [])],
-               'the index script')
+    done = run([sys.executable, str(script), '--root', str(root), 'facts', *(['--base', base] if base else []),
+                *(['--modules'] if modules else [])], 'the index script')
     if done.returncode:
         raise Problem(f'{SETTINGS["index_script"]} facts: {(done.stderr or done.stdout).strip()}')
     doc = json.loads(done.stdout)
@@ -283,7 +309,7 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
         print(f'skip: gnd not found ({SETTINGS["gnd_command"]!r}; install GND or set gnd_command in '
               f'rules_check.settings.json)')
         return int(require)
-    rules = load_rules(root)
+    rules = [rule for rule in load_rules(root) if rule.get('about', 'components') == 'components']
     head = read_facts(root)
     notes, before, old = [], None, None
     if base:
@@ -337,6 +363,119 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
     return int(bool(fails or (strict and new)))
 
 
+def read_plan_facts(root: Path, phase: str) -> dict:
+    """What the plans of a phase say, from the phase tool."""
+    name = SETTINGS['phase_script']
+    if not (root / name).is_file():
+        raise Problem(f'{name} is missing (phase_script in rules_check.settings.json): check --phase is for a '
+                      f'project that uses the phase workflow')
+    done = run([sys.executable, str(root / name), '--format', 'json', '--root', str(root), 'facts', '--phase', phase],
+               'the phase tool')
+    try:
+        answer = json.loads(done.stdout)
+        if not answer['ok']:
+            raise Problem(f'{name} facts: {answer["error"]["message"]}')
+        doc = answer['data']
+        if doc['format'] != 'devtools-facts/1':
+            raise Problem(f'{name} facts wrote format {doc["format"]!r}; this script reads devtools-facts/1')
+    except (ValueError, KeyError, TypeError):
+        raise Problem(f'{name} facts: {(done.stderr or done.stdout).strip()[:600]}')
+    return doc
+
+
+def names(entry: str, path: str) -> bool:
+    """Whether an entry of a task's files (a path, a folder ending in /, or a pattern with *) names a file."""
+    return entry == path or (entry.endswith('/') and path.startswith(entry)) or ('*' in entry and fnmatch.fnmatch(path, entry))
+
+
+def plans_with_components(root: Path, code: dict, plans: dict) -> dict:
+    """One set of facts from the two: the component facts, the plan facts, and the JOINED ones."""
+    holders = {}
+    for row in code['facts']['component_has_module']:
+        holders.setdefault(row['path'], []).append(row['component'])
+    members = {}
+    for row in code['facts']['subsystem_has_member']:
+        members.setdefault(row['subsystem'], []).append(row['component'])
+
+    def components(fact: str) -> set:
+        return {(row['task'], component) for row in plans['facts'][fact]
+                for path, held in holders.items() if names(row['path'], path) for component in held}
+
+    named = {(row['plan'], component) for fact in ('plan_reuses_component', 'plan_adds_component')
+             for row in plans['facts'][fact] for component in [row['component'], *members.get(row['component'], [])]}
+    found = {
+        'task_touches_component': components('task_names_file'),
+        'task_reads_component': components('task_reads_first'),
+        'task_adds_file': {(row['task'], row['path']) for row in plans['facts']['task_names_file']
+                           if '*' not in row['path'] and not row['path'].endswith('/')
+                           and not (root / row['path']).exists()},
+        'plan_names_component': named,
+    }
+    values = dict(code['types']['values'])
+    for name, primitive in plans['types']['values'].items():
+        if values.setdefault(name, primitive) != primitive:
+            raise Problem(f'the index script and the phase tool disagree about the value type {name}')
+    return {
+        'revision': plans.get('revision') or code.get('revision'),
+        'types': {'values': values,
+                  'facts': {**code['types']['facts'], **plans['types']['facts'],
+                            **{name: {'reading': reading, 'roles': [list(role) for role in roles]}
+                               for name, (reading, roles) in JOINED.items()}}},
+        'facts': {**code['facts'], **plans['facts'],
+                  **{name: [dict(zip((role for role, _ in JOINED[name][1]), row)) for row in sorted(rows)]
+                     for name, rows in found.items()}},
+    }
+
+
+def check_phase(root: Path, phase: str, strict: bool, require: bool, as_json: bool) -> int:
+    """Judge the rules about plans over the plans of one phase. No base: a plan is judged as written."""
+    gnd = shlex.split(SETTINGS['gnd_command'])
+    if not gnd or not shutil.which(gnd[0]):
+        print(f'skip: gnd not found ({SETTINGS["gnd_command"]!r}; install GND or set gnd_command in '
+              f'rules_check.settings.json)')
+        return int(require)
+    rules = [rule for rule in load_rules(root) if rule.get('about') == 'plans']
+    plans = read_plan_facts(root, phase)
+    doc = plans_with_components(root, read_facts(root, modules=True), plans)
+    with tempfile.TemporaryDirectory() as name:
+        folder = Path(name)
+        (folder / 'model.json').write_text(json.dumps(model(doc['types'], rules)), encoding='utf-8')
+        report = judge(gnd, folder, doc, None)
+    broken, undecided = findings(report, rules)
+    files = plans['evidence']['plans']
+    plan_of = {row['task']: row['plan'] for row in plans['facts']['task_in_plan']}
+
+    def where(binding) -> str:
+        """The plan file a line is about: the first plan, or task of a plan, among the values it binds."""
+        for value in binding.values() if isinstance(binding, dict) else []:
+            if plan_of.get(value, value) in files:
+                return f' ({files[plan_of.get(value, value)]})'
+        return ''
+
+    rows = [{'rule': rule['id'], 'level': level, 'remedy': rule.get('remedy', ''), 'binding': binding,
+             'text': describe(binding) + where(binding)} for level, rule, binding, _ in broken]
+    order = [rule['id'] for rule in rules]
+    rows.sort(key=lambda row: (order.index(row['rule']), row['text']))
+    rows.extend({'rule': rule['id'], 'level': level, 'remedy': f'gnd could not decide this rule ({why})',
+                 'binding': None, 'text': ''} for level, rule, why in undecided)
+    fails = sum(row['level'] == 'fail' for row in rows)
+    summary = (f'plan rules for phase {plans["phase"]}: {len(rules)} rule(s); {fails} to fix, '
+               f'{len(rows) - fails} warning(s)')
+    if as_json:
+        print(json.dumps({'rows': rows, 'summary': summary}, indent=1))
+    else:
+        for name, group in itertools.groupby(rows, key=lambda row: row['rule']):
+            group = list(group)
+            for row in group[:SHOWN]:
+                print(f'{row["level"]}: {name}' + (f': {row["text"]}' if row['text'] else ''))
+                if row['remedy']:
+                    print(f'  remedy: {row["remedy"]}')
+            if len(group) > SHOWN:
+                print(f'… +{len(group) - SHOWN} more for {name} (--format json lists them all)')
+        print(summary)
+    return int(bool(fails or (strict and rows)))
+
+
 def init(root: Path, show: bool) -> int:
     RULES, LAYERS = places(root)
     starters = {RULES: json.dumps(STARTER_RULES, indent=2) + '\n', LAYERS: STARTER_LAYERS}
@@ -360,13 +499,18 @@ def main(argv: list[str] | None = None) -> int:
     start.add_argument('--print', dest='show', action='store_true', help='print the starter files, write nothing')
     run_check = commands.add_parser('check')
     run_check.add_argument('--base', default='', help='report only what is new since the merge base with this branch')
+    run_check.add_argument('--phase', default='', help='judge the plans of this phase by the rules about plans')
     run_check.add_argument('--strict', action='store_true', help='also fail on a warning')
     run_check.add_argument('--require', action='store_true', help='fail when GND is not installed')
     run_check.add_argument('--format', choices=('text', 'json'), default='text')
     args = parser.parse_args(argv)
+    if args.command == 'check' and args.phase and args.base:
+        parser.error('--phase judges the plans as written: leave out --base')
     try:
         if args.command == 'init':
             return init(args.root, args.show)
+        if args.phase:
+            return check_phase(args.root, args.phase, args.strict, args.require, args.format == 'json')
         return check(args.root, args.base, args.strict, args.require, args.format == 'json')
     except Problem as exc:
         print(f'rules_check: {exc}', file=sys.stderr)

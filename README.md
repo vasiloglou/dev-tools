@@ -34,7 +34,8 @@ prompt. The reasoning is on the site:
   list the code changes it would suggest.
 - **Project rules (optional, a trial).** A project states which areas of its code may
   use which, and other rules about its components, and every change is checked against
-  them: only what the change added is reported. The index is exported as plain facts;
+  them: only what the change added is reported. The same file can hold rules about the
+  plans of a phase, judged before the plans are approved. The index is exported as plain facts;
   the rules are judged by [GND](https://github.com/vasiloglou/gnd-public), which the
   project installs separately. GND is what makes a rule a line of data and not another
   hand-written check, and what tells a new finding from one that was already there:
