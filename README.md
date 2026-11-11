@@ -9,6 +9,16 @@ copied into each project that uses it.
 
 Status: prototype.
 
+## Why
+
+A coding agent writes code faster than anyone can read it. What is left to settle is
+whether the code does what was asked, whether it rebuilt something that already existed,
+and whether the next session can carry on from it. These skills make an agent agree on
+the goal, write the tests first, reuse what exists, stop for your approval and leave a
+record, and each of those is held by a check that can refuse, not by a sentence in a
+prompt. The reasoning is on the site:
+[Why it exists](https://vasiloglou.github.io/dev-tools/why.html).
+
 ## What it gives an agent
 
 - **Phase workflow.** One roadmap phase at a time, in seven steps: Orient, Discuss (with
@@ -25,7 +35,9 @@ Status: prototype.
   use which, and other rules about its components, and every change is checked against
   them: only what the change added is reported. The index is exported as plain facts;
   the rules are judged by [GND](https://github.com/vasiloglou/gnd-public), which the
-  project installs separately.
+  project installs separately. GND is what makes a rule a line of data and not another
+  hand-written check, and what tells a new finding from one that was already there:
+  [Project rules and GND](https://vasiloglou.github.io/dev-tools/rules.html).
 
 A project picks the workflow that fits it. Both use the component index.
 
@@ -129,3 +141,9 @@ runs on 3.9.
 ```bash
 uv run --no-project --with pytest python -m pytest tests -q
 ```
+
+## Contributing
+
+Contributions come in as pull requests from a fork. `main` takes changes only through a
+pull request, and the maintainer reviews and merges each one. See
+[CONTRIBUTING.md](CONTRIBUTING.md).

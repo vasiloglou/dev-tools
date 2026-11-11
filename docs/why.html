@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why it exists · dev-tools</title>
+<meta name="description" content="What dev-tools is for, why a coding agent needs a process, and the nine ideas the skills are built on.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="why.html" aria-current="page">Why</a>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+    <a href="contribute.html">Contribute</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Why it exists</p>
+  <h1>Writing code got cheap. Knowing it is right did not.</h1>
+  <p class="lede">A coding agent can produce a day of work in minutes. Someone still has to know that it does what was asked, that it did not rebuild or break what was already there, and that the next session can carry on from it. dev-tools is a process that makes those three things checkable.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="two">
+    <div class="prose">
+      <h2>The problem is not the code</h2>
+      <p>An agent is fast and capable, and it starts every session with no memory of the last one. It has been asked to finish a task, and it is good at reaching whatever signal says the task is finished. When that signal is "the tests pass", the shortest way there is sometimes to change the test.</p>
+      <p>This is not bad intent. It is what happens when the only rules are sentences in a prompt. A sentence in a prompt is a request, and over a long task a request gets forgotten or traded away for progress.</p>
+      <p>There are two usual answers. Read every line the agent writes, and lose the speed you wanted it for. Or trust it, and find out later. dev-tools is a third: you decide a few things yourself, at fixed points, and checks hold everything in between.</p>
+    </div>
+    <div class="prose">
+      <h2>Why it matters</h2>
+      <p>The more work agents do, the less of it a person reads line by line. Something has to stand in for the reading. It is either trust or a record.</p>
+      <p>Speed with no record moves the cost to later. It shows up as a second helper for a job that already had one, a test that asserts less than its name says, and a decision nobody can explain six months on.</p>
+      <p>A record is worth having only if it is produced as the work happens and cannot be quietly rewritten afterwards. That is most of what these skills do: they make an agent leave one, and they refuse to move on when it is missing.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>What it can do</h2>
+    <p>Three pieces a project can take together or one at a time, an optional check of the project's own rules, and a command that delivers them.</p>
+  </div>
+  <div class="table-scroll"><table>
+    <tr><th>You want</th><th>What dev-tools gives the agent</th><th>Read more</th></tr>
+    <tr><td>A feature built against tests you agreed to</td><td>Seven fixed steps for one roadmap phase. A short prototype first, then acceptance tests that are locked before any code is written, then the build, one full test run, and a close. You approve at four of the steps.</td><td><a href="phase.html">Phase workflow</a></td></tr>
+    <tr><td>Work you can defend later</td><td>A spec you approve before any code, an independent reviewer in a different tool who tries to break the result, and numbered records that state the command, its exit code and a fingerprint of every file the claim rests on.</td><td><a href="milestone.html">Milestone workflow</a></td></tr>
+    <tr><td>No second copy of code that already exists</td><td>A map of the codebase, searchable by what the code does. The agent can build it for a project that has none, check it against every change, and review it against the code from time to time.</td><td><a href="components.html">Component index</a></td></tr>
+    <tr><td>Your own rules about which part of the code may use which</td><td>Optional, and a trial. The project writes its rules down once, and every change is checked against them by GND, a separate checker of facts against rules. Only what the change added is reported.</td><td><a href="rules.html">Project rules and GND</a></td></tr>
+    <tr><td>To stop today and carry on another day, or with another agent</td><td>The current phase, the current step and the files still missing are written in the repository. Any session reads the same state and continues.</td><td><a href="phase.html">Phase workflow</a></td></tr>
+    <tr><td>The same process in every project, for Claude Code and Codex</td><td>One command copies the skills into a project and records what it delivered. A later update never overwrites a file you changed without telling you.</td><td><a href="adopt.html">Add it to your project</a></td></tr>
+    <tr><td>To move a project that already has its own process</td><td>The agent finds the project's own copies, lists every line a replacement would drop, and carries the project's rules into a file the project owns before anything is replaced.</td><td><a href="adopt.html">Add it to your project</a></td></tr>
+  </table></div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>Nine ideas the rest follows from</h2>
+    <p>The skills are long and specific. These are the short reasons behind them.</p>
+  </div>
+  <ol class="steps from1 narrow">
+    <li>
+      <h3>A rule is a check, not a request</h3>
+      <p>What matters is enforced by a small script that can refuse. The state tool will not skip a step. The lock notices a changed test. The index check names a file no component has claimed. The sync will not overwrite your edit. The agent is still told the rule in words, but the words are not what holds it.</p>
+    </li>
+    <li>
+      <h3>Decide what "done" means before any code exists</h3>
+      <p>In a phase, the acceptance tests are written first, shown to fail for the right reason, approved by you, and locked. In a milestone, you approve a spec with its list of tests and expected results. Either way the target is fixed while it is still cheap to argue about, and it cannot move to meet the code.</p>
+    </li>
+    <li>
+      <h3>Try the idea before building it</h3>
+      <p>A phase starts with a prototype on real data, with a measurable target and a time limit. Each goal gets a verdict: go, pivot or kill. A goal that does not hold up is dropped there, before a test or a line of product code exists for it.</p>
+    </li>
+    <li>
+      <h3>Reuse before build</h3>
+      <p>An agent that cannot see the codebase writes what is already there. So it asks the component index first, and the plan you approve has a section that says what was searched for, what was found, and why anything new is justified.</p>
+    </li>
+    <li>
+      <h3>The repository remembers, so the agent does not have to</h3>
+      <p>Decisions, plans, test results and the current step are plain files under version control. Nothing important lives in a conversation. A new session, a different agent or a person reads the same files and knows where things stand.</p>
+    </li>
+    <li>
+      <h3>A person decides, at a few fixed points</h3>
+      <p>Scope, the tests, the plan and the close are yours. Between those points the agent works without stopping to ask. Merging and releasing stay your decisions. When you hand an approval to the agent, the record says it was delegated. It is never written up as if you had read it.</p>
+    </li>
+    <li>
+      <h3>Evidence, and its limits, in writing</h3>
+      <p>"Done" is a command, its exit code, and the files it ran on, not a sentence from the agent. A record also says what the result does not establish. One review is called one review, never a panel, and it does not cover text that changed after the reviewer read it.</p>
+    </li>
+    <li>
+      <h3>Process is a cost. Spend it where it buys something</h3>
+      <p>A process that reruns everything at every step gets abandoned. So focused tests run while working, results are reused for the same code, and the full suite runs once per phase. Review stops when most of its findings are about the previous round of repairs. Routine, reversible work takes a fast lane with no record at all.</p>
+    </li>
+    <li>
+      <h3>Plain files, owned by the project</h3>
+      <p>The skills are text and a few small scripts, copied into each project and committed there. There is no package to install, no service to run, and no dependency on this repository. What is specific to your project goes in one file you own, and it wins over the shared text.</p>
+    </li>
+  </ol>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>What it is not</h2>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>Not an agent</h3>
+      <p>It is instructions and checks for the agents you already use. It runs nothing by itself and calls no model.</p>
+    </div>
+    <div class="card">
+      <h3>Not a framework</h3>
+      <p>Nothing is imported by your product and nothing ships with it. Remove the copied files and your code is unchanged.</p>
+    </div>
+    <div class="card">
+      <h3>Not a guarantee</h3>
+      <p>A check catches what it was written to catch. A person's recorded decision can waive a missing file at a step, and the tool does not second-guess it.</p>
+    </div>
+    <div class="card">
+      <h3>Not finished</h3>
+      <p>It is a working prototype. In the trial runs so far the approvals were simulated. <a href="index.html">The home page</a> says what has been done and what has not.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap narrow">
+  <h2>Who it is for</h2>
+  <p>A developer or a small team that already works with Claude Code or Codex on a real codebase, and wants the agent to do longer stretches of work without giving up the say on scope, tests and merging.</p>
+  <p>It suits a project with a roadmap or a specification to work from. It is too much for a one-off script or an ad-hoc fix, and the skills say so: a phase runs only when you invoke it.</p>
+  <div class="next">
+    <a class="btn primary" href="phase.html">See a phase run</a>
+    <a class="btn" href="adopt.html">Add it to your project</a>
+    <a class="btn" href="contribute.html">Contribute</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="why.html">Why it exists</a> · <a href="contribute.html">Contribute</a> · <a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>
