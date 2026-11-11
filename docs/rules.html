@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project rules and GND · dev-tools</title>
+<meta name="description" content="Why dev-tools hands a project's own rules about its code to GND, a separate checker of facts against rules: what that adds, what it costs, and what a pass does not show.">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html">dev<span>-</span>tools</a>
+  <nav>
+    <a href="why.html">Why</a>
+    <a href="phase.html">Phase workflow</a>
+    <a href="milestone.html">Milestone workflow</a>
+    <a href="components.html" aria-current="page">Component index</a>
+    <a href="adopt.html">Add it to your project</a>
+    <a href="contribute.html">Contribute</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="page-head"><div class="wrap">
+  <p class="eyebrow">Project rules · optional, a trial</p>
+  <h1>The index says what the code is. GND says whether that is allowed.</h1>
+  <p class="lede">The component index knows which part of your code uses which. It has no way to say that the core must not import the command line. A project that wants such rules writes them down once, and dev-tools hands the facts and the rules to GND, a separate checker, to judge. This page says what GND adds, what it costs, and what a pass does not show.</p>
+</div></div>
+
+<section><div class="wrap">
+  <div class="two">
+    <div class="prose">
+      <h2>What GND is</h2>
+      <p><a href="https://github.com/vasiloglou/gnd-public">GND</a> is a separate open-source project from the same author. It checks a set of facts against a set of rules. For each rule it says that the rule holds, that it is broken and which facts break it, or that it cannot be decided.</p>
+      <p>The checking is deterministic. The same facts and the same rules give the same answer every time, and no language model takes part in it.</p>
+      <p>GND was built to check what agents produce in data applications, and it does much more than dev-tools asks of it. dev-tools uses one command, <code>gnd check</code>.</p>
+    </div>
+    <div class="prose">
+      <h2>Why dev-tools does not judge the rules itself</h2>
+      <p>The checks dev-tools ships are about its own process: is this step done, was this test changed, has a component claimed this file. Each is a few lines of Python with one fixed question.</p>
+      <p>A project's rules about its own architecture are different. Every project has its own, they change, and nobody here knows them in advance. Writing one more hand-made check for each would never end.</p>
+      <p>That is a job for a rule engine: the rule is data, and one engine judges any rule. GND is such an engine, so dev-tools states the facts and leaves the judging to it.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>How the two fit together</h2>
+    <p>dev-tools produces the facts and prints the result. The project writes the rules. GND does the judging in the middle.</p>
+  </div>
+  <div class="table-scroll"><table>
+    <tr><th>Step</th><th>Whose</th><th>What happens</th></tr>
+    <tr><td>Facts</td><td>dev-tools</td><td>The index script writes the catalog and the import graph as plain facts: which components exist, their status, area and tests, which one uses which, and which imports lie inside a loop. This step needs no GND.</td></tr>
+    <tr><td>Rules</td><td>The project</td><td>Two small files beside the catalog, written by hand. <code>layers.toml</code> gives each area a rank or names pairs that are never allowed. <code>rules.json</code> holds the rules; four starter rules ship.</td></tr>
+    <tr><td>Judging</td><td>GND</td><td>The check script turns the facts and the rules into the form GND reads and runs <code>gnd check</code>, on the branch and on the base it started from. GND marks each broken rule as new or standing.</td></tr>
+    <tr><td>Report</td><td>dev-tools</td><td>The script prints what the change added: a failure for a <em>must</em> rule, a warning for a <em>should</em> rule, each with the components, one import behind them, and the remedy the rule's author wrote.</td></tr>
+  </table></div>
+  <div class="two">
+    <div>
+<pre class="code"><span class="dim"># docs/components/layers.toml</span>
+<span class="k">[rank]</span>            <span class="dim"># a component may use components of its own rank or a lower one</span>
+core = 0
+store = 1
+cli = 2
+
+<span class="k">[[forbid]]</span>        <span class="dim"># one pair that is never allowed, whatever the ranks</span>
+from = "store"
+to = "report"</pre>
+      <p class="caption">Layers need no rule to be written. This example is from the guide that ships with the skill.</p>
+    </div>
+    <div>
+<pre class="code"><span class="dim"># one entry in docs/components/rules.json</span>
+{
+  "id": "canonical_does_not_use_experimental",
+  "level": "must",
+  "remedy": "A canonical component uses an experimental one: finish it first, or mark the caller experimental",
+  "type": "guarded",
+  "antecedent": [
+    {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}},
+    {"fact_type": "component_has_status", "bind": {"component": "$a", "status": "canonical"}}
+  ],
+  "consequent": {"absence": {"fact_type": "component_has_status", "bind": {"component": "$b", "status": "experimental"}}}
+}</pre>
+      <p class="caption">A rule of the project's own, also from the guide. It reads: for every canonical component that uses another, the other must not be experimental. The part from <code>type</code> down is GND's constraint language.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="section-head">
+    <h2>What GND adds</h2>
+    <p>Six things the check has because the judging is GND's.</p>
+  </div>
+  <div class="grid">
+    <div class="card">
+      <h3>A rule is data, not code</h3>
+      <p>A project adds a rule by writing one entry in a file. No Python is written and nothing in dev-tools changes. The rule can be read, reviewed and changed like any other line in the repository.</p>
+    </div>
+    <div class="card">
+      <h3>The same answer every time</h3>
+      <p>No model reads the code and forms an opinion about its architecture. This is the first idea on the <a href="why.html">Why</a> page, a rule is a check and not a request, applied to the shape of the code.</p>
+    </div>
+    <div class="card">
+      <h3>Only what the change added</h3>
+      <p>GND judges the base and the branch by the same rules and marks each finding new or standing. An existing project can switch the check on without first repairing its history.</p>
+    </div>
+    <div class="card">
+      <h3>A finding names its facts</h3>
+      <p>A failure is not "architecture violated". It names the rule, the two components, and the import between them, and it repeats the remedy the rule carries.</p>
+    </div>
+    <div class="card">
+      <h3>"Cannot decide" is not a pass</h3>
+      <p>A rule GND could not decide is reported under that rule's own level. A check that did not run exits with its own code, and a report the script cannot read stops it.</p>
+    </div>
+    <div class="card">
+      <h3>The engine is someone else's job</h3>
+      <p>dev-tools' part is small: state the facts, call GND, print the report. The constraint language and the comparison with the base live in a project whose whole purpose is checking facts against rules.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="feature">
+    <div>
+      <span class="num">What it looks like</span>
+      <h3>One new import, judged against the base</h3>
+      <p>A branch makes the scanner call the report. The scanner's area has rank 0 and the report's has rank 1, so the rank rule is broken, and the new import also closes a loop.</p>
+      <p>The line marked as a new import is the one to fix. The four standing items were broken before the branch and are counted, not listed.</p>
+      <p><a href="components.html">Where this sits in the component index →</a></p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a branch where the scanner starts calling the report</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">cat docs/components/layers.toml</span>
+[rank]   # a component may use its own rank or a lower one
+fs = 0
+format = 0
+report = 1
+cli = 2
+
+<span class="p">$</span> <span class="cmd">rules check --base develop</span>
+fail: no_use_of_a_higher_rank: a=fs.scan b=report.rows from=fs to=report rank=0 used=1 (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
+  remedy: A component uses one of a higher rank ([rank] in layers.toml): move what it needs down, or the caller up
+warn: no_import_inside_a_loop: a=fs.scan b=report.rows (src/shelf/scan.py -&gt; src/shelf/report.py) [new import]
+  remedy: This import is part of a loop of imports between components: move the shared code into a component both can use
+warn: no_import_inside_a_loop: a=report.rows b=fs.scan (src/shelf/report.py -&gt; src/shelf/scan.py)
+  remedy: This import is part of a loop of imports between components: move the shared code into a component both can use
+rules against develop (f8ca93c): 4 rule(s); 1 to fix, 2 warning(s), 4 standing
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">The same capture as on the component index page. <code>rules</code> is short for <code>python3 .claude/skills/components/scripts/rules_check.py</code>.</p>
+    </div>
+  </div>
+</div></section>
+
+<section><div class="wrap">
+  <div class="two">
+    <div class="prose">
+      <h2>What it costs</h2>
+      <p>The skills are plain files with nothing to install, and that is one of the ideas they are built on. GND is the one exception, which is why it is optional.</p>
+      <ul>
+        <li><strong>Nothing depends on it.</strong> Without GND the check prints <code>skip:</code> and passes. Both workflows, the index and the export of facts work the same.</li>
+        <li><strong>One install.</strong> GND is on PyPI as <code>get-nick-done</code>, under the Apache 2.0 licence, and needs Python 3.11 or newer. A project that would rather not install it sets the command to run it through <code>uvx</code>.</li>
+        <li><strong>A known version.</strong> The check needs release 0.2.0 or newer and was last tried with 0.3.0. It stops on a report in a version it does not know.</li>
+        <li><strong>In automated checks, say it is required.</strong> With <code>--require</code> a missing GND is a failure, so a job cannot pass by not running. An example job for GitHub ships in <code>examples/rules-check.yml</code>.</li>
+      </ul>
+<pre class="code">uv tool install get-nick-done==0.3.0
+python3 .claude/skills/components/scripts/rules_check.py init
+python3 .claude/skills/components/scripts/rules_check.py check --base main</pre>
+      <p class="caption">Install, write the two starter files, check a branch against its base.</p>
+    </div>
+    <div class="prose">
+      <h2>What a pass does not show</h2>
+      <ul>
+        <li><strong>Only what the index sees.</strong> The facts come from the catalog and from <code>import</code> statements. An import made at run time from a name in a string breaks no rule, and neither does a call through a registry.</li>
+        <li><strong>Component ids, not folders.</strong> A file is judged by the component that lists it, wherever it sits on disk.</li>
+        <li><strong>A regrouping can look new.</strong> Moving a file from one component to another makes its old imports new facts.</li>
+        <li><strong>The index must be right first.</strong> A file no component has claimed has no facts, so its imports break no rule. The index checks run before this one.</li>
+        <li><strong>What was already broken.</strong> Against a base, a pass says nothing about standing items. The summary line counts them.</li>
+        <li><strong>The rule is only as good as its sentence.</strong> GND checks the facts against what was written, not against what was meant.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap">
+  <div class="section-head">
+    <h2>The facts a rule can name</h2>
+    <p>This is the whole vocabulary. A rule is a statement over these nine kinds of fact.</p>
+  </div>
+  <div class="table-scroll"><table>
+    <tr><th>Fact</th><th>Roles</th><th>Meaning</th></tr>
+    <tr><td><code>component_is_listed</code></td><td><code>component</code></td><td>The catalog has this component</td></tr>
+    <tr><td><code>component_has_status</code></td><td><code>component</code>, <code>status</code></td><td>Canonical, experimental, deprecated, external or a duplicate of another</td></tr>
+    <tr><td><code>component_in_area</code></td><td><code>component</code>, <code>area</code></td><td>The first part of its id: <code>core.sizes</code> is in <code>core</code></td></tr>
+    <tr><td><code>component_uses</code></td><td><code>caller</code>, <code>callee</code></td><td>A file of one imports a file of the other</td></tr>
+    <tr><td><code>component_uses_in_cycle</code></td><td><code>caller</code>, <code>callee</code></td><td>That import lies inside a loop of imports</td></tr>
+    <tr><td><code>component_has_test</code></td><td><code>component</code>, <code>path</code></td><td>A test the component lists</td></tr>
+    <tr><td><code>subsystem_has_member</code></td><td><code>subsystem</code>, <code>component</code></td><td>A component that belongs to a subsystem</td></tr>
+    <tr><td><code>area_has_rank</code></td><td><code>area</code>, <code>rank</code></td><td>From the ranks in <code>layers.toml</code></td></tr>
+    <tr><td><code>area_must_not_use</code></td><td><code>source</code>, <code>target</code></td><td>From a forbidden pair in <code>layers.toml</code></td></tr>
+  </table></div>
+</div></section>
+
+<section><div class="wrap narrow">
+  <h2>Where it stands</h2>
+  <p>This check is a trial. It has run on two codebases and no project has adopted it yet. The agent is told to use it where you asked for it and not to add it to a project unasked.</p>
+  <p>What has not been shown yet is the part that matters most: an owner acting on a finding, and someone writing a rule of their own from the guide.</p>
+  <div class="next">
+    <a class="btn primary" href="components.html">Back to the component index</a>
+    <a class="btn" href="https://github.com/vasiloglou/gnd-public">GND on GitHub</a>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>dev-tools · development-process skills for Claude Code and Codex</span>
+  <span><a href="why.html">Why it exists</a> · <a href="contribute.html">Contribute</a> · <a href="https://github.com/vasiloglou/dev-tools">Source on GitHub</a></span>
+</div></footer>
+</body>
+</html>
