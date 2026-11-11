@@ -106,6 +106,11 @@ python3 path/to/dev-tools/devtools/from_gsd.py convert --project . --dry-run
   GSD's plans for it kept as input in a `gsd/` folder inside the phase folder. Phases GSD
   had paused or left in its backlog are listed, not queued.
 
+Only GSD has a converter. `sync.py survey` names a plan kept by another planning tool (Spec Kit,
+OpenSpec, Kiro, BMAD, Task Master, Agent OS, or a `.planning/` folder in another format), and
+`skills/adopt-devtools/SKILL.md`, "Coming from another planning tool", says how it is carried
+by hand.
+
 See `examples/phase-project.devtools.toml` for a complete project file, and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
 pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project follows

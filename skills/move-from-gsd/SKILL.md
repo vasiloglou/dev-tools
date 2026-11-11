@@ -138,12 +138,16 @@ Then create the branch.
    milestone began again at phase 1. The phase tool needs each number once. Find which
    run of numbers has its folders in `.planning/phases/` (GSD moves the earlier run's
    folders to `milestones/<version>-phases/`) and pass `--numbering first` or
-   `--numbering last`. The other run stays readable in the archived roadmap.
+   `--numbering last`. The other run stays readable in the archived roadmap. The
+   message names each number with its two titles. If they are the same phases, listed
+   twice in other words, pass `--numbering same`: nothing is left out.
 6. **Dependencies.** The survey notes a phase whose dependency line names a phase it
    did not carry as a dependency ("independent of Phase 9"), and a phase that depends on
    one GSD put off. Read each line with the user; a wrong dependency is corrected in
    `ROADMAP.md` after the conversion. One phase is current: a phase GSD had started
-   goes first if its dependencies are finished, otherwise the phase it waits on.
+   goes first if its dependencies are finished, otherwise the phase it waits on. Where
+   GSD's `STATE.md` names a current phase that is open and can start, that phase is the
+   current one, and the survey says so when the roadmap alone would have picked another.
 7. **The base branch.** `STATE.md` records the branch phases start from and return to.
    The survey prints the one it found. If it "cannot be told", or it is not the
    project's integration branch (a project that merges to `develop` and releases from
@@ -227,13 +231,19 @@ The script carries text; it does not judge it. Read each of these and fix what i
 by editing the file (these are the project's files, not synced ones):
 
 - **`ROADMAP.md`**: each open phase has the goal, dependencies and requirements the
-  GSD roadmap gave it. A phase that says `Requirements: none recorded` and has not
-  started needs its requirements named before it is planned. The section "Put off
+  GSD roadmap gave it, and the requirements GSD's traceability table gave it. A phase
+  that says `Requirements: none recorded` and has not started needs its requirements
+  named before it is planned. A slug the script changed (one that began with a digit)
+  is noted in the record; the phase folder keeps its name. The section "Put off
   under GSD" at the end is a list, not phases.
 - **`REQUIREMENTS.md`**: the `U` rows are GSD's group headings ("Authentication").
   Reword each as what a user needs, with the user. The two lists at the end
   (requirements without a phase, requirements put off) are for the owner to assign or
-  delete.
+  delete. A row that says "Named by the GSD roadmap; its text is not in the GSD
+  requirement files" is an id GSD never defined: the record lists them. Write the text,
+  or delete the row and take the id out of its phase. A word in a roadmap line that only
+  looks like an id (`gpt-5`) is not carried. GSD's "Out of Scope" list is carried as a
+  section at the end.
 - **`MANIFESTO.md`**: `T1` and `T2` are the workflow's own rules. The rules after them
   are GSD's constraints, word for word. Keep the ones the project truly does not bend,
   delete the rest, and renumber. This file needs the owner's approval.
@@ -260,14 +270,16 @@ Only what is checked in to this repository; ask the user before removing anythin
    again to see what is left. Otherwise, and for whatever is left, `git rm` the listed
    paths. An agent or skill whose name does not start with `gsd-` is the
    project's own: leave it. A path git does not track is a developer's local install:
-   leave it and say so. The survey looks in `.claude`, `.codex`, `.opencode`, `.gemini`
-   and `.agents`; GSD can also install for other tools (`.cursor`, `.windsurf`,
-   `.github` and more), so look there yourself.
+   leave it and say so. The survey looks in `.claude`, `.codex`, `.opencode`, `.gemini`,
+   `.agents` and every other folder at the top of the project whose name starts with a
+   dot (`.cursor`, `.windsurf`, `.github` …).
 2. **Hooks and settings.** `.claude/settings.json` and `.claude/settings.local.json`
-   (and the other runtimes' settings) may run GSD's hooks or status line. Remove those
-   entries, and only those. `settings.local.json` is each developer's own and is not in
-   git: say in the report that every teammate has to remove the entries from theirs,
-   or their sessions will call hook files that are gone.
+   (and the other tools' settings) may run GSD's hooks or status line. The survey lists
+   each settings file that calls GSD, with the number of calls and whether git tracks
+   it. Remove those entries, and only those. A file git does not track
+   (`settings.local.json`) is each developer's own: say in the report that every
+   teammate has to remove the entries from theirs, or their sessions will call hook
+   files that are gone.
 3. **Instruction files.** In `CLAUDE.md`, `AGENTS.md` and the like, GSD writes blocks
    between `<!-- GSD:… -->` marks and the project may have added its own lines about
    `/gsd-*` commands. Replace them with a few lines: the plan is in `.planning/`, the

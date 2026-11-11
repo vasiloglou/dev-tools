@@ -427,3 +427,22 @@ def test_an_excluded_file_is_listed_as_kept(shipped, grown, capsys):
     (grown / ".devtools.toml").write_text(text)
     assert run("compare", "--project", grown, "--source", shipped) == 0
     assert "kept     .claude/skills/process/SKILL.md  excluded: stays as it is" in capsys.readouterr().out
+
+
+def test_the_survey_names_a_plan_kept_by_another_tool(shipped, grown, capsys):
+    (grown / ".kiro/specs/login").mkdir(parents=True)
+    (grown / ".planning").mkdir()
+    (grown / ".planning/ROADMAP.md").write_text("# Plan\n\n1. Build it\n")
+    run("survey", "--project", grown, "--source", shipped)
+    out = capsys.readouterr().out
+    assert "## A plan kept by another planning tool" in out and ".kiro/specs/: Kiro" in out
+    assert ".planning/: a plan in a format the phase tool does not read" in out
+    assert "Coming from another planning tool" in out
+
+
+def test_a_plan_the_phase_tool_wrote_is_not_another_tools(shipped, grown, capsys):
+    (grown / ".planning").mkdir()
+    (grown / ".planning/STATE.md").write_text('---\ncurrent_phase: "01"\nphase_status: not_started\n---\n')
+    (grown / ".planning/ROADMAP.md").write_text("# Roadmap\n\n## Phase 1: Scan\n")
+    run("survey", "--project", grown, "--source", shipped)
+    assert "another planning tool" not in capsys.readouterr().out

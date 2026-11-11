@@ -404,6 +404,12 @@ def missing_artifacts(pl: Planning, nn: str, status: str) -> list:
         if STATUSES.index(needed_at) <= reached:
             if pdir is None or not any(pdir.glob(pattern.format(nn=nn))):
                 missing.append(label.format(nn=nn))
+    if pdir is not None and STATUSES.index("implemented") <= reached:
+        # Every plan was carried out: one summary must not stand for several plans.
+        for plan in sorted(pdir.glob("%s-[0-9][0-9]-PLAN.md" % nn)):
+            summary = plan.name[:-len("PLAN.md")] + "SUMMARY.md"
+            if any(pdir.glob("%s-[0-9][0-9]-SUMMARY.md" % nn)) and not (pdir / summary).is_file():
+                missing.append(summary)
     # Only phases that opt in via CONTEXT are gated, and only at tests_approved.
     context = pdir / ("%s-CONTEXT.md" % nn) if pdir is not None else None
     if (status == "tests_approved" and context is not None and context.is_file()
@@ -412,6 +418,13 @@ def missing_artifacts(pl: Planning, nn: str, status: str) -> list:
         if not (pdir / proof).is_file():
             missing.append(proof)
     return missing
+
+
+def finished_elsewhere(phase: dict, status: str) -> bool:
+    """A complete phase whose roadmap block says it has no acceptance tests ("none: finished
+    under GSD"): it was accepted by another process and has none of this one's files."""
+    tests = (phase.get("_fields") or {}).get("Acceptance tests", "")
+    return status == "complete" and tests.strip().lower().startswith("none")
 
 
 def open_phases(pl: Planning, completed: list) -> list:
@@ -459,7 +472,7 @@ def cmd_status(pl: Planning, args) -> dict:
         "completed_phases": completed,
         "phase_dir": rel(pl.root, pdir) if pdir else None,
         "phase_title": phase.get("title", ""),
-        "missing": missing_artifacts(pl, nn, status),
+        "missing": [] if finished_elsewhere(phase, status) else missing_artifacts(pl, nn, status),
         "blockers": blockers, "deps_complete": deps_complete,
         "gates_applicable": gates_for(nn),
         "branch": branch.strip() if branch else None,
@@ -618,6 +631,11 @@ def check_roadmap(pl: Planning) -> list:
         for name in ROADMAP_FIELDS:
             if name not in p["_fields"]:
                 issues.append(issue(f, p["_line"], "roadmap", "phase %s lacks '**%s:**'" % (p["id"], name)))
+        if p["slug"][:1].isdigit():
+            issues.append(issue(f, p["_lines"].get("Slug", p["_line"]), "roadmap",
+                                "phase %s has slug %r: a slug starts with a letter, or its acceptance folder "
+                                "p%s_%s reads as the tests of an inserted phase"
+                                % (p["id"], p["slug"], p["id"].replace(".", "_"), p["slug"].replace("-", "_"))))
         if p["status"] not in STATUSES:
             issues.append(issue(f, p["_lines"].get("Status", p["_line"]), "roadmap",
                                 "phase %s has invalid status %r" % (p["id"], p["status"])))

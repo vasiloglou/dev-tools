@@ -70,6 +70,7 @@ python3 <dev-tools>/devtools/sync.py survey --project .
 | Symlinked skill folders | Skills installed by something else | Nothing |
 | `[not tracked by git]` | The folder is ignored or was never added | Leave it out of the config unless the user wants it committed |
 | To find what reads these copies | A `git grep` line with the names that point at the copies | Used in step 2 |
+| A plan kept by another planning tool | Spec Kit, OpenSpec, Kiro, BMAD, Task Master or Agent OS files, or a `.planning/` whose roadmap or state the phase tool did not write | No tool moves it. See "Coming from another planning tool" at the end of this file |
 | A planning folder written by GSD | `.planning/` holds a GSD plan | This skill covers the project's copies of the skills only. The plan is moved with the `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`); never run `phase_tool.py setup` on it |
 
 In a git project the survey reads the files git tracks or would track, plus the skill and
@@ -384,3 +385,39 @@ the commit. Show the user:
 
 If you ran unattended, the questions the Rules told you to carry are at the top of the
 record and of your report.
+
+## Coming from another planning tool
+
+Only GSD has a converter (`move-from-gsd`). For any other tool that keeps a plan in the
+project (the survey names Spec Kit, OpenSpec, Kiro, BMAD, Task Master and Agent OS, and a
+`.planning/` folder in a format the phase tool does not read), the plan is carried by
+hand. The steps above still cover the project's copies of the skills; these cover the
+plan.
+
+1. **Keep the old plan readable.** Leave the other tool's folders where they are. If
+   `.planning/` itself holds the old plan, `git mv` its files to `.planning/archive/<tool>/`
+   first: `phase_tool.py setup` stops with `FOREIGN_PLAN` while a `STATE.md`,
+   `ROADMAP.md` or `REQUIREMENTS.md` in another format is there, and it never
+   overwrites a file.
+2. **Run `phase_tool.py setup`** once the skills are synced. It writes the planning
+   files with one placeholder phase.
+3. **Write the roadmap from the old plan**, one `## Phase N: Title` block for each unit
+   of work the old tool had (a spec, a change, an epic, a milestone), in the format of
+   `references/artifact-formats.md` in the process-phase skill:
+
+   | The old plan has | It becomes |
+   |---|---|
+   | A unit that is built and accepted | A phase with `Status: complete` and `Acceptance tests: none: finished under <tool>`, with a link to its old record. Add its number to `completed_phases` in `STATE.md` |
+   | A unit that is specified and not built | A phase with `Status: not_started`. Its spec is input to the phase's discussion; link it from the phase's goal |
+   | A unit half built | Finish it under the old tool first, or make it a `not_started` phase and say in its goal what exists |
+   | Requirements or user stories | Rows of `REQUIREMENTS.md`: a `U` row for each need, a `REQ-<FAMILY>-<number>` row for each requirement, with its phase |
+   | A constitution, principles or standing rules | `MANIFESTO.md` for what must always hold; `references/project.md` for how the work is done here |
+   | Recorded decisions | Rows of `DECISIONS.md` |
+
+4. **Record the move** as a row in `DECISIONS.md`, with a second row that says the
+   phases finished under the old tool stand as complete with no locked acceptance
+   tests. `check --all` asks for neither file for a phase whose block says
+   `Acceptance tests: none`.
+5. **Run `phase_tool.py check --all`** and fix what it reports before the first phase
+   starts. Take the other tool's commands, agents and hooks out of the project only
+   with the user's go-ahead, as for GSD (`move-from-gsd`, step 6).

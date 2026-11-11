@@ -13,7 +13,7 @@ Read these fields:
 | Field | Meaning | Action |
 |---|---|---|
 | `current_phase`, `phase_status`, `active_step` | Position in the status machine | Pick the step: `next_step` unless `--step` overrides it |
-| `missing[]` | Artifacts expected for the status already reached (e.g. `NN-CONTEXT.md`, `NN-TESTLOCK.json`, `NN-EVIDENCE/red.txt`) | Produce them in the right step; from `plan_approved` on, `advance` refuses to move while any is missing (only a DEC can waive one) |
+| `missing[]` | Artifacts expected for the status already reached (e.g. `NN-CONTEXT.md`, `NN-TESTLOCK.json`, `NN-EVIDENCE/red.txt`), and a summary for each plan once the phase is `implemented`. Empty for a complete phase whose roadmap block says `Acceptance tests: none` (finished under another process) | Produce them in the right step; from `plan_approved` on, `advance` refuses to move while any is missing (only a DEC can waive one) |
 | `blockers[]` / `blocked_on` | Set by a previous step or a human | Stop and show them. Only the human clears `blocked_on` |
 | `deps_complete` | All phases in **Depends on** are `complete` | If false, stop |
 | `dirty` | Working tree has changes | Apply the dirty-tree policy below |
