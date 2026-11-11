@@ -59,6 +59,9 @@ DEFAULT_SETTINGS = {
     # First status whose missing artifacts block ``advance``. "context_approved" enforces
     # every step; "plan_approved" only warns for the first two (for phases begun under that rule).
     "gated_from": "context_approved",
+    # False: whole-number phases are numbered from 0 or 1 without gaps. True: any rising numbers,
+    # for a roadmap whose numbers come from an earlier process (a project moved from GSD).
+    "phase_gaps": False,
 }
 
 
@@ -573,11 +576,12 @@ def check_roadmap(pl: Planning) -> list:
     issues = []
     nums = [p["num"] for p in phases if "." not in p["id"]]
     first = 1 if nums and nums[0] == 1 else 0
-    if nums != list(range(first, first + len(nums))):
+    gaps = SETTINGS["phase_gaps"]
+    if not gaps and nums != list(range(first, first + len(nums))):
         issues.append(issue(f, phases[0]["_line"], "roadmap", "phases not contiguous from 0: %s" % nums))
     ids = {p["id"] for p in phases}
     keys = [phase_key(p["id"]) for p in phases]
-    if any("." in p["id"] for p in phases) and (keys != sorted(keys) or len(ids) != len(phases)):
+    if (gaps or any("." in p["id"] for p in phases)) and (keys != sorted(keys) or len(ids) != len(phases)):
         issues.append(issue(f, phases[0]["_line"], "roadmap", "phases not in unique numeric order"))
     for p in phases:
         if "." in p["id"] and p["id"].split(".")[0] not in ids:

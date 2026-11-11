@@ -72,7 +72,7 @@ The heading is exactly `## Phase N: <Title>`, where N is an integer (`N.M` for a
 - **Risks:** RK-NN, RK-NN
 ```
 
-No other `## Phase` headings may appear anywhere in the file. Whole-number phases are numbered without gaps, starting at 0 or 1; `N.M` phases are inserted between them later. Only **Depends on** decides what may start.
+No other `## Phase` headings may appear anywhere in the file. Whole-number phases are numbered without gaps, starting at 0 or 1 (a project that sets `phase_gaps`, below, keeps whatever rising numbers it has); `N.M` phases are inserted between them later. Only **Depends on** decides what may start.
 
 ## REQUIREMENTS.md rows
 
@@ -100,7 +100,7 @@ python3 .claude/skills/process-phase/scripts/phase_tool.py setup [--name NAME] [
 
 ## Settings
 
-`scripts/phase_tool.settings.json` (written by the sync from `.devtools.toml`) holds the project's paths and names. `gated_from` sets the first status at which `advance` blocks on missing files: `context_approved` (default, every step enforced), or `tests_approved` / `plan_approved` for a project whose earlier phases were run when the first steps only warned.
+`scripts/phase_tool.settings.json` (written by the sync from `.devtools.toml`) holds the project's paths and names. `gated_from` sets the first status at which `advance` blocks on missing files: `context_approved` (default, every step enforced), or `tests_approved` / `plan_approved` for a project whose earlier phases were run when the first steps only warned. `phase_gaps = true` accepts a roadmap whose phase numbers do not start at 0 or 1 or skip some, for a project whose numbers come from an earlier process (one moved from GSD).
 
 ## Identifier formats
 

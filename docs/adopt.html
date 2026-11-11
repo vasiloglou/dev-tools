@@ -297,6 +297,80 @@ skills/components/scripts/components_index.py
   </div>
 </div></section>
 
+<section id="from-gsd"><div class="wrap">
+  <div class="section-head">
+    <h2>Coming from GSD?</h2>
+    <p>A project planned with GSD already keeps its plan in <code>.planning/</code>, and names its phase folders and the files inside them the way the phase workflow does. So the phase folders stay exactly as they are. What changes is the format of three files, and GSD&#39;s own files move to an archive inside the planning folder.</p>
+  </div>
+
+  <div class="feature">
+    <div>
+      <span class="num">Look</span>
+      <h3>See what the move would do</h3>
+      <p>One command reads the GSD planning folder and writes nothing. It lists every phase with the status it will get, the requirements and decisions it will carry, and GSD&#39;s own files that are checked in to the project.</p>
+      <p>It also names what only the owner can decide: a phase that is under way, phases GSD left unticked, a roadmap that began again at phase 1 for a later milestone.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>widget · a small project planned with GSD</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">from_gsd.py survey --project .</span>
+GSD project: Widget (PROJECT.md, config.json, STATE.md (gsd_state_version))
+GSD milestone: v1.1 Reports, status executing
+
+Phases: 5 (2 complete, 1 context_approved, 2 not_started)
+  2.1    not_started       Hash Cache  [no folder]
+  3      context_approved  Report  [a CONTEXT file and no plan]
+  4      not_started       Export  [no folder]
+Current phase after the move: 3 (Report), context_approved
+  It was discussed under GSD and not planned: its next step here is Specify, as for any phase.
+
+Requirements: 6 in the table, 1 without a phase, 1 put off
+Needs (U rows), one per GSD group: 3
+Decisions carried from PROJECT.md: 2
+Constraints carried into MANIFESTO.md: 2
+Requirement ids: DUPE-01 -&gt; REQ-DUPE-01, DUPE-02 -&gt; REQ-DUPE-02, …
+
+Moved to .planning/archive/gsd/: STATE.md, ROADMAP.md, REQUIREMENTS.md, PROJECT.md, config.json
+Left where they are: MILESTONES.md
+
+GSD installed inside the project:
+  .claude/: 1 file(s), found by name (commands)
+  CLAUDE.md mentions GSD or .planning/PROJECT.md 2 time(s): read and update it</pre></div>
+      <p class="caption">Two phases were finished under GSD and stay finished. Phase 3 had been discussed and not planned, so it goes on from the next step.</p>
+    </div>
+  </div>
+
+  <div class="feature flip">
+    <div>
+      <span class="num">Convert</span>
+      <h3>Rewrite three files, keep everything else</h3>
+      <p>The roadmap, the requirements and the state are rewritten in the format the phase tool reads. Phase numbers, titles, goals, dependencies and success criteria are kept. A requirement keeps its id with <code>REQ-</code> in front, so a search for the old id still finds it.</p>
+      <p>GSD&#39;s constraints become draft rules in the manifesto and its key decisions become decision rows. Both are drafts: the owner reads them before they count. A record lists every file, every phase with the reason for its status, and every id that changed.</p>
+    </div>
+    <div>
+      <div class="table-scroll">
+      <table>
+        <thead><tr><th>GSD has</th><th>After the move</th></tr></thead>
+        <tbody>
+          <tr><td>Phase folders, plans, summaries, verifications</td><td>Untouched</td></tr>
+          <tr><td><code>STATE.md</code>, <code>ROADMAP.md</code>, <code>REQUIREMENTS.md</code></td><td>Rewritten; the originals are in <code>archive/gsd/</code></td></tr>
+          <tr><td><code>PROJECT.md</code></td><td>Archived; its constraints and decisions are carried as drafts</td></tr>
+          <tr><td>Milestones, retrospective, research, quick tasks</td><td>Left in place as history</td></tr>
+          <tr><td><code>/gsd-*</code> commands and agents checked in to the project</td><td>Removed, with your go-ahead. An install in your home folder is not touched</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h3>What you gain</h3><p>Acceptance tests agreed and locked before the code, one tool that refuses a step whose files are missing, and a search of existing code before anything new is built.</p></div>
+    <div class="card"><h3>What you give up</h3><p>GSD&#39;s milestone commands and its autonomous runs across phases. A new stretch of work is new phases added to the roadmap.</p></div>
+    <div class="card"><h3>Finished phases</h3><p>A phase finished under GSD stays finished. It has no acceptance tests, and a decision row on record says so.</p></div>
+    <div class="card"><h3>A phase under way</h3><p>Moving between phases is simplest. A phase carried mid-way has no locked tests: they are written late, or waived by a decision the owner approves.</p></div>
+  </div>
+  <p class="caption">Tried on copies of nine real GSD projects, from 2 to 43 phase folders. Each converted and passed the phase tool&#39;s check, with no phase folder changed. One passed only once the check was told to leave the project&#39;s own skills alone. No project has made the move for real yet, and nobody has run a phase to the end after it.</p>
+</div></section>
+
 <section><div class="wrap narrow">
   <h2>For a project already in flight</h2>
   <p>Nothing has to be migrated at once.</p>
