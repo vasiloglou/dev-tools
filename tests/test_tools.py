@@ -776,20 +776,31 @@ def layered(project, cli_imports_sizes=True):
     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
 
 
-def fake_gnd(project, report=None, exit_code=0, stderr=""):
-    """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it."""
+def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None):
+    """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it.
+    `check --help` names the flags of a GND newer than 0.3.0 when `newer`; with `--baseline-model` it keeps the
+    base edition and prints `comparison`."""
     folder = project.parent / "fake-gnd"
     folder.mkdir(exist_ok=True)
     script = folder / "gnd"
     script.write_text(
         "#!%s\nimport shutil, sys\nfrom pathlib import Path\n"
         "here = Path(__file__).parent\n"
+        "if '--help' in sys.argv:\n"
+        "    print((here / 'help.txt').read_text()); sys.exit(0)\n"
+        "if '--baseline-model' in sys.argv:\n"
+        "    shutil.copy(sys.argv[sys.argv.index('--baseline-model') + 1], here / 'base-model.json')\n"
+        "    print((here / 'comparison.json').read_text()); sys.exit(0)\n"
         "shutil.copy(sys.argv[2], here / 'model.json'); shutil.copy(sys.argv[3], here / 'head.facts.json')\n"
         "(here / 'argv.txt').write_text(' '.join(sys.argv[1:]))\n"
         "sys.stderr.write((here / 'stderr.txt').read_text())\n"
         "print((here / 'report.json').read_text())\n"
         "sys.exit(int((here / 'exit.txt').read_text()))\n" % sys.executable)
     script.chmod(0o755)
+    (folder / "help.txt").write_text("usage: gnd check [--rule-ids] [--baseline BASE] [--allow-vacuous]"
+                                     + (" [--baseline-model BASE] [--guarded-diagnostics]" if newer else ""))
+    (folder / "comparison.json").write_text(json.dumps(comparison or {}))
+    (folder / "base-model.json").unlink(missing_ok=True)
     (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
     (folder / "exit.txt").write_text(str(exit_code))
     (folder / "stderr.txt").write_text(stderr)
@@ -800,6 +811,11 @@ def fake_gnd(project, report=None, exit_code=0, stderr=""):
 STARTER_IDS = ["no_forbidden_area_use", "no_use_of_a_higher_rank", "no_import_inside_a_loop",
                "canonical_component_has_a_test", "private_module_stays_in_its_component"]
 PLAN_RULE = "plan_names_the_components_it_touches"  # the one starter rule about plans: only `check --phase` judges it
+
+
+def rule_ids(model):
+    """The ids of the rules in a model the script built, without the value lists it adds."""
+    return [c["id"] for c in model["constraints"] if not c["id"].startswith("devtools_")]
 
 
 def gnd_report(*verdicts, exit_code=0, version=15, rules=STARTER_IDS, baseline=None, **more):
@@ -869,9 +885,13 @@ def test_rules_names_rule_id_and_import_evidence(project):
     facts_seen = json.loads((seen / "head.facts.json").read_text())
     argv = (seen / "argv.txt").read_text()
     assert argv.startswith("check ") and "--rule-ids --allow-vacuous --format json" in argv and "--baseline" not in argv
-    assert [c["id"] for c in model["constraints"]] == STARTER_IDS
-    assert all("level" not in c and c["remedy"] for c in model["constraints"])
-    assert [c["modality"] for c in model["constraints"]] == ["alethic", "alethic", "deontic", "deontic", "deontic"]
+    rules = [c for c in model["constraints"] if not c["id"].startswith("devtools_")]
+    assert [c["id"] for c in rules] == STARTER_IDS
+    assert all("level" not in c and "examples" not in c and c["remedy"] for c in rules)
+    assert [c["modality"] for c in rules] == ["alethic", "alethic", "deontic", "deontic", "deontic"]
+    assert {c["id"]: c.get("allowed") for c in model["constraints"] if c["id"].startswith("devtools_")} == {
+        "devtools_component_has_status_status_values": ["canonical", "deprecated", "duplicate-of", "experimental", "external"],
+        "devtools_area_values": ["cli", "core"]}, "the values a role can hold, for a literal outside them"
     assert {f["id"] for f in model["fact_types"]} == set(facts_seen["facts"]) == set(facts_seen["population"]["covers"])
     assert facts_seen["population"]["source"] == "tool-output"
     assert facts_seen["population"]["producer"].startswith("components_index.py facts @ ")
@@ -961,6 +981,144 @@ def test_rules_says_when_the_rules_file_changed(project):
 
 
 REAL_GND = os.environ.get("GND_COMMAND") or shutil.which("gnd")
+NEWER_GND = bool(REAL_GND) and "--baseline-model" in subprocess.run(
+    [*REAL_GND.split(), "check", "--help"], capture_output=True, text=True).stdout
+
+
+def test_rules_say_when_a_rule_judged_nothing_or_names_a_value_nothing_holds(project):
+    layered(project)
+    silent = verdict("no_forbidden_area_use", "pass")
+    silent["guarded_antecedent"] = {"binding_count": 0, "first_empty_atom_index": 2}
+    counted = verdict("canonical_component_has_a_test", "pass")
+    counted["guarded_antecedent"] = {"binding_count": 2, "first_empty_atom_index": None}
+    warning = {"path": "$.constraints[3].antecedent[0].bind[status]", "rule_id": "semantic:guarded-literal-outside-domain",
+               "message": "Literal lies outside the value domain declared by constraints[5]."}
+    report = gnd_report(silent, counted, version=16, warnings=[warning])
+
+    seen = fake_gnd(project, report)
+    code, out = tool(project, "check", script=RULES)
+    assert code == 2 and "report version 16" in out, "a GND that has no such flag was not asked for that report"
+    assert "--guarded-diagnostics" not in (seen / "argv.txt").read_text()
+
+    seen = fake_gnd(project, report, newer=True)
+    code, out = tool(project, "check", script=RULES)
+    assert code == 0, out
+    assert "--guarded-diagnostics" in (seen / "argv.txt").read_text()
+    assert ("reread: no_forbidden_area_use matched nothing: no binding gets past atom 2 (component_in_area) of its "
+            "antecedent, though every fact it names has rows\n") in out
+    assert ("reread: canonical_component_has_a_test: 'canonical' is not a value component_has_status.status can hold "
+            "(canonical, deprecated, duplicate-of, experimental, external)\n") in out, "the rule and the role GND named"
+    code, out = tool(project, "check", "--format", "json", script=RULES)
+    assert json.loads(out)["bindings"] == {"no_forbidden_area_use": 0, "canonical_component_has_a_test": 2}
+
+    rules = project / "docs/components/rules.json"
+    rules.write_text(rules.read_text().replace('"no_import_inside_a_loop"', '"devtools_loop"'))
+    code, out = tool(project, "check", script=RULES)
+    assert code == 2 and "devtools_loop: an id starting with devtools_ is kept" in out
+
+
+def test_rules_say_what_an_edit_of_the_rules_hides(project):
+    layered(project)
+    commit(project)
+    rules = project / "docs/components/rules.json"
+    rules.write_text(rules.read_text().replace('"no_import_inside_a_loop", "level": "should"', '"no_import_inside_a_loop", "level": "must"', 1)
+                     .replace('"id": "no_forbidden_area_use"', '"id": "no_forbidden_area_use_2"'))
+    gone = {"$a": "cli.run", "$b": "core.sizes", "$from": "cli", "$to": "core"}
+    side = lambda modality: {"constraint_ref": "constraints[0]", "constraint_type": "guarded", "modality": modality, "verdict": "fail"}
+    comparison = {"schema_version": "gnd-rule-edition-comparison/1", "exit_code": 0, "reason": None, "rules": [
+        {"address": "constraint:no_forbidden_area_use", "pairing": "removed", "base": side("alethic"), "head": None,
+         "delta": {"base_only": [gone], "head_only": [], "standing": []}, "reason": None},
+        {"address": "constraint:canonical_component_has_a_test", "pairing": "paired", "base": side("alethic"),
+         "head": side("deontic"), "delta": {"base_only": [{"$a": "x"}] * 5, "head_only": [], "standing": []}, "reason": None},
+        {"address": "constraint:no_import_inside_a_loop", "pairing": "paired", "base": side("deontic"), "head": side("alethic"),
+         "delta": None, "reason": "alignment-ambiguous"},
+        {"address": "constraint:devtools_area_values", "pairing": "paired", "base": side("deontic"), "head": side("deontic"),
+         "delta": {"base_only": [{"x": 1}], "head_only": [], "standing": []}, "reason": None}]}
+
+    seen = fake_gnd(project, gnd_report(rules=["no_forbidden_area_use_2", *STARTER_IDS[1:]]), comparison=comparison)
+    code, out = tool(project, "check", "--base", "main", script=RULES)
+    assert code == 0 and "reread: rules changed in this change: docs/components/rules.json" in out, out
+    assert not (seen / "base-model.json").exists(), "a GND without --baseline-model is not asked"
+
+    seen = fake_gnd(project, gnd_report(rules=["no_forbidden_area_use_2", *STARTER_IDS[1:]], version=16), newer=True, comparison=comparison)
+    code, out = tool(project, "check", "--base", "main", script=RULES)
+    assert code == 0, out
+    assert ("reread: no_forbidden_area_use was removed in this change; on this code it reported 1 finding(s); "
+            "a=cli.run b=core.sizes from=cli to=core\n") in out
+    assert ("reread: canonical_component_has_a_test was edited in this change and no longer reports 5 finding(s) it "
+            "reported before; a=x; a=x; a=x; …\n") in out
+    assert "reread: canonical_component_has_a_test went from must to should in this change\n" in out
+    assert "reread: no_import_inside_a_loop: the two editions could not be compared (alignment-ambiguous)\n" in out
+    assert "devtools_area_values" not in out, "the value lists the script adds are not rules"
+    base = json.loads((seen / "base-model.json").read_text())
+    assert rule_ids(base) == STARTER_IDS, "the base edition is the rules file at the base"
+    assert rule_ids(json.loads((seen / "model.json").read_text()))[0] == "no_forbidden_area_use_2"
+
+    commit(project)
+    seen = fake_gnd(project, gnd_report(rules=["no_forbidden_area_use_2", *STARTER_IDS[1:]], version=16), newer=True, comparison=comparison)
+    tool(project, "check", "--base", "HEAD", script=RULES)
+    assert not (seen / "base-model.json").exists(), "rules that did not change are not compared"
+
+
+def test_starter_rules_carry_examples_and_the_vocabulary_lists_match_the_phase_tool(project):
+    rules = json.loads(tool(project, "init", "--print", script=RULES)[1].split("\n", 1)[1].rsplit("# docs/components/layers.toml", 1)[0])
+    assert all(set(rule["examples"]) == {"fails", "passes"} for rule in rules["rules"]), "every starter rule shows both"
+    spec = importlib.util.spec_from_file_location("rules_check", ROOT / "skills/components/scripts/rules_check.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    spec = importlib.util.spec_from_file_location("phase_tool", ROOT / "skills/phase/process-phase/scripts/phase_tool.py")
+    phase_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(phase_module)
+    assert module.PLAN_KEYS == sorted(phase_module.PLAN_KEYS)
+
+
+@pytest.mark.skipif(not REAL_GND, reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
+def test_rules_are_tested_on_their_own_examples_with_real_gnd(project):
+    layered(project)
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": REAL_GND}))
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0 and out.endswith("rules test: 6 rule(s), 12 example(s); 0 wrong\n"), out
+    assert "note: no_import_inside_a_loop: the passing example 1 matched nothing" in out, "no loop: nothing to judge"
+
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    rules["rules"][3]["antecedent"][0]["bind"]["status"] = "canonicl"
+    rules["rules"][0]["examples"]["passes"] = rules["rules"][0]["examples"]["fails"]
+    rules["rules"].append({"id": "no_examples", "level": "should", "type": "guarded",
+                           "antecedent": [{"fact_type": "component_is_listed", "bind": {"component": "$a"}}],
+                           "consequent": {"atom": {"fact_type": "component_has_test", "bind": {"component": "$a", "path": "x"}}},
+                           "examples": {"fails": {"component_is_lsted": [{"component": "a.b"}]}}})
+    path.write_text(json.dumps(rules))
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1, out
+    assert "wrong: canonical_component_has_a_test: the failing example 1 does not break the rule" in out
+    assert "wrong: no_forbidden_area_use: the passing example 1 breaks the rule: a=cli.run b=core.sizes from=cli to=core" in out
+    assert "wrong: no_examples: the failing example 1 names component_is_lsted, which no fact type of this project is" in out
+    assert out.endswith("7 rule(s), 13 example(s); 3 wrong\n"), out
+    rules["rules"][-1]["examples"] = {"fails": "x"}
+    path.write_text(json.dumps(rules))
+    code, out = tool(project, "test", script=RULES)
+    assert code == 2 and 'no_examples: "examples" is' in out
+
+
+@pytest.mark.skipif(not NEWER_GND, reason="needs a GND newer than 0.3.0 (--guarded-diagnostics, --baseline-model)")
+def test_a_misspelt_or_loosened_rule_is_named_with_newer_gnd(project):
+    layered(project)
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": REAL_GND}))
+    commit(project)
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    rules["rules"][3]["antecedent"][0]["bind"]["status"] = "canonicl"
+    path.write_text(json.dumps(rules))
+    code, out = tool(project, "check", "--base", "main", script=RULES)
+    assert code == 0, out
+    assert ("reread: canonical_component_has_a_test was edited in this change and no longer reports 2 finding(s) it "
+            "reported before; a=cli.run; a=core.sizes\n") in out
+    assert ("reread: canonical_component_has_a_test matched nothing: no binding gets past atom 0 (component_has_status) "
+            "of its antecedent") in out
+    assert "reread: canonical_component_has_a_test: 'canonicl' is not a value component_has_status.status can hold" in out
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1 and "no binding gets past atom 0 (component_has_status)" in out, out
 
 
 @pytest.mark.skipif(not REAL_GND, reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
@@ -1110,7 +1268,7 @@ def test_rules_about_plans_are_judged_for_a_phase_only(project):
     seen = fake_gnd(project)
     code, out = tool(project, "check", script=RULES)
     assert code == 0 and "rules: 5 rule(s); 0 to fix" in out, out
-    assert [c["id"] for c in json.loads((seen / "model.json").read_text())["constraints"]] == STARTER_IDS
+    assert rule_ids(json.loads((seen / "model.json").read_text())) == STARTER_IDS
 
     seen = fake_gnd(project, gnd_report(verdict(PLAN_RULE, "warning", broken), rules=[PLAN_RULE]))
     code, out = tool(project, "check", "--phase", "1", script=RULES)
@@ -1123,7 +1281,8 @@ def test_rules_about_plans_are_judged_for_a_phase_only(project):
     assert tool(project, "check", "--phase", "1", "--strict", script=RULES)[0] == 1
     model = json.loads((seen / "model.json").read_text())
     rows = json.loads((seen / "head.facts.json").read_text())["facts"]
-    assert [c["id"] for c in model["constraints"]] == [PLAN_RULE] and "about" not in model["constraints"][0]
+    assert rule_ids(model) == [PLAN_RULE] and "about" not in model["constraints"][0]
+    assert "devtools_task_has_type_type_values" in {c["id"] for c in model["constraints"]}
     assert "--baseline" not in (seen / "argv.txt").read_text()
     assert {f["id"] for f in model["fact_types"]} == set(rows), "the component facts, the plan facts and the joined ones"
     assert rows["task_touches_component"] == [{"task": "01-01-T1", "component": "core.sizes"}], "a pattern names a file"
@@ -1135,7 +1294,8 @@ def test_rules_about_plans_are_judged_for_a_phase_only(project):
     plan.write_text(component_plan(reuse="subsystem.report"))
     fake_gnd(project, gnd_report(rules=[PLAN_RULE]))
     code, out = tool(project, "check", "--phase", "1", "--format", "json", script=RULES)
-    assert code == 0 and json.loads(out) == {"rows": [], "summary": "plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)"}
+    assert code == 0 and json.loads(out) == {"rows": [], "notes": [], "bindings": {},
+                                        "summary": "plan rules for phase 01: 1 rule(s); 0 to fix, 0 warning(s)"}
     rows = json.loads((project.parent / "fake-gnd/head.facts.json").read_text())["facts"]
     assert {"plan": "01-01", "component": "core.sizes"} in rows["plan_names_component"], "a subsystem names its members"
 

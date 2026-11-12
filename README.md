@@ -36,7 +36,10 @@ prompt. The reasoning is on the site:
   use which, and other rules about its components, and every change is checked against
   them: only what the change added is reported. The same file can hold rules about the
   plans of a phase, judged before the plans are approved, and rules about single files,
-  such as a private file used only inside its component. The index is exported as plain facts;
+  such as a private file used only inside its component. Each rule can carry examples it
+  must fail and pass on (`rules_check.py test`), and with a GND newer than 0.3.0 the check
+  also names a rule that matched nothing, a misspelt value, and what an edit of the rules
+  hides. The index is exported as plain facts;
   the rules are judged by [GND](https://github.com/vasiloglou/gnd-public), which the
   project installs separately. GND is what makes a rule a line of data and not another
   hand-written check, and what tells a new finding from one that was already there:
