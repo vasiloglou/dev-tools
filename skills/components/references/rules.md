@@ -37,8 +37,10 @@ moved the catalog finds them there.
 
    Release 0.3.0 is the one this script was last tried with. A GND newer than 0.3.0 (at
    the time of writing, gnd-public `main` from commit 0ff0e9c, not yet released) adds the
-   three checks of a rule itself in [Test a rule](#test-a-rule); the script asks
-   `gnd check --help` whether they are there and works as before when they are not. A project that would rather not
+   three checks of a rule itself in [Test a rule](#test-a-rule); gnd-public `main` from
+   commit f7797f6 adds the cases GND builds from a rule (with the `synth` extra:
+   `get-nick-done[synth]`) and [`suggest`](#suggest-rules-from-the-code). The script asks
+   each command's `--help` whether they are there and works as before when they are not. A project that would rather not
    install it sets `gnd_command = "uvx --from get-nick-done==0.3.0 gnd"`. The script
    stops (exit 2) when GND has no `--rule-ids` (release 0.1.0), and on a report of a
    version it does not know.
@@ -63,7 +65,9 @@ moved the catalog finds them there.
    ```
 
    An area with no rank is not judged by rank. An area that no component is in is an
-   error, so a misspelt name cannot pass quietly.
+   error, so a misspelt name cannot pass quietly. With a newer GND,
+   [`suggest`](#suggest-rules-from-the-code) lists the directions the code already keeps,
+   to start from.
 4. Run the check on the whole project once and read what it prints:
 
    ```bash
@@ -205,7 +209,7 @@ say more than was meant.
 
 A rule that never fires looks exactly like a rule the code obeys. A misspelt value, a role
 bound to the wrong name, an antecedent that cannot match: each gives a quiet pass for
-ever. Four things catch it.
+ever. Five things catch it.
 
 **Examples, written by the rule's author.** A rule may carry facts it must fail on and facts
 it must pass on:
@@ -247,6 +251,47 @@ The next three need a GND newer than 0.3.0 and appear in `check` by themselves:
   today's facts are judged by the base edition of the rules and by today's, rule by rule,
   and the lines say what the edit stops reporting. A rule that was added, or that reports
   more, needs no line: the ordinary output shows it.
+
+The fifth is in `test`, with a GND whose `gnd synth` has `--guarded-cases` (newer still, and
+the `synth` extra). **Cases GND builds from the rule as written**, a failing one and a passing
+one. Where it can build none, the rule itself is wrong:
+
+- `wrong: <rule> can never fail` (`no-failing-case`): whatever matches the antecedent already
+  meets the consequent, so the rule only ever passes.
+- `wrong: <rule> can never apply` (`antecedent-unreachable`): no facts can match the
+  antecedent. Not repeated for a rule already noted for a value nothing can hold.
+- `note: <rule> can never pass once it applies` (`no-passing-case`): right for a ban, written
+  as a guard whose consequent cannot hold; otherwise reread it.
+
+A shape GND builds no cases for, or a search that ran out, says nothing about the rule and
+prints nothing. The cases come from the rule, so they cannot show it means what its author
+meant: the examples do that.
+
+## Suggest rules from the code
+
+```bash
+python3 .claude/skills/components/scripts/rules_check.py suggest
+```
+
+It reads the code, not the rules: GND's `guarded-join` discovery (`gnd discover`, newer than
+0.3.0) over which component uses which and the area each is in. Nothing is written.
+
+- `almost: <a> uses <b> in N of its M use(s)`, with one of the uses and its import. GND reports a
+  pair as a near miss when the uses are at most 5% of the area's, and at most 32. Those
+  that close a loop (`<b> uses <a> K time(s)`) come first: a low layer reaching up is the
+  usual layering mistake. Read each one: fix the import, or decide the use is meant. A pair
+  `layers.toml` already forbids is left out, since `check` reports it. An area with fewer
+  than 20 uses has no near misses.
+- `kept: <a> never uses <b>, … (each uses it)` Directions the code keeps that `layers.toml`
+  does not say yet: `<b>` uses `<a>` and never the other way. A pair of areas that do not use
+  each other at all is not listed. `--format toml` prints these as `[[forbid]]` lines: keep the
+  ones the project means, with the user's go-ahead, and the starter rule
+  `no_forbidden_area_use` holds them from then on.
+
+A direction kept today is a fact about today's code, not a decision: a suggestion becomes a
+rule only when someone means it. `--format json` lists every near miss with the uses behind
+it. Exit 0 when it ran, 2 when it could not; without such a GND it prints `skip:` (exit 1 with
+`--require`).
 
 ## Rules about plans
 

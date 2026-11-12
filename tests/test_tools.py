@@ -776,10 +776,11 @@ def layered(project, cli_imports_sizes=True):
     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
 
 
-def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None):
+def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None):
     """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it.
     `check --help` names the flags of a GND newer than 0.3.0 when `newer`; with `--baseline-model` it keeps the
-    base edition and prints `comparison`."""
+    base edition and prints `comparison`. With `discovery`, `gnd discover` has the guarded-join family and
+    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest."""
     folder = project.parent / "fake-gnd"
     folder.mkdir(exist_ok=True)
     script = folder / "gnd"
@@ -788,6 +789,15 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
         "here = Path(__file__).parent\n"
         "if '--help' in sys.argv:\n"
         "    print((here / 'help.txt').read_text()); sys.exit(0)\n"
+        "if sys.argv[1] in ('discover', 'synth'):\n"
+        "    (here / (sys.argv[1] + '-argv.txt')).write_text(' '.join(sys.argv[1:]))\n"
+        "    shutil.copy(sys.argv[2], here / (sys.argv[1] + '-model.json'))\n"
+        "    if sys.argv[1] == 'discover':\n"
+        "        Path(sys.argv[sys.argv.index('--report') + 1]).write_text((here / 'discovery.json').read_text())\n"
+        "    else:\n"
+        "        out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir()\n"
+        "        (out / 'guarded-cases.json').write_text((here / 'cases.json').read_text())\n"
+        "    sys.exit(0)\n"
         "if '--baseline-model' in sys.argv:\n"
         "    shutil.copy(sys.argv[sys.argv.index('--baseline-model') + 1], here / 'base-model.json')\n"
         "    print((here / 'comparison.json').read_text()); sys.exit(0)\n"
@@ -798,8 +808,12 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
         "sys.exit(int((here / 'exit.txt').read_text()))\n" % sys.executable)
     script.chmod(0o755)
     (folder / "help.txt").write_text("usage: gnd check [--rule-ids] [--baseline BASE] [--allow-vacuous]"
-                                     + (" [--baseline-model BASE] [--guarded-diagnostics]" if newer else ""))
+                                     + (" [--baseline-model BASE] [--guarded-diagnostics]" if newer else "")
+                                     + (" [--joined-relation FACT:SOURCE:TARGET]" if discovery is not None else "")
+                                     + (" [--guarded-cases]" if cases is not None else ""))
     (folder / "comparison.json").write_text(json.dumps(comparison or {}))
+    (folder / "discovery.json").write_text(json.dumps(discovery or {}))
+    (folder / "cases.json").write_text(json.dumps(cases or {}))
     (folder / "base-model.json").unlink(missing_ok=True)
     (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
     (folder / "exit.txt").write_text(str(exit_code))
@@ -1119,6 +1133,123 @@ def test_a_misspelt_or_loosened_rule_is_named_with_newer_gnd(project):
     assert "reread: canonical_component_has_a_test: 'canonicl' is not a value component_has_status.status can hold" in out
     code, out = tool(project, "test", script=RULES)
     assert code == 1 and "no binding gets past atom 0 (component_has_status)" in out, out
+
+
+def forbidden(source, target, **more):
+    """A forbidden pair as GND's guarded-join family proposes it: a use from `source` never reaches `target`."""
+    return {"family": "guarded-join", "constraint": {"id": "gj_" + source + "_" + target, "type": "guarded", "antecedent": [
+        {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}},
+        {"fact_type": "component_in_area", "bind": {"component": "$a", "area": source}}],
+        "consequent": {"absence": {"fact_type": "component_in_area", "bind": {"component": "$b", "area": target}}}}, **more}
+
+
+def test_rules_suggest_reads_the_directions_the_code_keeps(project):
+    layered(project)  # cli.run uses core.sizes, and layers.toml forbids cli to core
+    fake_gnd(project)
+    code, out = tool(project, "suggest", script=RULES)
+    assert code == 0 and out.startswith("skip: suggest needs a GND whose `gnd discover` has the guarded-join family")
+    assert tool(project, "suggest", "--require", script=RULES)[0] == 1
+
+    ref = "ft%d#0" % list(facts(project)["types"]["facts"]).index("component_uses")
+    discovery = {"joined_rules": {"reason": None}, "emitted": [forbidden("core", "cli"), forbidden("core", "core")],
+                 "near_misses": [forbidden("cli", "core", violations=1, subjects=20, counterexamples=[ref])]}
+    seen = fake_gnd(project, discovery=discovery)
+    code, out = tool(project, "suggest", script=RULES)
+    assert code == 0, out
+    assert "--families guarded-join --joined-relation component_uses:caller:callee --joined-classifier " \
+           "component_in_area:component:area" in (seen / "discover-argv.txt").read_text()
+    assert "kept: core never uses cli (each uses it)\n" in out
+    assert "almost:" not in out, "a pair layers.toml forbids is what `check` reports"
+    assert "core never uses core" not in out, "a use inside one area is not a layer"
+
+    layers = project / "docs/components/layers.toml"
+    layers.write_text("")
+    code, out = tool(project, "suggest", script=RULES)
+    assert "almost: cli uses core in 1 of its 20 use(s): cli.run -> core.sizes (src/widget/cli.py -> src/widget/sizes.py)\n" in out
+    assert out.endswith("2 component(s) in 2 area(s), 1 use(s); 1 near miss(es), 1 direction(s) the code keeps that "
+                        "layers.toml does not say; --format toml prints them as [[forbid]] lines\n"), out
+    code, out = tool(project, "suggest", "--format", "toml", script=RULES)
+    assert tomllib.loads(out)["forbid"] == [{"from": "core", "to": "cli"}]
+    code, out = tool(project, "suggest", "--format", "json", script=RULES)
+    assert json.loads(out)["near_misses"][0]["rows"] == [
+        {"caller": "cli.run", "callee": "core.sizes", "imports": [["src/widget/cli.py", "src/widget/sizes.py"]]}]
+
+    layers.write_text("[rank]\ncore = 0\ncli = 1\n")
+    code, out = tool(project, "suggest", script=RULES)
+    assert "kept:" not in out, "a rank already says core does not use cli"
+
+    fake_gnd(project, discovery={"joined_rules": {"reason": "coverage-gap"}})
+    code, out = tool(project, "suggest", script=RULES)
+    assert code == 2 and "could not look for rules over the areas: coverage-gap" in out
+
+
+def test_rules_test_asks_gnd_for_the_cases_a_rule_cannot_have(project):
+    layered(project)
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    for rule in rules["rules"]:
+        rule.pop("examples")
+    path.write_text(json.dumps(rules))
+    manifest = {"schema_version": "gnd-guarded-cases/1", "rules": [
+        {"rule_id": "no_forbidden_area_use", "reason": None, "cases": [{"kind": "failing"}, {"kind": "passing"}]},
+        {"rule_id": "no_use_of_a_higher_rank", "reason": "no-failing-case", "cases": []},
+        {"rule_id": "no_import_inside_a_loop", "reason": "no-passing-case", "cases": []},
+        {"rule_id": "canonical_component_has_a_test", "reason": "search-limit", "cases": []},
+        {"rule_id": "private_module_stays_in_its_component", "reason": "antecedent-unreachable", "cases": []}]}
+    code, out = tool(project, "test", script=RULES)
+    assert "can never" not in out, "a GND without --guarded-cases is not asked"
+
+    seen = fake_gnd(project, cases=manifest)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1, out
+    assert ("wrong: no_use_of_a_higher_rank can never fail: whatever matches its antecedent already meets its consequent "
+            "(gnd synth --guarded-cases: no-failing-case)\n") in out
+    assert "note: no_import_inside_a_loop can never pass once it applies: right for a ban, else reread it" in out
+    assert "wrong: private_module_stays_in_its_component can never apply: no facts can match its antecedent" in out
+    assert "search-limit" not in out, "a search that ran out says nothing about the rule"
+    assert rule_ids(json.loads((seen / "synth-model.json").read_text())) == STARTER_IDS + [PLAN_RULE]
+
+    fake_gnd(project, cases={"schema_version": "gnd-guarded-cases/9"})
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0 and "note: gnd synth --guarded-cases wrote 'gnd-guarded-cases/9'" in out, out
+
+
+def offered(command, flag):
+    return bool(REAL_GND) and flag in subprocess.run([*REAL_GND.split(), command, "--help"],
+                                                     capture_output=True, text=True).stdout
+
+
+@pytest.mark.skipif(not offered("discover", "--joined-relation") or not offered("synth", "--guarded-cases"),
+                    reason="needs a GND newer than 0.3.0 (gnd discover guarded-join, gnd synth --guarded-cases)")
+def test_suggestions_and_generated_cases_with_newer_gnd(project):
+    # core: a base and twenty components on it, one of which uses cli; cli uses core; app uses cli.
+    (project / "src/widget/base.py").write_text('"""Base."""\n')
+    (project / "src/widget/cli.py").write_text('"""Cli."""\nfrom widget import base\n')
+    (project / "src/widget/app.py").write_text('"""App."""\nfrom widget import cli\n')
+    parts = [entry("core.base", "Base", "src/widget/base.py"), entry("cli.run", "Run", "src/widget/cli.py"),
+             entry("app.main", "Main", "src/widget/app.py")]
+    for number in range(20):
+        (project / ("src/widget/c%d.py" % number)).write_text(
+            '"""Part."""\nfrom widget import base\n' + ("from widget import cli\n" if number == 0 else ""))
+        parts.append(entry("core.c%d" % number, "Part %d" % number, "src/widget/c%d.py" % number))
+    catalog(project, *parts)
+    assert tool(project, "init", script=RULES)[0] == 0
+    (project / RULES_SETTINGS).write_text(json.dumps({"gnd_command": REAL_GND}))
+    code, out = tool(project, "suggest", script=RULES)
+    assert code == 0, out
+    assert ("almost: core uses cli in 1 of its 21 use(s); cli uses core 1 time(s), so this closes a loop: "
+            "core.c0 -> cli.run (src/widget/c0.py -> src/widget/cli.py)\n") in out
+    assert "kept: cli never uses app (each uses it)\n" in out
+
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    rules["rules"].append({"id": "cannot_fail", "level": "should", "type": "guarded",
+                           "antecedent": [{"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}],
+                           "consequent": {"atom": {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}}})
+    path.write_text(json.dumps(rules))
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1 and "wrong: cannot_fail can never fail" in out, out
+    assert out.endswith("7 rule(s), 12 example(s); 1 wrong; 1 rule(s) without examples\n"), out
 
 
 @pytest.mark.skipif(not REAL_GND, reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
