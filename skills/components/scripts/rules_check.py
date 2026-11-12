@@ -5,6 +5,7 @@
     rules_check.py check [--base REF] [--strict] [--require] [--format json]
     rules_check.py check --phase NN [--strict] [--require] [--format json]
     rules_check.py test [--format json]   judge each rule on the examples it carries
+    rules_check.py suggest [--format json|toml]   which areas the code already keeps apart, and near misses
 
 ``check`` asks ``components_index.py facts`` for the catalog and the import graph as
 facts, adds the rules in ``rules.json``, and has ``gnd check`` judge them
@@ -34,7 +35,16 @@ the findings the edit stops reporting on today's code (``--baseline-model``). Wi
 those flags the output is what it was.
 
 ``test`` judges each rule alone on the ``examples`` it carries: facts it must fail on and
-facts it must pass on, written by the rule's author.
+facts it must pass on, written by the rule's author. With a GND whose ``gnd synth`` has
+``--guarded-cases``, it also asks GND to build a failing and a passing case for each rule
+from the rule as written, and reports a rule GND finds can never fail, or can never apply.
+
+``suggest`` reads the code, not the rules: GND's ``guarded-join`` discovery (``gnd discover``,
+newer than 0.3.0) over which component uses which and the area each is in. It prints the
+near misses first, an area that uses another only a few times, often a layering mistake
+nobody wrote down, and then the directions the code keeps: an area that never uses one
+that uses it. ``--format toml`` prints those as ``[[forbid]]`` lines for ``layers.toml``.
+Nothing is written: a pair the code keeps today is a rule only when someone means it.
 
 ``rules.json`` and ``layers.toml`` live beside the catalog, in the index script's
 ``docs_dir``. Settings live beside this script, in rules_check.settings.json. Needs
@@ -45,6 +55,7 @@ version 15).
 from __future__ import annotations
 
 import argparse
+import datetime
 import fnmatch
 import importlib.util
 import itertools
@@ -55,6 +66,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 DEFAULT_SETTINGS = {
@@ -71,6 +83,14 @@ COMPARISON = 'gnd-rule-edition-comparison/1'  # what `gnd check --baseline-model
 NEWER = ('--guarded-diagnostics', '--baseline-model')  # flags of a GND newer than 0.3.0, used when present
 RESERVED = 'devtools_'  # the ids of the value lists the script adds; a rule's id may not start with it
 OUTSIDE = 'semantic:guarded-literal-outside-domain'
+CASES = 'gnd-guarded-cases/1'  # what `gnd synth --guarded-cases` writes
+# Why GND could build no case for a rule, and what that says about the rule; other reasons
+# (a shape it does not build cases for, a search that ran out) say nothing about it.
+NO_CASE = {'antecedent-unreachable': ('wrong', 'can never apply: no facts can match its antecedent'),
+           'no-failing-case': ('wrong', 'can never fail: whatever matches its antecedent already meets its consequent'),
+           'no-passing-case': ('note', 'can never pass once it applies: right for a ban, else reread it')}
+# `suggest`: the relation and the classifier GND's guarded-join family reads.
+RELATION, CLASSIFIER = 'component_uses:caller:callee', 'component_in_area:component:area'
 # The values a role can hold whatever the project: a literal outside them in a rule is a typo.
 # PLAN_KEYS is `phase_tool.PLAN_KEYS`; a test keeps the two equal.
 STATUSES = ['canonical', 'deprecated', 'duplicate-of', 'experimental', 'external']
@@ -350,10 +370,10 @@ def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
     return doc
 
 
-def features(gnd: list) -> set:
-    """Which flags of a GND newer than 0.3.0 this one has, read from `gnd check --help`."""
-    done = run([*gnd, 'check', '--help'], 'gnd')
-    return {flag for flag in NEWER if not done.returncode and flag in done.stdout}
+def features(gnd: list, command: str = 'check', flags: tuple = NEWER) -> set:
+    """Which flags of a GND newer than 0.3.0 this one has, read from `gnd <command> --help`."""
+    done = run([*gnd, command, '--help'], 'gnd')
+    return {flag for flag in flags if not done.returncode and flag in done.stdout}
 
 
 def judge(gnd: list, folder: Path, head: dict, base: dict | None, diagnose: bool = False) -> dict:
@@ -751,6 +771,32 @@ def vocabulary(root: Path) -> dict:
     return types
 
 
+def generated(gnd: list, types: dict, rules: list[dict], noted: set) -> list[tuple]:
+    """What `gnd synth --guarded-cases` finds about the rules as written: a rule it could build no failing,
+    or no passing, case for. Those cases come from the rule itself, so they cannot say the rule means what
+    its author meant; the examples do that. A rule already noted for a literal outside its values is not
+    noted again for applying to nothing."""
+    with tempfile.TemporaryDirectory() as name:
+        folder = Path(name)
+        (folder / 'model.json').write_text(json.dumps(model(types, rules)), encoding='utf-8')
+        done = run([*gnd, 'synth', str(folder / 'model.json'), '--guarded-cases', '--out', str(folder / 'cases'),
+                    '--seed', '0'], 'gnd')
+        try:
+            manifest = json.loads((folder / 'cases' / 'guarded-cases.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            return [('note', f'gnd synth --guarded-cases built no cases (exit {done.returncode}): '
+                             f'{(done.stderr or done.stdout).strip()[:300]}')]
+    if manifest.get('schema_version') != CASES:
+        return [('note', f'gnd synth --guarded-cases wrote {manifest.get("schema_version")!r}; this script reads {CASES}')]
+    found = []
+    for entry in manifest.get('rules') or []:
+        name, reason = entry.get('rule_id'), entry.get('reason')
+        if reason in NO_CASE and not (reason == 'antecedent-unreachable' and name in noted):
+            level, says = NO_CASE[reason]
+            found.append((level, f'{name} {says} (gnd synth --guarded-cases: {reason})'))
+    return found
+
+
 def test(root: Path, require: bool, as_json: bool) -> int:
     """Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set
     must not. A passing set the rule matched nothing in is noted: it shows only that the rule is quiet
@@ -763,7 +809,7 @@ def test(root: Path, require: bool, as_json: bool) -> int:
     rules = load_rules(root)
     diagnose = '--guarded-diagnostics' in features(gnd)
     types = vocabulary(root)
-    results, without, count = [], [], 0
+    results, without, count, typos = [], [], 0, set()
     for rule in rules:
         sets = example_sets(rule) or []
         if not sets:
@@ -794,7 +840,9 @@ def test(root: Path, require: bool, as_json: bool) -> int:
                 index = seen['first_empty_atom_index']
                 fact = atoms[index].get('fact_type', '?') if 0 <= index < len(atoms) else '?'
                 why = f': no binding gets past atom {index} ({fact})'
-            results.extend(('note', note) for note in outside(report, built, [rule]))
+            literals = outside(report, built, [rule])
+            results.extend(('note', note) for note in literals)
+            typos.update([rule['id']] if literals else [])
             broke = verdict.get('verdict') in {'fail', 'warning'}
             if verdict.get('verdict') == 'unchecked':
                 results.append(('wrong', f'{label}: gnd could not decide the rule ({verdict.get("reason_code")})'))
@@ -806,6 +854,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
             elif kind == 'passes' and empty:
                 results.append(('note', f'{label} matched nothing{why}, so it shows only that the rule is quiet '
                                         f'with no subject'))
+    if '--guarded-cases' in features(gnd, 'synth', ('--guarded-cases',)):
+        results.extend(generated(gnd, types, rules, typos))
     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
     wrong = sum(level == 'wrong' for level, _ in results)
     summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
@@ -820,6 +870,117 @@ def test(root: Path, require: bool, as_json: bool) -> int:
             print(f'no examples: {", ".join(without)}')
         print(summary)
     return int(bool(wrong))
+
+
+def joined(gnd: list, head: dict) -> dict:
+    """GND's guarded-join discovery over the component facts: the report of `gnd discover`."""
+    areas = {row['area'] for row in head['facts']['component_in_area']}
+    stamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+    with tempfile.TemporaryDirectory() as name:
+        folder = Path(name)
+        (folder / 'model.json').write_text(json.dumps(model(head['types'], [])), encoding='utf-8')
+        (folder / 'pop.json').write_text(json.dumps(population(head)), encoding='utf-8')
+        done = run([*gnd, 'discover', str(folder / 'model.json'), str(folder / 'pop.json'), '--families', 'guarded-join',
+                    '--joined-relation', RELATION, '--joined-classifier', CLASSIFIER,
+                    '--max-directed-pairs', str(max(1, len(areas) ** 2)),  # every ordered pair, an area with itself too
+                    '--actor', 'rules_check.py', '--requested-at', stamp,
+                    '--out', str(folder / 'proposal.json'), '--report', str(folder / 'report.json')], 'gnd')
+        try:
+            report = json.loads((folder / 'report.json').read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            raise Problem(f'gnd discover failed (exit {done.returncode}): {(done.stderr or done.stdout).strip()[:600]}')
+    reason = (report.get('joined_rules') or {}).get('reason')
+    if reason:
+        raise Problem(f'gnd discover could not look for rules over the areas: {reason}')
+    return report
+
+
+def area_pair(constraint: dict) -> tuple | None:
+    """(source area, target area) of a forbidden pair GND proposes: a use from the one never reaches the other."""
+    try:
+        atoms, target = constraint['antecedent'], constraint['consequent']['absence']
+        source = next(atom['bind']['area'] for atom in atoms if atom['fact_type'] == 'component_in_area')
+        if target['fact_type'] != 'component_in_area' or target['bind']['area'] == source:
+            return None  # a use inside one area is not a layer
+        return source, target['bind']['area']
+    except (KeyError, TypeError, StopIteration):
+        return None
+
+
+def suggest(root: Path, require: bool, form: str) -> int:
+    """Rules about areas the code already keeps, and the near misses, from GND's guarded-join discovery."""
+    gnd = shlex.split(SETTINGS['gnd_command'])
+    if not gnd or not shutil.which(gnd[0]):
+        print(f'skip: gnd not found ({SETTINGS["gnd_command"]!r}; install GND or set gnd_command in '
+              f'rules_check.settings.json)')
+        return int(require)
+    if '--joined-relation' not in features(gnd, 'discover', ('--joined-relation',)):
+        print('skip: suggest needs a GND whose `gnd discover` has the guarded-join family (newer than 0.3.0)')
+        return int(require)
+    head = read_facts(root)
+    facts = head['facts']
+    area = {row['component']: row['area'] for row in facts['component_in_area']}
+    uses = Counter((area.get(row['caller']), area.get(row['callee'])) for row in facts['component_uses'])
+    rank = {row['area']: row['rank'] for row in facts['area_has_rank']}
+    banned = {(row['source'], row['target']) for row in facts['area_must_not_use']}
+
+    def covered(pair: tuple) -> bool:
+        """Whether layers.toml already says so: a [[forbid]] pair, or a target of a higher rank."""
+        return pair in banned or (pair[0] in rank and pair[1] in rank and rank[pair[1]] > rank[pair[0]])
+
+    report = joined(gnd, head) if facts['component_uses'] else {'emitted': [], 'near_misses': []}
+    imports = {(row['caller'], row['callee']): row['imports'] for row in head['evidence']['component_uses']}
+    names = [spec for spec in head['types']['facts']]
+    kept, almost = [], []
+    for entry in report.get('emitted') or []:
+        pair = area_pair(entry.get('constraint') or {})
+        if pair and uses[pair[::-1]] and not covered(pair):  # the other way is used: the code keeps a direction
+            kept.append({'from': pair[0], 'to': pair[1], 'used_the_other_way': uses[pair[::-1]]})
+    for entry in report.get('near_misses') or []:
+        pair = area_pair(entry.get('constraint') or {})
+        if not pair or covered(pair):  # what layers.toml forbids, `check` reports
+            continue
+        rows = []
+        for ref in entry.get('counterexamples') or []:
+            found = re.fullmatch(r'ft(\d+)#(\d+)', str(ref))
+            fact = names[int(found.group(1))] if found and int(found.group(1)) < len(names) else None
+            table = facts.get(fact) or []
+            if fact == 'component_uses' and int(found.group(2)) < len(table):
+                row = table[int(found.group(2))]
+                rows.append({'caller': row['caller'], 'callee': row['callee'],
+                             'imports': imports.get((row['caller'], row['callee']), [])})
+        almost.append({'from': pair[0], 'to': pair[1], 'uses': entry.get('violations'), 'of': entry.get('subjects'),
+                       'used_the_other_way': uses[pair[::-1]], 'rows': rows})
+    kept.sort(key=lambda row: (row['from'], row['to']))
+    almost.sort(key=lambda row: (not row['used_the_other_way'], (row['uses'] or 0) / max(row['of'] or 1, 1),
+                                 row['from'], row['to']))
+    summary = (f'suggest: {len(area)} component(s) in {len(set(area.values()))} area(s), '
+               f'{len(facts["component_uses"])} use(s); {len(almost)} near miss(es), '
+               f'{len(kept)} direction(s) the code keeps that layers.toml does not say')
+    if form == 'json':
+        print(json.dumps({'near_misses': almost, 'kept': kept, 'summary': summary}, indent=1))
+        return 0
+    if form == 'toml':
+        print('# Directions the code keeps today (rules_check.py suggest). Keep the ones you mean.')
+        for row in kept:
+            print(f'\n[[forbid]]  # {row["to"]} uses {row["from"]} {row["used_the_other_way"]} time(s)\n'
+                  f'from = "{row["from"]}"\nto = "{row["to"]}"')
+        return 0
+    for row in almost[:SHOWN]:
+        first = row['rows'][0] if row['rows'] else None
+        through = ''
+        if first:
+            through = f': {first["caller"]} -> {first["callee"]}' + ''.join(
+                f' ({" -> ".join(pair)})' for pair in first['imports'][:1])
+        back = (f'; {row["to"]} uses {row["from"]} {row["used_the_other_way"]} time(s), so this closes a loop'
+                if row['used_the_other_way'] else '')
+        print(f'almost: {row["from"]} uses {row["to"]} in {row["uses"]} of its {row["of"]} use(s){back}{through}')
+    if len(almost) > SHOWN:
+        print(f'… +{len(almost) - SHOWN} more near misses (--format json lists them all)')
+    for source, group in itertools.groupby(kept, key=lambda row: row['from']):
+        print(f'kept: {source} never uses ' + ', '.join(row['to'] for row in group) + ' (each uses it)')
+    print(summary + ('; --format toml prints them as [[forbid]] lines' if kept else ''))
+    return 0
 
 
 def init(root: Path, show: bool) -> int:
@@ -852,6 +1013,9 @@ def main(argv: list[str] | None = None) -> int:
     try_examples = commands.add_parser('test')
     try_examples.add_argument('--require', action='store_true', help='fail when GND is not installed')
     try_examples.add_argument('--format', choices=('text', 'json'), default='text')
+    find = commands.add_parser('suggest')
+    find.add_argument('--require', action='store_true', help='fail when GND, or its guarded-join family, is missing')
+    find.add_argument('--format', choices=('text', 'json', 'toml'), default='text')
     args = parser.parse_args(argv)
     if args.command == 'check' and args.phase and args.base:
         parser.error('--phase judges the plans as written: leave out --base')
@@ -860,6 +1024,8 @@ def main(argv: list[str] | None = None) -> int:
             return init(args.root, args.show)
         if args.command == 'test':
             return test(args.root, args.require, args.format == 'json')
+        if args.command == 'suggest':
+            return suggest(args.root, args.require, args.format)
         if args.phase:
             return check_phase(args.root, args.phase, args.strict, args.require, args.format == 'json')
         return check(args.root, args.base, args.strict, args.require, args.format == 'json')

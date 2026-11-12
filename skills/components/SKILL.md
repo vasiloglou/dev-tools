@@ -268,7 +268,9 @@ It reports only what the change added: fix each `fail:`, and fix or justify each
 Exit 2 means the check did not run, which is not a pass. The checker is GND, which the
 project installs separately; without it the command prints `skip:` and exits 0. Never
 edit a rule to make a line go away. After writing or changing a rule, give it a failing and
-a passing example and run `rules_check.py test` (`references/rules.md`, Test a rule). This
+a passing example and run `rules_check.py test` (`references/rules.md`, Test a rule).
+`rules_check.py suggest` lists the directions between areas the code already keeps, and the
+near misses; show them to the user, and add a `[[forbid]]` pair only with their go-ahead. This
 check is a trial: use it where the user asked for it.
 
 ## Rules

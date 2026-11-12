@@ -234,8 +234,39 @@ rules test: 6 rule(s), 12 example(s); 1 wrong
       <p class="caption">A scratch project made for this capture, judged by a GND built from gnd-public <code>main</code> at 0ff0e9c, which is not yet released. The check names the hidden findings, the empty antecedent and the misspelt value; the rule's own example fails. The standing item is the private-file import of the earlier capture.</p>
     </div>
   </div>
+  <div class="feature" id="suggest">
+    <div>
+      <span class="num">Suggesting rules</span>
+      <h3>The layers a codebase already keeps, and where it almost does</h3>
+      <p>A project starts with an empty <code>layers.toml</code>, and someone has to say which areas may use which. <code>rules_check.py suggest</code> reads that off the code instead. GND's discovery looks at every use between components and the area each is in.</p>
+      <p>First come the near misses: an area that uses another only a few times, against many uses the other way. Those few uses are often a layering mistake nobody wrote down. Then come the directions the code keeps: an area that never uses one that uses it.</p>
+      <p>Nothing is written. A direction the code keeps today becomes a rule only when someone means it. <code>--format toml</code> prints the directions as <code>[[forbid]]</code> lines to paste into <code>layers.toml</code>. A newer <code>test</code> also asks GND to build cases from each rule, and reports a rule that can never fail.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>gnd-public · GND's own code, 245 components</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">rules suggest</span>
+almost: check uses exp in 1 of its 113 use(s); exp uses check 3 time(s), so this closes a loop: check.element_coverage -&gt; exp.spec (src/gnd/coverage.py -&gt; src/gnd/exp/spec.py)
+almost: model uses checker in 1 of its 112 use(s); checker uses model 10 time(s), so this closes a loop: model.diff -&gt; checker.evaluate (src/gnd/diff.py -&gt; src/gnd/checker/__init__.py)
+almost: model uses extract in 1 of its 112 use(s); extract uses model 13 time(s), so this closes a loop: model.diff -&gt; extract.source_anchors (src/gnd/diff.py -&gt; src/gnd/extract/anchors.py)
+<span class="dim">…</span>
+almost: model uses synth in 2 of its 112 use(s); synth uses model 33 time(s), so this closes a loop: model.diff -&gt; synth.assemble (src/gnd/diff.py -&gt; src/gnd/synth/assemble.py)
+<span class="dim">…</span>
+kept: model never uses agent, assurance, cli, codegen, conformance, discover, evolve, examples, exp, export, fidelity, measure, recovery, witness (each uses it)
+<span class="dim">…</span>
+suggest: 245 component(s) in 25 area(s), 1308 use(s); 56 near miss(es), 97 direction(s) the code keeps that layers.toml does not say; --format toml prints them as [[forbid]] lines
+<span class="dim">exit code 0</span>
+
+<span class="p">$</span> <span class="cmd">rules suggest --format toml | head -5</span>
+# Directions the code keeps today (rules_check.py suggest). Keep the ones you mean.
+
+[[forbid]]  # cli uses agent 4 time(s)
+from = "agent"
+to = "cli"</pre></div>
+      <p class="caption">GND's own repository at f7797f6, which keeps its component index with dev-tools. The run used a GND built from that commit, which is not yet released, and is shortened where marked. Three of the near misses come from one file: <code>src/gnd/diff.py</code> in the <code>model</code> area reaches up into <code>checker</code>, <code>extract</code> and <code>synth</code>, all of which use <code>model</code>. Whether that is a mistake is for the project to say.</p>
+    </div>
+  </div>
   <div class="callout">
-    <p><strong>What has and has not been shown.</strong> The rules about plans and about files, and the tests of a rule, have run on projects made to test them and on no real project, and no step of the workflow requires them. The three lines that need a newer GND were tried on a build that is not yet released. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
+    <p><strong>What has and has not been shown.</strong> The rules about plans and about files, and the tests of a rule, have run on projects made to test them and on no real project, and no step of the workflow requires them. The three lines that need a newer GND were tried on a build that is not yet released. <code>suggest</code> has run on one real codebase, GND's own, on such a build; what it prints are suggestions, and none has been adopted as a rule yet. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
   </div>
 </div></section>
 
