@@ -4,6 +4,7 @@
     rules_check.py init [--print]     write a starter rules file and layers.toml (never overwrites one)
     rules_check.py check [--base REF] [--strict] [--require] [--format json]
     rules_check.py check --phase NN [--strict] [--require] [--format json]
+    rules_check.py test [--format json]   judge each rule on the examples it carries
 
 ``check`` asks ``components_index.py facts`` for the catalog and the import graph as
 facts, adds the rules in ``rules.json``, and has ``gnd check`` judge them
@@ -25,6 +26,16 @@ approved: the rules marked ``"about": "plans"``, over what ``phase_tool.py facts
 the plans and the component facts together. Plain ``check`` leaves those rules out. There is
 no base to compare with: every line is about the plans as written.
 
+A GND newer than 0.3.0 adds three ``reread:`` lines, and the script asks ``gnd check
+--help`` whether it can: a rule whose antecedent matched nothing although every fact it
+names has rows (``--guarded-diagnostics``); a literal in a rule that no fact of its kind can
+hold, such as a misspelt status or area; and, when ``--base`` finds ``rules.json`` edited,
+the findings the edit stops reporting on today's code (``--baseline-model``). Without
+those flags the output is what it was.
+
+``test`` judges each rule alone on the ``examples`` it carries: facts it must fail on and
+facts it must pass on, written by the rule's author.
+
 ``rules.json`` and ``layers.toml`` live beside the catalog, in the index script's
 ``docs_dir``. Settings live beside this script, in rules_check.settings.json. Needs
 Python 3.11 or newer, and GND 0.2.0 or newer (get-nick-done on PyPI), the first release
@@ -35,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import fnmatch
+import importlib.util
 import itertools
 import json
 import re
@@ -54,6 +66,17 @@ DEFAULT_SETTINGS = {
 }
 SHOWN = 10  # lines printed for one rule; --format json has them all
 REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, and new or standing
+DIAGNOSED = 16  # the same report with `--guarded-diagnostics`: each guarded rule's antecedent bindings
+COMPARISON = 'gnd-rule-edition-comparison/1'  # what `gnd check --baseline-model` writes
+NEWER = ('--guarded-diagnostics', '--baseline-model')  # flags of a GND newer than 0.3.0, used when present
+RESERVED = 'devtools_'  # the ids of the value lists the script adds; a rule's id may not start with it
+OUTSIDE = 'semantic:guarded-literal-outside-domain'
+# The values a role can hold whatever the project: a literal outside them in a rule is a typo.
+# PLAN_KEYS is `phase_tool.PLAN_KEYS`; a test keeps the two equal.
+STATUSES = ['canonical', 'deprecated', 'duplicate-of', 'experimental', 'external']
+TASK_TYPES = ['auto', 'checkpoint:decision', 'checkpoint:human-verify']
+TEST_KINDS = ['contract', 'guard']
+PLAN_KEYS = ['autonomous', 'gap_closure', 'golden_impact', 'llm_dependency', 'prove_method']
 BANDS = {0, 1, 2, 4}  # exit codes of a check that ran: accepted, violated, vacuous rules, undecided
 USES = ('component_uses', 'component_uses_in_cycle')
 MODEL_ID = 'urn:devtools:component-rules@1'
@@ -67,7 +90,15 @@ STARTER_RULES = {'rules': [
      'antecedent': [{'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}},
                     {'fact_type': 'component_in_area', 'bind': {'component': '$a', 'area': '$from'}},
                     {'fact_type': 'component_in_area', 'bind': {'component': '$b', 'area': '$to'}}],
-     'consequent': {'absence': {'fact_type': 'area_must_not_use', 'bind': {'source': '$from', 'target': '$to'}}}},
+     'consequent': {'absence': {'fact_type': 'area_must_not_use', 'bind': {'source': '$from', 'target': '$to'}}},
+     'examples': {'fails': {'component_uses': [{'caller': 'cli.run', 'callee': 'core.sizes'}],
+                            'component_in_area': [{'component': 'cli.run', 'area': 'cli'},
+                                                  {'component': 'core.sizes', 'area': 'core'}],
+                            'area_must_not_use': [{'source': 'cli', 'target': 'core'}]},
+                  'passes': {'component_uses': [{'caller': 'cli.run', 'callee': 'core.sizes'}],
+                             'component_in_area': [{'component': 'cli.run', 'area': 'cli'},
+                                                   {'component': 'core.sizes', 'area': 'core'}],
+                             'area_must_not_use': [{'source': 'core', 'target': 'cli'}]}}},
     {'id': 'no_use_of_a_higher_rank', 'level': 'must',
      'remedy': 'A component uses one of a higher rank ([rank] in layers.toml): move what it needs down, '
                'or the caller up',
@@ -77,19 +108,37 @@ STARTER_RULES = {'rules': [
                     {'fact_type': 'component_in_area', 'bind': {'component': '$b', 'area': '$to'}},
                     {'fact_type': 'area_has_rank', 'bind': {'area': '$from', 'rank': '$rank'}},
                     {'fact_type': 'area_has_rank', 'bind': {'area': '$to', 'rank': '$used'}}],
-     'consequent': {'comparison': {'operator': '<=', 'left': '$used', 'right': '$rank'}}},
+     'consequent': {'comparison': {'operator': '<=', 'left': '$used', 'right': '$rank'}},
+     'examples': {'fails': {'component_uses': [{'caller': 'core.sizes', 'callee': 'cli.run'}],
+                            'component_in_area': [{'component': 'cli.run', 'area': 'cli'},
+                                                  {'component': 'core.sizes', 'area': 'core'}],
+                            'area_has_rank': [{'area': 'core', 'rank': 0}, {'area': 'cli', 'rank': 1}]},
+                  'passes': {'component_uses': [{'caller': 'cli.run', 'callee': 'core.sizes'}],
+                             'component_in_area': [{'component': 'cli.run', 'area': 'cli'},
+                                                   {'component': 'core.sizes', 'area': 'core'}],
+                             'area_has_rank': [{'area': 'core', 'rank': 0}, {'area': 'cli', 'rank': 1}]}}},
     {'id': 'no_import_inside_a_loop', 'level': 'should',
      'remedy': 'This import is part of a loop of imports between components: move the shared code '
                'into a component both can use',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_uses_in_cycle', 'bind': {'caller': '$a', 'callee': '$b'}}],
-     'consequent': {'absence': {'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}}}},
+     'consequent': {'absence': {'fact_type': 'component_uses', 'bind': {'caller': '$a', 'callee': '$b'}}},
+     # Every import inside a loop is reported, so the passing example has no loop: it shows the rule is
+     # quiet then, and `test` notes that it matched nothing.
+     'examples': {'fails': {'component_uses': [{'caller': 'cli.run', 'callee': 'core.sizes'},
+                                               {'caller': 'core.sizes', 'callee': 'cli.run'}],
+                            'component_uses_in_cycle': [{'caller': 'cli.run', 'callee': 'core.sizes'},
+                                                        {'caller': 'core.sizes', 'callee': 'cli.run'}]},
+                  'passes': {'component_uses': [{'caller': 'cli.run', 'callee': 'core.sizes'}]}}},
     {'id': 'canonical_component_has_a_test', 'level': 'should',
      'remedy': 'A canonical component lists no test: add a tests: line to its entry, or write one',
      'type': 'guarded',
      'antecedent': [{'fact_type': 'component_has_status', 'bind': {'component': '$a', 'status': 'canonical'}}],
      'consequent': {'exists': {'atoms': [{'fact_type': 'component_has_test',
-                                          'bind': {'component': '$a', 'path': '$test'}}]}}},
+                                          'bind': {'component': '$a', 'path': '$test'}}]}},
+     'examples': {'fails': {'component_has_status': [{'component': 'core.sizes', 'status': 'canonical'}]},
+                  'passes': {'component_has_status': [{'component': 'core.sizes', 'status': 'canonical'}],
+                             'component_has_test': [{'component': 'core.sizes', 'path': 'tests/test_sizes.py'}]}}},
     {'id': 'private_module_stays_in_its_component', 'level': 'should',
      'remedy': 'A file imports a private file (its name starts with _) of another component: import what '
                'that component offers, or move the file to the component that uses it',
@@ -97,7 +146,15 @@ STARTER_RULES = {'rules': [
      'antecedent': [{'fact_type': 'module_imports', 'bind': {'importer': '$a', 'imported': '$b'}},
                     {'fact_type': 'module_is_private', 'bind': {'path': '$b'}},
                     {'fact_type': 'component_has_module', 'bind': {'component': '$c', 'path': '$b'}}],
-     'consequent': {'atom': {'fact_type': 'component_has_module', 'bind': {'component': '$c', 'path': '$a'}}}},
+     'consequent': {'atom': {'fact_type': 'component_has_module', 'bind': {'component': '$c', 'path': '$a'}}},
+     'examples': {'fails': {'module_imports': [{'importer': 'src/app/cli.py', 'imported': 'src/app/_round.py'}],
+                            'module_is_private': [{'path': 'src/app/_round.py'}],
+                            'component_has_module': [{'component': 'cli.run', 'path': 'src/app/cli.py'},
+                                                     {'component': 'core.sizes', 'path': 'src/app/_round.py'}]},
+                  'passes': {'module_imports': [{'importer': 'src/app/sizes.py', 'imported': 'src/app/_round.py'}],
+                             'module_is_private': [{'path': 'src/app/_round.py'}],
+                             'component_has_module': [{'component': 'core.sizes', 'path': 'src/app/sizes.py'},
+                                                      {'component': 'core.sizes', 'path': 'src/app/_round.py'}]}}},
     {'id': 'plan_names_the_components_it_touches', 'about': 'plans', 'level': 'should',
      'remedy': 'A task changes a file of a component the plan does not name: add the component to the '
                "plan's reuse: line, or to new_component: if the plan creates it",
@@ -105,7 +162,13 @@ STARTER_RULES = {'rules': [
      'antecedent': [{'fact_type': 'task_touches_component', 'bind': {'task': '$task', 'component': '$component'}},
                     {'fact_type': 'task_in_plan', 'bind': {'task': '$task', 'plan': '$plan'}}],
      'consequent': {'atom': {'fact_type': 'plan_names_component',
-                             'bind': {'plan': '$plan', 'component': '$component'}}}},
+                             'bind': {'plan': '$plan', 'component': '$component'}}},
+     'examples': {'fails': {'task_touches_component': [{'task': '01-01-T1', 'component': 'core.sizes'}],
+                            'task_in_plan': [{'task': '01-01-T1', 'plan': '01-01'}],
+                            'plan_names_component': [{'plan': '01-01', 'component': 'cli.run'}]},
+                  'passes': {'task_touches_component': [{'task': '01-01-T1', 'component': 'core.sizes'}],
+                             'task_in_plan': [{'task': '01-01-T1', 'plan': '01-01'}],
+                             'plan_names_component': [{'plan': '01-01', 'component': 'core.sizes'}]}}},
 ]}
 # What `check --phase` adds to the plan facts and the component facts: each needs both.
 JOINED = {
@@ -172,6 +235,8 @@ def load_rules(root: Path) -> list[dict]:
         if not isinstance(name, str) or not re.fullmatch(r'[a-z][a-z0-9_]*', name):
             problems.append(f'rule {number}: needs an "id" of lower-case letters, digits and _')
             continue
+        if name.startswith(RESERVED):
+            problems.append(f'{name}: an id starting with {RESERVED} is kept for the value lists this script adds')
         if name in seen:
             problems.append(f'{name}: id used twice')
         seen.add(name)
@@ -181,16 +246,61 @@ def load_rules(root: Path) -> list[dict]:
             problems.append(f'{name}: "about" is components or plans')
         if not isinstance(rule.get('remedy', ''), str) or 'type' not in rule:
             problems.append(f'{name}: needs a "type", and "remedy" is text')
+        if 'examples' in rule and example_sets(rule) is None:
+            problems.append(f'{name}: "examples" is {{"fails": ..., "passes": ...}}, each a set of facts '
+                            '({fact type: [rows]}) or a list of them')
     if problems:
         raise Problem(f'{RULES}: ' + '; '.join(problems))
     return rules
 
 
-def model(types: dict, rules: list[dict]) -> dict:
-    """The GND model: fact types as the facts file describes them, and the project's rules."""
+def example_sets(rule: dict):
+    """A rule's examples as [(kind, number, facts)], or None when they are not written as `test` reads them."""
+    found = []
+    examples = rule.get('examples')
+    if not isinstance(examples, dict) or not set(examples) <= {'fails', 'passes'}:
+        return None
+    for kind in ('fails', 'passes'):
+        sets = examples.get(kind, [])
+        for number, facts in enumerate(sets if isinstance(sets, list) else [sets], 1):
+            if not isinstance(facts, dict) or not all(isinstance(rows, list) and all(isinstance(r, dict) for r in rows)
+                                                       for rows in facts.values()):
+                return None
+            found.append((kind, number, facts))
+    return found
+
+
+def domains(types: dict, facts: dict | None = None) -> list[dict]:
+    """The value lists the vocabulary fixes, for the roles the types have: a rule naming another value is a
+    typo. Advisory constraints: GND warns about a literal outside them; their verdicts are not findings."""
+    lists = []
+    present = {(name, role) for name, spec in types['facts'].items() for role, _ in spec['roles']}
+    for fact, role, values in (('component_has_status', 'status', STATUSES), ('task_has_type', 'type', TASK_TYPES),
+                               ('test_is_in_contract', 'kind', TEST_KINDS), ('plan_declares', 'key', PLAN_KEYS)):
+        if (fact, role) in present:
+            lists.append((fact, role, values))
+    areas = sorted({row['area'] for row in (facts or {}).get('component_in_area', [])})
+    if areas and ('component_in_area', 'area') in present:
+        lists.append((None, 'area', areas))  # every role an area plays: the catalog's areas are all there are
+    found = []
+    for fact, role, values in lists:
+        kind = dict(types['facts'][fact]['roles'])[role] if fact else role
+        body = {'id': f'{RESERVED}{(fact + "_") if fact else ""}{role}_values', 'type': 'value', 'object_type': kind,
+                'allowed': values, 'modality': 'deontic', 'source': 'explicit', 'status': 'confirmed',
+                'provenance': {'user_quote': 'the values this role can hold'}}
+        if fact:
+            body['role_ref'] = {'fact_type': fact, 'role': role}
+        found.append(body)
+    return found
+
+
+def model(types: dict, rules: list[dict], facts: dict | None = None) -> dict:
+    """The GND model: fact types as the facts file describes them, the project's rules, and the value
+    lists of `domains` after them."""
     constraints = []
     for rule in rules:
-        body = {key: value for key, value in rule.items() if key not in ('level', 'about') and (key != 'remedy' or value)}
+        body = {key: value for key, value in rule.items()
+                if key not in ('level', 'about', 'examples') and (key != 'remedy' or value)}
         body.update(modality='alethic' if rule.get('level', 'must') == 'must' else 'deontic', source='explicit',
                     status='confirmed', provenance={'user_quote': rule.get('remedy') or rule['id']})
         constraints.append(body)
@@ -202,7 +312,7 @@ def model(types: dict, rules: list[dict]) -> dict:
         'fact_types': [{'id': name, 'reading': spec['reading'],
                         'roles': [{'role_name': role, 'object_type': kind} for role, kind in spec['roles']]}
                        for name, spec in types['facts'].items()],
-        'constraints': constraints,
+        'constraints': constraints + domains(types, facts),
     }
 
 
@@ -240,13 +350,20 @@ def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
     return doc
 
 
-def judge(gnd: list, folder: Path, head: dict, base: dict | None) -> dict:
-    """The report of `gnd check` on the head facts, against the base facts when given."""
+def features(gnd: list) -> set:
+    """Which flags of a GND newer than 0.3.0 this one has, read from `gnd check --help`."""
+    done = run([*gnd, 'check', '--help'], 'gnd')
+    return {flag for flag in NEWER if not done.returncode and flag in done.stdout}
+
+
+def judge(gnd: list, folder: Path, head: dict, base: dict | None, diagnose: bool = False) -> dict:
+    """The report of `gnd check` on the head facts, against the base facts when given. With `diagnose`,
+    each guarded verdict also says how many bindings its antecedent had."""
     for name, doc in (('head', head), ('base', base)):
         if doc is not None:
             (folder / f'{name}.pop.json').write_text(json.dumps(population(doc)), encoding='utf-8')
     command = [*gnd, 'check', str(folder / 'model.json'), str(folder / 'head.pop.json'), '--rule-ids',
-               '--allow-vacuous', '--format', 'json']
+               '--allow-vacuous', *(['--guarded-diagnostics'] if diagnose else []), '--format', 'json']
     if base is not None:
         command[-2:-2] = ['--baseline', str(folder / 'base.pop.json')]
     done = run(command, 'gnd')
@@ -262,8 +379,9 @@ def judge(gnd: list, folder: Path, head: dict, base: dict | None) -> dict:
         issues = '; '.join(f'{i.get("path")}: {str(i.get("message"))[:200]}' for i in (report.get('issues') or [])[:5])
         raise Problem(f'gnd did not judge the rules ({report.get("outcome")}, exit {report.get("exit_code")}): '
                       f'{issues or report.get("error")}')
-    if report.get('schema_version') != REPORT:
-        raise Problem(f'gnd wrote report version {report.get("schema_version")}; this script reads version {REPORT}')
+    wanted = DIAGNOSED if diagnose else REPORT
+    if report.get('schema_version') != wanted:
+        raise Problem(f'gnd wrote report version {report.get("schema_version")}; this script reads version {wanted} here')
     return report
 
 
@@ -273,6 +391,8 @@ def findings(report: dict, rules: list[dict]) -> tuple[list, list]:
     broken, undecided, judged = [], [], set()
     try:
         for verdict in report['verdicts']:
+            if verdict['address'].removeprefix('constraint:').startswith(RESERVED):
+                continue  # a value list of `domains`, not a rule
             rule = by_id[verdict['address'].removeprefix('constraint:')]  # every rule has an id
             judged.add(rule['id'])
             level = 'fail' if rule.get('level', 'must') == 'must' else 'warn'
@@ -290,6 +410,102 @@ def findings(report: dict, rules: list[dict]) -> tuple[list, list]:
     if unjudged:
         raise Problem(f'gnd gave no verdict for: {", ".join(unjudged)}')
     return broken, undecided
+
+
+def silent(report: dict, rules: list[dict]) -> list[str]:
+    """`reread:` notes for the rules a report shows judged nothing: an antecedent that no binding gets
+    through although every fact it names has rows (GND says so only with --guarded-diagnostics)."""
+    by_id = {rule['id']: rule for rule in rules}
+    notes = []
+    for verdict in report.get('verdicts', []):
+        rule = by_id.get(verdict.get('address', '').removeprefix('constraint:'))
+        seen = verdict.get('guarded_antecedent') or {}
+        index = seen.get('first_empty_atom_index')
+        if rule and seen.get('binding_count') == 0 and isinstance(index, int):
+            atoms = rule.get('antecedent') or []
+            fact = atoms[index].get('fact_type', '?') if 0 <= index < len(atoms) and isinstance(atoms[index], dict) else '?'
+            notes.append(f'{rule["id"]} matched nothing: no binding gets past atom {index} ({fact}) of its antecedent, '
+                         f'though every fact it names has rows')
+    return notes
+
+
+def outside(report: dict, built: dict, rules: list[dict]) -> list[str]:
+    """`reread:` notes for a literal in a rule that no fact of its kind can hold, from GND's warnings."""
+    notes = []
+    for warning in report.get('warnings') or []:
+        if not isinstance(warning, dict) or warning.get('rule_id') != OUTSIDE:
+            continue
+        path = str(warning.get('path', ''))
+        steps = re.findall(r'\.([A-Za-z_]+)|\[(\d+)\]|\[([^\]]+)\]', path)
+        node, trail = built, []
+        try:
+            for key, index, name in steps:
+                trail.append(node)
+                node = node[int(index)] if index else node[key or name]
+        except (KeyError, IndexError, TypeError, ValueError):
+            notes.append(f'a literal lies outside the values its role can hold, at {path}')
+            continue
+        owner = trail[2] if len(trail) > 2 and isinstance(trail[2], dict) else {}  # model, constraints, the rule
+        atom = next((step for step in reversed(trail) if isinstance(step, dict) and 'fact_type' in step), {})
+        role = (steps[-1][2] or steps[-1][0]) if steps else '?'
+        found = re.search(r'constraints\[(\d+)\]', str(warning.get('message', '')))
+        allowed = built['constraints'][int(found.group(1))].get('allowed', []) if found else []
+        notes.append(f'{owner.get("id", "a rule")}: {node!r} is not a value {atom.get("fact_type", "?")}.{role} '
+                     f'can hold' + (f' ({", ".join(map(str, allowed))})' if allowed else ''))
+    return notes
+
+
+def hidden(comparison: dict) -> list[str]:
+    """`reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code."""
+    notes = []
+    if comparison.get('schema_version') != COMPARISON:
+        return [f'the rules were edited, and gnd wrote no comparison this script reads '
+                f'({comparison.get("schema_version")!r})']
+    for row in comparison.get('rules') or []:
+        name = str(row.get('address', '')).removeprefix('constraint:')
+        if name.startswith(RESERVED):
+            continue
+        delta, before, after = row.get('delta') or {}, row.get('base') or {}, row.get('head') or {}
+        gone = delta.get('base_only') or []
+        shown = ''.join(f'; {describe(binding)}' for binding in gone[:3]) + ('; …' if len(gone) > 3 else '')
+        if row.get('pairing') == 'removed':
+            notes.append(f'{name} was removed in this change; on this code it reported {len(gone)} finding(s){shown}')
+        elif row.get('pairing') == 'paired' and gone:
+            notes.append(f'{name} was edited in this change and no longer reports {len(gone)} finding(s) it '
+                         f'reported before{shown}')
+        if row.get('pairing') == 'paired' and before.get('modality') == 'alethic' and after.get('modality') == 'deontic':
+            notes.append(f'{name} went from must to should in this change')
+        if row.get('reason'):
+            notes.append(f'{name}: the two editions could not be compared ({row["reason"]})')
+    if comparison.get('reason'):
+        notes.append(f'the two editions of the rules could not be compared ({comparison["reason"]})')
+    return notes
+
+
+def base_rules(root: Path, revision: str) -> list[dict] | None:
+    """The rules about components as `rules.json` held them at a commit, or None when it had none."""
+    RULES = places(root)[0]
+    done = run(['git', '-C', str(root), 'show', f'{revision}:{RULES}'], 'git')
+    if done.returncode:
+        return None
+    try:
+        rules = json.loads(done.stdout).get('rules')
+    except (ValueError, AttributeError):
+        return None
+    return [rule for rule in rules if isinstance(rule, dict) and rule.get('about', 'components') == 'components'
+            and isinstance(rule.get('id'), str)] if isinstance(rules, list) else None
+
+
+def compare(gnd: list, folder: Path, head_model: dict, base_model: dict) -> dict:
+    """`gnd check` of today's facts under today's rules, against the base edition of the rules."""
+    (folder / 'base-model.json').write_text(json.dumps(base_model), encoding='utf-8')
+    done = run([*gnd, 'check', str(folder / 'model.json'), str(folder / 'head.pop.json'),
+                '--baseline-model', str(folder / 'base-model.json'), '--format', 'json'], 'gnd')
+    try:
+        found = json.loads(done.stdout)
+    except ValueError:
+        return {'reason': f'gnd check --baseline-model exited {done.returncode}: {(done.stderr or done.stdout).strip()[:300]}'}
+    return found if isinstance(found, dict) else {'reason': 'gnd wrote no comparison'}
 
 
 def used_pair(rule: dict, binding) -> tuple | None:
@@ -325,6 +541,7 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
               f'rules_check.settings.json)')
         return int(require)
     rules = [rule for rule in load_rules(root) if rule.get('about', 'components') == 'components']
+    has = features(gnd)
     head = read_facts(root)
     # The facts about files are asked for only when a rule names one: a file path in a fact
     # makes a renamed file a new fact, which a project whose rules name no file is spared.
@@ -338,11 +555,17 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
             old = {(row['caller'], row['callee']): row['imports'] for row in before['evidence']['component_uses']}
         else:
             notes.append(f'no catalog at {before["revision"][:7]}: everything broken counts as new')
-        notes.extend(f'rules changed in this change: {path}' for path in changed_rules(root, before['revision']))
+        edited = changed_rules(root, before['revision'])
+        notes.extend(f'rules changed in this change: {path}' for path in edited)
+    built = model(head['types'], rules, head['facts'])
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
-        (folder / 'model.json').write_text(json.dumps(model(head['types'], rules)), encoding='utf-8')
-        report = judge(gnd, folder, head, before if old is not None else None)
+        (folder / 'model.json').write_text(json.dumps(built), encoding='utf-8')
+        report = judge(gnd, folder, head, before if old is not None else None, '--guarded-diagnostics' in has)
+        earlier = base_rules(root, before['revision']) if base and places(root)[0] in edited else None
+        if earlier is not None and '--baseline-model' in has:
+            notes.extend(hidden(compare(gnd, folder, built, model(head['types'], earlier, head['facts']))))
+    notes.extend(silent(report, rules) + outside(report, built, rules))
     broken, undecided = findings(report, rules)
     edges = {(row['caller'], row['callee']): row['imports'] for row in head['evidence']['component_uses']}
     rows = []
@@ -364,7 +587,8 @@ def check(root: Path, base: str, strict: bool, require: bool, as_json: bool) -> 
     summary = (f'rules{against}: {len(rules)} rule(s); {fails} to fix, {len(new) - fails} warning(s)'
                + (f', {len(rows) - len(new)} standing' if old is not None else ''))
     if as_json:
-        print(json.dumps({'rows': rows, 'notes': notes, 'summary': summary, 'baseline': report.get('baseline')}, indent=1))
+        print(json.dumps({'rows': rows, 'notes': notes, 'summary': summary, 'baseline': report.get('baseline'),
+                          'bindings': bindings(report)}, indent=1))
     else:
         for name, group in itertools.groupby(new, key=lambda row: row['rule']):
             group = list(group)
@@ -447,6 +671,14 @@ def plans_with_components(root: Path, code: dict, plans: dict) -> dict:
     }
 
 
+def bindings(report: dict) -> dict:
+    """{rule id: how many bindings its antecedent had}, for the guarded rules GND counted."""
+    return {verdict['address'].removeprefix('constraint:'): verdict['guarded_antecedent'].get('binding_count')
+            for verdict in report.get('verdicts', [])
+            if isinstance(verdict.get('guarded_antecedent'), dict)
+            and not verdict['address'].removeprefix('constraint:').startswith(RESERVED)}
+
+
 def check_phase(root: Path, phase: str, strict: bool, require: bool, as_json: bool) -> int:
     """Judge the rules about plans over the plans of one phase. No base: a plan is judged as written."""
     gnd = shlex.split(SETTINGS['gnd_command'])
@@ -455,12 +687,15 @@ def check_phase(root: Path, phase: str, strict: bool, require: bool, as_json: bo
               f'rules_check.settings.json)')
         return int(require)
     rules = [rule for rule in load_rules(root) if rule.get('about') == 'plans']
+    has = features(gnd)
     plans = read_plan_facts(root, phase)
     doc = plans_with_components(root, read_facts(root, modules=True), plans)
+    built = model(doc['types'], rules, doc['facts'])
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
-        (folder / 'model.json').write_text(json.dumps(model(doc['types'], rules)), encoding='utf-8')
-        report = judge(gnd, folder, doc, None)
+        (folder / 'model.json').write_text(json.dumps(built), encoding='utf-8')
+        report = judge(gnd, folder, doc, None, '--guarded-diagnostics' in has)
+    notes = silent(report, rules) + outside(report, built, rules)
     broken, undecided = findings(report, rules)
     files = plans['evidence']['plans']
     plan_of = {row['task']: row['plan'] for row in plans['facts']['task_in_plan']}
@@ -482,7 +717,7 @@ def check_phase(root: Path, phase: str, strict: bool, require: bool, as_json: bo
     summary = (f'plan rules for phase {plans["phase"]}: {len(rules)} rule(s); {fails} to fix, '
                f'{len(rows) - fails} warning(s)')
     if as_json:
-        print(json.dumps({'rows': rows, 'summary': summary}, indent=1))
+        print(json.dumps({'rows': rows, 'notes': notes, 'summary': summary, 'bindings': bindings(report)}, indent=1))
     else:
         for name, group in itertools.groupby(rows, key=lambda row: row['rule']):
             group = list(group)
@@ -492,8 +727,99 @@ def check_phase(root: Path, phase: str, strict: bool, require: bool, as_json: bo
                     print(f'  remedy: {row["remedy"]}')
             if len(group) > SHOWN:
                 print(f'… +{len(group) - SHOWN} more for {name} (--format json lists them all)')
+        for note in notes:
+            print(f'reread: {note}')
         print(summary)
     return int(bool(fails or (strict and rows)))
+
+
+def vocabulary(root: Path) -> dict:
+    """Every fact type a rule can name: the component facts, the file facts, and, where the phase tool is
+    here, the plan facts and the ones `check --phase` joins."""
+    types = read_facts(root, modules=True)['types']
+    script = root / SETTINGS['phase_script']
+    if script.is_file():
+        spec = importlib.util.spec_from_file_location('phase_tool', script)
+        tool = importlib.util.module_from_spec(spec)
+        try:
+            spec.loader.exec_module(tool)
+        except (Exception, SystemExit) as exc:  # noqa: BLE001 - a broken phase tool leaves its facts out
+            raise Problem(f'{SETTINGS["phase_script"]} could not be read for its fact types: {exc}')
+        types = {'values': {**types['values'], **tool.FACT_VALUES},
+                 'facts': {**types['facts'], **{name: {'reading': reading, 'roles': [list(role) for role in roles]}
+                                                for name, (reading, roles) in {**tool.FACT_TYPES, **JOINED}.items()}}}
+    return types
+
+
+def test(root: Path, require: bool, as_json: bool) -> int:
+    """Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set
+    must not. A passing set the rule matched nothing in is noted: it shows only that the rule is quiet
+    with no subject (a GND newer than 0.3.0 says so; 0.3.0 only when no fact the rule names has rows)."""
+    gnd = shlex.split(SETTINGS['gnd_command'])
+    if not gnd or not shutil.which(gnd[0]):
+        print(f'skip: gnd not found ({SETTINGS["gnd_command"]!r}; install GND or set gnd_command in '
+              f'rules_check.settings.json)')
+        return int(require)
+    rules = load_rules(root)
+    diagnose = '--guarded-diagnostics' in features(gnd)
+    types = vocabulary(root)
+    results, without, count = [], [], 0
+    for rule in rules:
+        sets = example_sets(rule) or []
+        if not sets:
+            without.append(rule['id'])
+        for kind, number, facts in sets:
+            count += 1
+            label = f'{rule["id"]}: the {"failing" if kind == "fails" else "passing"} example {number}'
+            unknown = sorted(set(facts) - set(types['facts']))
+            if unknown:
+                results.append(('wrong', f'{label} names {", ".join(unknown)}, which no fact type of this project is'))
+                continue
+            doc = {'facts': {name: facts.get(name, []) for name in types['facts']}, 'revision': 'examples'}
+            built = model(types, [rule])
+            with tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                (folder / 'model.json').write_text(json.dumps(built), encoding='utf-8')
+                try:
+                    report = judge(gnd, folder, doc, None, diagnose)
+                except Problem as exc:
+                    results.append(('wrong', f'{label} could not be judged: {exc}'))
+                    continue
+            verdict = next((v for v in report['verdicts'] if v.get('address') == 'constraint:' + rule['id']), {})
+            seen = verdict.get('guarded_antecedent') or {}
+            empty = verdict.get('verdict') == 'vacuous' or seen.get('binding_count') == 0
+            why = ''
+            if isinstance(seen.get('first_empty_atom_index'), int):
+                atoms = rule.get('antecedent') or []
+                index = seen['first_empty_atom_index']
+                fact = atoms[index].get('fact_type', '?') if 0 <= index < len(atoms) else '?'
+                why = f': no binding gets past atom {index} ({fact})'
+            results.extend(('note', note) for note in outside(report, built, [rule]))
+            broke = verdict.get('verdict') in {'fail', 'warning'}
+            if verdict.get('verdict') == 'unchecked':
+                results.append(('wrong', f'{label}: gnd could not decide the rule ({verdict.get("reason_code")})'))
+            elif kind == 'fails' and not broke:
+                results.append(('wrong', f'{label} does not break the rule' + (f'; it matched nothing{why}' if empty else '')))
+            elif kind == 'passes' and broke:
+                first = (verdict.get('offending_facts') or [None])[0]
+                results.append(('wrong', f'{label} breaks the rule: {describe(first)}'))
+            elif kind == 'passes' and empty:
+                results.append(('note', f'{label} matched nothing{why}, so it shows only that the rule is quiet '
+                                        f'with no subject'))
+    results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
+    wrong = sum(level == 'wrong' for level, _ in results)
+    summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
+               + (f'; {len(without)} rule(s) without examples' if without else ''))
+    if as_json:
+        print(json.dumps({'results': [{'level': level, 'text': text} for level, text in results],
+                          'without_examples': without, 'summary': summary}, indent=1))
+    else:
+        for level, text in results:
+            print(f'{level}: {text}')
+        if without:
+            print(f'no examples: {", ".join(without)}')
+        print(summary)
+    return int(bool(wrong))
 
 
 def init(root: Path, show: bool) -> int:
@@ -523,12 +849,17 @@ def main(argv: list[str] | None = None) -> int:
     run_check.add_argument('--strict', action='store_true', help='also fail on a warning')
     run_check.add_argument('--require', action='store_true', help='fail when GND is not installed')
     run_check.add_argument('--format', choices=('text', 'json'), default='text')
+    try_examples = commands.add_parser('test')
+    try_examples.add_argument('--require', action='store_true', help='fail when GND is not installed')
+    try_examples.add_argument('--format', choices=('text', 'json'), default='text')
     args = parser.parse_args(argv)
     if args.command == 'check' and args.phase and args.base:
         parser.error('--phase judges the plans as written: leave out --base')
     try:
         if args.command == 'init':
             return init(args.root, args.show)
+        if args.command == 'test':
+            return test(args.root, args.require, args.format == 'json')
         if args.phase:
             return check_phase(args.root, args.phase, args.strict, args.require, args.format == 'json')
         return check(args.root, args.base, args.strict, args.require, args.format == 'json')

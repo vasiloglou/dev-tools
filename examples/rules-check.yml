@@ -20,6 +20,8 @@ jobs:
       # 0.2.0 is the first release with the rule-check flags; 0.3.0 is the one last tried.
       - name: Install GND
         run: pip install get-nick-done==0.3.0
+      - name: Test each rule on its own examples
+        run: python .claude/skills/components/scripts/rules_check.py test --require
       - name: Check the rules
         # --require: fail, rather than skip, if GND did not install.
         run: >

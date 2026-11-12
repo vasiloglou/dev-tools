@@ -35,7 +35,10 @@ moved the catalog finds them there.
    uv tool install get-nick-done==0.3.0
    ```
 
-   Release 0.3.0 is the one this script was last tried with. A project that would rather not
+   Release 0.3.0 is the one this script was last tried with. A GND newer than 0.3.0 (at
+   the time of writing, gnd-public `main` from commit 0ff0e9c, not yet released) adds the
+   three checks of a rule itself in [Test a rule](#test-a-rule); the script asks
+   `gnd check --help` whether they are there and works as before when they are not. A project that would rather not
    install it sets `gnd_command = "uvx --from get-nick-done==0.3.0 gnd"`. The script
    stops (exit 2) when GND has no `--rule-ids` (release 0.1.0), and on a report of a
    version it does not know.
@@ -90,7 +93,15 @@ python3 .claude/skills/components/scripts/rules_check.py check --base <base bran
   are printed for a rule; `--format json` has them all.
 - `reread: rules changed in this change: <file>` The rules or the layers were edited in
   this change. Both revisions are judged by today's rules, so a loosened rule hides what
-  it used to report: say in the PR body what changed and why.
+  it used to report: say in the PR body what changed and why. With a newer GND, the next
+  lines say what the edit hides (see [Test a rule](#test-a-rule)).
+- `reread: <rule> was removed in this change; …`, `reread: <rule> was edited in this change
+  and no longer reports N finding(s) …`, `reread: <rule> went from must to should …`
+  What an edit of `rules.json` stops reporting on today's code. Each needs the user's
+  go-ahead, named in the PR body.
+- `reread: <rule> matched nothing: …` and `reread: <rule>: '<value>' is not a value … can
+  hold` A rule that judged nothing, or names a value no fact of its kind can hold: most
+  often a typo. See [Test a rule](#test-a-rule).
 - `reread: no catalog at <commit>` The base has no component index, so everything
   broken counts as new.
 
@@ -186,9 +197,56 @@ The last three are facts about files (`facts --modules` prints them). `check` as
 only when a rule it judges names one, so a project whose rules name no file is judged on
 the component facts alone, as before.
 
-After adding a rule, run `check --format json` with no base and read what it reports: a
-rule that reports nothing may be right, or may name a fact that never matches, and one
-that reports hundreds may say more than was meant.
+After adding a rule, give it examples and run `test` ([Test a rule](#test-a-rule)), then run
+`check --format json` with no base and read what it reports: one that reports hundreds may
+say more than was meant.
+
+## Test a rule
+
+A rule that never fires looks exactly like a rule the code obeys. A misspelt value, a role
+bound to the wrong name, an antecedent that cannot match: each gives a quiet pass for
+ever. Four things catch it.
+
+**Examples, written by the rule's author.** A rule may carry facts it must fail on and facts
+it must pass on:
+
+```json
+"examples": {
+  "fails":  {"component_has_status": [{"component": "core.sizes", "status": "canonical"}]},
+  "passes": {"component_has_status": [{"component": "core.sizes", "status": "canonical"}],
+             "component_has_test": [{"component": "core.sizes", "path": "tests/test_sizes.py"}]}
+}
+```
+
+Each of `fails` and `passes` is one set of facts, `{fact type: [rows]}`, or a list of them.
+A fact type the set leaves out has no rows. Then:
+
+```bash
+python3 .claude/skills/components/scripts/rules_check.py test
+```
+
+judges each rule alone on each set. `wrong:` a failing set that does not break the rule, a
+passing set that does, or a set naming a fact type that does not exist. `note:` a passing set
+the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
+`no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
+2 when it could not run. Rules without examples are listed. Every starter rule has one
+example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs a
+newer GND.
+
+The next three need a GND newer than 0.3.0 and appear in `check` by themselves:
+
+- **A rule that matched nothing** (`--guarded-diagnostics`). When every fact a rule names
+  has rows and still no binding gets through its antecedent, the line names the first atom
+  that emptied it. A rule can be right and have no subject today: read it, do not delete it.
+- **A value nothing can hold.** The script adds the values the vocabulary fixes (the five
+  statuses, the task types, the test kinds, the `plan_declares` keys, the areas the catalog
+  has) as value lists with ids that start with `devtools_`, a prefix a rule's id may not use.
+  GND then names a literal in a rule that lies outside them, in the antecedent or the
+  consequent alike.
+- **What an edit hides** (`--baseline-model`). With `--base`, when `rules.json` changed,
+  today's facts are judged by the base edition of the rules and by today's, rule by rule,
+  and the lines say what the edit stops reporting. A rule that was added, or that reports
+  more, needs no line: the ordinary output shows it.
 
 ## Rules about plans
 

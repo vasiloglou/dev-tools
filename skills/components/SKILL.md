@@ -267,8 +267,9 @@ python3 .claude/skills/components/scripts/rules_check.py check --base <base bran
 It reports only what the change added: fix each `fail:`, and fix or justify each `warn:`.
 Exit 2 means the check did not run, which is not a pass. The checker is GND, which the
 project installs separately; without it the command prints `skip:` and exits 0. Never
-edit a rule to make a line go away. This check is a trial: use it where the user asked
-for it.
+edit a rule to make a line go away. After writing or changing a rule, give it a failing and
+a passing example and run `rules_check.py test` (`references/rules.md`, Test a rule). This
+check is a trial: use it where the user asked for it.
 
 ## Rules
 

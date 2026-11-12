@@ -202,8 +202,40 @@ rules against main (cf2e89d): 5 rule(s); 0 to fix, 1 warning(s), 2 standing
       <p class="caption">A scratch project made for this capture, judged by GND 0.3.0. <code>_rounding.py</code> belongs to the <code>format.sizes</code> component, whose own <code>units.py</code> imports it without a line. The two standing items are components that list no test.</p>
     </div>
   </div>
+  <div class="feature flip" id="test">
+    <div>
+      <span class="num">Testing a rule</span>
+      <h3>A rule that never fires is caught, not trusted</h3>
+      <p>A rule that never fires looks exactly like a rule the code obeys. One misspelt word turns a rule that reports two components into one that reports nothing, and a plain check stays green.</p>
+      <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. This works with GND 0.3.0.</p>
+      <p>A GND newer than 0.3.0 adds three lines to the ordinary check: a rule whose antecedent matched nothing, a value no fact of its kind can hold, and, when a change edits the rules, what the edit stops reporting on today's code. On 0.3.0 the check works as before.</p>
+    </div>
+    <div>
+<div class="term"><div class="bar"><i></i><i></i><i></i><b>a scratch project · one misspelt word in a starter rule</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">git diff -U0 docs/components/rules.json | grep &quot;^[-+] &quot;</span>
+-            &quot;status&quot;: &quot;canonical&quot;
++            &quot;status&quot;: &quot;canonicl&quot;
+
+<span class="p">$</span> <span class="cmd">rules check --base main</span>
+<span class="warn">reread: rules changed in this change: docs/components/rules.json</span>
+<span class="warn">reread: canonical_component_has_a_test was edited in this change and no longer reports 2 finding(s) it reported before; a=format.sizes; a=report.rows</span>
+<span class="warn">reread: canonical_component_has_a_test matched nothing: no binding gets past atom 0 (component_has_status) of its antecedent, though every fact it names has rows</span>
+<span class="warn">reread: canonical_component_has_a_test: &#x27;canonicl&#x27; is not a value component_has_status.status can hold (canonical, deprecated, duplicate-of, experimental, external)</span>
+rules against main (40f51a2): 5 rule(s); 0 to fix, 0 warning(s), 1 standing
+<span class="dim">exit code 0</span>
+
+<span class="p">$</span> <span class="cmd">rules test</span>
+<span class="warn">note: no_import_inside_a_loop: the passing example 1 matched nothing, so it shows only that the rule is quiet with no subject</span>
+<span class="warn">note: canonical_component_has_a_test: &#x27;canonicl&#x27; is not a value component_has_status.status can hold (canonical, deprecated, duplicate-of, experimental, external)</span>
+<span class="bad">wrong: canonical_component_has_a_test: the failing example 1 does not break the rule; it matched nothing: no binding gets past atom 0 (component_has_status)</span>
+<span class="warn">note: canonical_component_has_a_test: the passing example 1 matched nothing: no binding gets past atom 0 (component_has_status), so it shows only that the rule is quiet with no subject</span>
+rules test: 6 rule(s), 12 example(s); 1 wrong
+<span class="dim">exit code 1</span></pre></div>
+      <p class="caption">A scratch project made for this capture, judged by a GND built from gnd-public <code>main</code> at 0ff0e9c, which is not yet released. The check names the hidden findings, the empty antecedent and the misspelt value; the rule's own example fails. The standing item is the private-file import of the earlier capture.</p>
+    </div>
+  </div>
   <div class="callout">
-    <p><strong>What has and has not been shown.</strong> The rules about plans and about files have run on projects made to test them and on no real project, and no step of the workflow requires them. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
+    <p><strong>What has and has not been shown.</strong> The rules about plans and about files, and the tests of a rule, have run on projects made to test them and on no real project, and no step of the workflow requires them. The three lines that need a newer GND were tried on a build that is not yet released. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
   </div>
 </div></section>
 
