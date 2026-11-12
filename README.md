@@ -37,7 +37,7 @@ prompt. The reasoning is on the site:
   them: only what the change added is reported. The same file can hold rules about the
   plans of a phase, judged before the plans are approved, and rules about single files,
   such as a private file used only inside its component. Each rule can carry examples it
-  must fail and pass on (`rules_check.py test`), and with a GND newer than 0.3.0 the check
+  must fail and pass on (`rules_check.py test`), and with GND 0.3.1 the check
   also names a rule that matched nothing, a misspelt value, and what an edit of the rules
   hides, and `rules_check.py suggest` reads off the code which areas it already keeps
   apart and where it almost does. The index is exported as plain facts;

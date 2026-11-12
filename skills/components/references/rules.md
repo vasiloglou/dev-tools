@@ -32,16 +32,17 @@ moved the catalog finds them there.
    `--allow-vacuous`):
 
    ```bash
-   uv tool install get-nick-done==0.3.0
+   uv tool install "get-nick-done[synth] @ git+https://github.com/vasiloglou/gnd-public@v0.3.1"
    ```
 
-   Release 0.3.0 is the one this script was last tried with. A GND newer than 0.3.0 (at
-   the time of writing, gnd-public `main` from commit 0ff0e9c, not yet released) adds the
-   three checks of a rule itself in [Test a rule](#test-a-rule); gnd-public `main` from
-   commit f7797f6 adds the cases GND builds from a rule (with the `synth` extra:
-   `get-nick-done[synth]`) and [`suggest`](#suggest-rules-from-the-code). The script asks
-   each command's `--help` whether they are there and works as before when they are not. A project that would rather not
-   install it sets `gnd_command = "uvx --from get-nick-done==0.3.0 gnd"`. The script
+   Release 0.3.1 is the one this script was last tried with. It is a tag on GitHub, not on
+   PyPI, hence the install from git. It adds the checks of a rule itself in
+   [Test a rule](#test-a-rule) and [`suggest`](#suggest-rules-from-the-code); the `synth`
+   extra is needed only for the cases GND builds from a rule. The script asks each
+   command's `--help` whether a check is there and works as before when it is not, so
+   0.3.0 from PyPI (`get-nick-done==0.3.0`) still runs every rule. A project that would
+   rather not install it sets
+   `gnd_command = "uvx --from 'get-nick-done[synth] @ git+https://github.com/vasiloglou/gnd-public@v0.3.1' gnd"`. The script
    stops (exit 2) when GND has no `--rule-ids` (release 0.1.0), and on a report of a
    version it does not know.
 2. Write the starter files (neither is overwritten if it exists):
@@ -234,10 +235,10 @@ passing set that does, or a set naming a fact type that does not exist. `note:` 
 the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
 `no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
 2 when it could not run. Rules without examples are listed. Every starter rule has one
-example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs a
-newer GND.
+example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs
+0.3.1.
 
-The next three need a GND newer than 0.3.0 and appear in `check` by themselves:
+The next three need GND 0.3.1 and appear in `check` by themselves:
 
 - **A rule that matched nothing** (`--guarded-diagnostics`). When every fact a rule names
   has rows and still no binding gets through its antecedent, the line names the first atom
@@ -252,8 +253,7 @@ The next three need a GND newer than 0.3.0 and appear in `check` by themselves:
   and the lines say what the edit stops reporting. A rule that was added, or that reports
   more, needs no line: the ordinary output shows it.
 
-The fifth is in `test`, with a GND whose `gnd synth` has `--guarded-cases` (newer still, and
-the `synth` extra). **Cases GND builds from the rule as written**, a failing one and a passing
+The fifth is in `test`, with GND 0.3.1 and its `synth` extra (`gnd synth --guarded-cases`). **Cases GND builds from the rule as written**, a failing one and a passing
 one. Where it can build none, the rule itself is wrong:
 
 - `wrong: <rule> can never fail` (`no-failing-case`): whatever matches the antecedent already
@@ -273,8 +273,8 @@ meant: the examples do that.
 python3 .claude/skills/components/scripts/rules_check.py suggest
 ```
 
-It reads the code, not the rules: GND's `guarded-join` discovery (`gnd discover`, newer than
-0.3.0) over which component uses which and the area each is in. Nothing is written.
+It reads the code, not the rules: GND's `guarded-join` discovery (`gnd discover`, GND
+0.3.1) over which component uses which and the area each is in. Nothing is written.
 
 - `almost: <a> uses <b> in N of its M use(s)`, with one of the uses and its import. GND reports a
   pair as a near miss when the uses are at most 5% of the area's, and at most 32. Those
