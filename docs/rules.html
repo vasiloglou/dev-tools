@@ -208,7 +208,7 @@ rules against main (cf2e89d): 5 rule(s); 0 to fix, 1 warning(s), 2 standing
       <h3>A rule that never fires is caught, not trusted</h3>
       <p>A rule that never fires looks exactly like a rule the code obeys. One misspelt word turns a rule that reports two components into one that reports nothing, and a plain check stays green.</p>
       <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. This works with GND 0.3.0.</p>
-      <p>A GND newer than 0.3.0 adds three lines to the ordinary check: a rule whose antecedent matched nothing, a value no fact of its kind can hold, and, when a change edits the rules, what the edit stops reporting on today's code. On 0.3.0 the check works as before.</p>
+      <p>GND 0.3.1 adds three lines to the ordinary check: a rule whose antecedent matched nothing, a value no fact of its kind can hold, and, when a change edits the rules, what the edit stops reporting on today's code. On 0.3.0 the check works as before.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>a scratch project · one misspelt word in a starter rule</b><em>captured</em></div>
@@ -231,7 +231,7 @@ rules against main (40f51a2): 5 rule(s); 0 to fix, 0 warning(s), 1 standing
 <span class="warn">note: canonical_component_has_a_test: the passing example 1 matched nothing: no binding gets past atom 0 (component_has_status), so it shows only that the rule is quiet with no subject</span>
 rules test: 6 rule(s), 12 example(s); 1 wrong
 <span class="dim">exit code 1</span></pre></div>
-      <p class="caption">A scratch project made for this capture, judged by a GND built from gnd-public <code>main</code> at 0ff0e9c, which is not yet released. The check names the hidden findings, the empty antecedent and the misspelt value; the rule's own example fails. The standing item is the private-file import of the earlier capture.</p>
+      <p class="caption">A scratch project made for this capture, judged by GND 0.3.1. The check names the hidden findings, the empty antecedent and the misspelt value; the rule's own example fails. The standing item is the private-file import of the earlier capture.</p>
     </div>
   </div>
   <div class="feature" id="suggest">
@@ -240,7 +240,7 @@ rules test: 6 rule(s), 12 example(s); 1 wrong
       <h3>The layers a codebase already keeps, and where it almost does</h3>
       <p>A project starts with an empty <code>layers.toml</code>, and someone has to say which areas may use which. <code>rules_check.py suggest</code> reads that off the code instead. GND's discovery looks at every use between components and the area each is in.</p>
       <p>First come the near misses: an area that uses another only a few times, against many uses the other way. Those few uses are often a layering mistake nobody wrote down. Then come the directions the code keeps: an area that never uses one that uses it.</p>
-      <p>Nothing is written. A direction the code keeps today becomes a rule only when someone means it. <code>--format toml</code> prints the directions as <code>[[forbid]]</code> lines to paste into <code>layers.toml</code>. A newer <code>test</code> also asks GND to build cases from each rule, and reports a rule that can never fail.</p>
+      <p>Nothing is written. A direction the code keeps today becomes a rule only when someone means it. <code>--format toml</code> prints the directions as <code>[[forbid]]</code> lines to paste into <code>layers.toml</code>. <code>suggest</code> needs GND 0.3.1; on 0.3.0 it prints <code>skip:</code>. With 0.3.1 and its <code>synth</code> extra, <code>test</code> also asks GND to build cases from each rule, and reports a rule that can never fail.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>gnd-public · GND's own code, 245 components</b><em>captured</em></div>
@@ -262,11 +262,11 @@ suggest: 245 component(s) in 25 area(s), 1308 use(s); 56 near miss(es), 97 direc
 [[forbid]]  # cli uses agent 4 time(s)
 from = "agent"
 to = "cli"</pre></div>
-      <p class="caption">GND's own repository at f7797f6, which keeps its component index with dev-tools. The run used a GND built from that commit, which is not yet released, and is shortened where marked. Three of the near misses come from one file: <code>src/gnd/diff.py</code> in the <code>model</code> area reaches up into <code>checker</code>, <code>extract</code> and <code>synth</code>, all of which use <code>model</code>. Whether that is a mistake is for the project to say.</p>
+      <p class="caption">GND's own repository at f7797f6, which keeps its component index with dev-tools. The run was judged by GND 0.3.1 and is shortened where marked. Three of the near misses come from one file: <code>src/gnd/diff.py</code> in the <code>model</code> area reaches up into <code>checker</code>, <code>extract</code> and <code>synth</code>, all of which use <code>model</code>. Whether that is a mistake is for the project to say.</p>
     </div>
   </div>
   <div class="callout">
-    <p><strong>What has and has not been shown.</strong> The rules about plans and about files, and the tests of a rule, have run on projects made to test them and on no real project, and no step of the workflow requires them. The three lines that need a newer GND were tried on a build that is not yet released. <code>suggest</code> has run on one real codebase, GND's own, on such a build; what it prints are suggestions, and none has been adopted as a rule yet. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
+    <p><strong>What has and has not been shown.</strong> The rules about plans and about files, and the tests of a rule, have run on projects made to test them and on no real project, and no step of the workflow requires them. The three lines that need GND 0.3.1, and <code>suggest</code>, are in a tagged version now. The three lines were tried on a scratch project only. <code>suggest</code> has run on one real codebase, GND's own; what it prints are suggestions, and none has been adopted as a rule yet. A rule sees only what a plan writes down: a task that changes a file its plan does not name breaks no rule here.</p>
   </div>
 </div></section>
 
@@ -277,14 +277,14 @@ to = "cli"</pre></div>
       <p>The skills are plain files with nothing to install, and that is one of the ideas they are built on. GND is the one exception, which is why it is optional.</p>
       <ul>
         <li><strong>Nothing depends on it.</strong> Without GND the check prints <code>skip:</code> and passes. Both workflows, the index and the export of facts work the same.</li>
-        <li><strong>One install.</strong> GND is on PyPI as <code>get-nick-done</code>, under the Apache 2.0 licence, and needs Python 3.11 or newer. A project that would rather not install it sets the command to run it through <code>uvx</code>.</li>
-        <li><strong>A known version.</strong> The check needs release 0.2.0 or newer and was last tried with 0.3.0. It stops on a report in a version it does not know.</li>
+        <li><strong>One install.</strong> GND is on PyPI as <code>get-nick-done</code> up to 0.3.0, under the Apache 2.0 licence, and needs Python 3.11 or newer. Version 0.3.1 is not on PyPI; it installs from the git tag <code>v0.3.1</code>, as below. A project that would rather not install it sets the command to run it through <code>uvx</code>.</li>
+        <li><strong>A known version.</strong> The check needs release 0.2.0 or newer and was last tried with 0.3.1. It uses what 0.3.1 adds when it is there. It stops on a report in a version it does not know.</li>
         <li><strong>In automated checks, say it is required.</strong> With <code>--require</code> a missing GND is a failure, so a job cannot pass by not running. An example job for GitHub ships in <code>examples/rules-check.yml</code>.</li>
       </ul>
-<pre class="code">uv tool install get-nick-done==0.3.0
+<pre class="code">uv tool install "get-nick-done[synth] @ git+https://github.com/vasiloglou/gnd-public@v0.3.1"
 python3 .claude/skills/components/scripts/rules_check.py init
 python3 .claude/skills/components/scripts/rules_check.py check --base main</pre>
-      <p class="caption">Install, write the two starter files, check a branch against its base.</p>
+      <p class="caption">Install 0.3.1 from its git tag, write the two starter files, check a branch against its base. The <code>[synth]</code> extra is needed only for the cases <code>test</code> asks GND to build.</p>
     </div>
     <div class="prose">
       <h2>What a pass does not show</h2>

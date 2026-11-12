@@ -27,7 +27,7 @@ approved: the rules marked ``"about": "plans"``, over what ``phase_tool.py facts
 the plans and the component facts together. Plain ``check`` leaves those rules out. There is
 no base to compare with: every line is about the plans as written.
 
-A GND newer than 0.3.0 adds three ``reread:`` lines, and the script asks ``gnd check
+GND 0.3.1 adds three ``reread:`` lines, and the script asks ``gnd check
 --help`` whether it can: a rule whose antecedent matched nothing although every fact it
 names has rows (``--guarded-diagnostics``); a literal in a rule that no fact of its kind can
 hold, such as a misspelt status or area; and, when ``--base`` finds ``rules.json`` edited,
@@ -40,7 +40,7 @@ facts it must pass on, written by the rule's author. With a GND whose ``gnd synt
 from the rule as written, and reports a rule GND finds can never fail, or can never apply.
 
 ``suggest`` reads the code, not the rules: GND's ``guarded-join`` discovery (``gnd discover``,
-newer than 0.3.0) over which component uses which and the area each is in. It prints the
+0.3.1) over which component uses which and the area each is in. It prints the
 near misses first, an area that uses another only a few times, often a layering mistake
 nobody wrote down, and then the directions the code keeps: an area that never uses one
 that uses it. ``--format toml`` prints those as ``[[forbid]]`` lines for ``layers.toml``.
@@ -71,7 +71,8 @@ from pathlib import Path
 
 DEFAULT_SETTINGS = {
     'index_script': 'scripts/components_index.py',
-    # The command that runs GND, for example "uvx --from get-nick-done==0.3.0 gnd".
+    # The command that runs GND, for example "uvx --from get-nick-done==0.3.0 gnd"; 0.3.1, a git tag, also needs
+    # its URL: "uvx --from 'get-nick-done[synth] @ git+https://github.com/vasiloglou/gnd-public@v0.3.1' gnd".
     'gnd_command': 'gnd',
     # The phase tool, for `check --phase`: it writes what the plans of a phase say, as facts.
     'phase_script': '.claude/skills/process-phase/scripts/phase_tool.py',
@@ -80,7 +81,7 @@ SHOWN = 10  # lines printed for one rule; --format json has them all
 REPORT = 15  # the `gnd check --rule-ids` report: a rule's own id, its remedy, and new or standing
 DIAGNOSED = 16  # the same report with `--guarded-diagnostics`: each guarded rule's antecedent bindings
 COMPARISON = 'gnd-rule-edition-comparison/1'  # what `gnd check --baseline-model` writes
-NEWER = ('--guarded-diagnostics', '--baseline-model')  # flags of a GND newer than 0.3.0, used when present
+NEWER = ('--guarded-diagnostics', '--baseline-model')  # flags of GND 0.3.1, used when present
 RESERVED = 'devtools_'  # the ids of the value lists the script adds; a rule's id may not start with it
 OUTSIDE = 'semantic:guarded-literal-outside-domain'
 CASES = 'gnd-guarded-cases/1'  # what `gnd synth --guarded-cases` writes
@@ -100,7 +101,7 @@ PLAN_KEYS = ['autonomous', 'gap_closure', 'golden_impact', 'llm_dependency', 'pr
 BANDS = {0, 1, 2, 4}  # exit codes of a check that ran: accepted, violated, vacuous rules, undecided
 USES = ('component_uses', 'component_uses_in_cycle')
 MODEL_ID = 'urn:devtools:component-rules@1'
-GND_FROM = 'get-nick-done 0.2.0'  # the first release with the flags; 0.3.0 is the one this script was last tried with
+GND_FROM = 'get-nick-done 0.2.0'  # the first release with the flags; 0.3.1 is the one this script was last tried with
 
 STARTER_RULES = {'rules': [
     {'id': 'no_forbidden_area_use', 'level': 'must',
@@ -371,7 +372,7 @@ def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
 
 
 def features(gnd: list, command: str = 'check', flags: tuple = NEWER) -> set:
-    """Which flags of a GND newer than 0.3.0 this one has, read from `gnd <command> --help`."""
+    """Which flags of GND 0.3.1 this one has, read from `gnd <command> --help`."""
     done = run([*gnd, command, '--help'], 'gnd')
     return {flag for flag in flags if not done.returncode and flag in done.stdout}
 
@@ -800,7 +801,7 @@ def generated(gnd: list, types: dict, rules: list[dict], noted: set) -> list[tup
 def test(root: Path, require: bool, as_json: bool) -> int:
     """Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set
     must not. A passing set the rule matched nothing in is noted: it shows only that the rule is quiet
-    with no subject (a GND newer than 0.3.0 says so; 0.3.0 only when no fact the rule names has rows)."""
+    with no subject (GND 0.3.1 says so; 0.3.0 only when no fact the rule names has rows)."""
     gnd = shlex.split(SETTINGS['gnd_command'])
     if not gnd or not shutil.which(gnd[0]):
         print(f'skip: gnd not found ({SETTINGS["gnd_command"]!r}; install GND or set gnd_command in '
@@ -915,7 +916,7 @@ def suggest(root: Path, require: bool, form: str) -> int:
               f'rules_check.settings.json)')
         return int(require)
     if '--joined-relation' not in features(gnd, 'discover', ('--joined-relation',)):
-        print('skip: suggest needs a GND whose `gnd discover` has the guarded-join family (newer than 0.3.0)')
+        print('skip: suggest needs a GND whose `gnd discover` has the guarded-join family (GND 0.3.1)')
         return int(require)
     head = read_facts(root)
     facts = head['facts']
