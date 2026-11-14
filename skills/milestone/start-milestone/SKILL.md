@@ -25,7 +25,8 @@ All planning output belongs under `{{devtools:planning_dir}}/milestones/<milesto
 Validate the resolved path stays inside the repository and is not a symlink to
 another location. Existing milestones keep their canonical plan path and phase
 IDs. A new plan normally lives at `notes/<milestone>-plan.md`, not a competing
-`PLAN.md` or a second planning directory.
+`PLAN.md` or a second planning directory. Here and in the other workflow skills,
+`notes/` is the milestone's own folder, `{{devtools:planning_dir}}/milestones/<milestone>/notes/`.
 
 Read before authoring:
 

@@ -36,6 +36,9 @@ names; this table is the contract.
 | 5 | **Refactoring review** | the record's `Refactoring review` section | no |
 | 6 | **Record + commit** | `milestones/<milestone>/NNN-phase-N.md` + a commit in the record contract's grammar | done; a STOP only as step 6 says |
 
+`notes/` is the milestone's own folder, `{{devtools:planning_dir}}/milestones/<milestone>/notes/`
+([record format](references/milestone-record-format.md)).
+
 **When to use:**
 - The owner says "phase N", "the next phase", or "process this phase"
 - A phase's spec needs writing, or a written spec needs executing

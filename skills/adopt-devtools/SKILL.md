@@ -71,7 +71,7 @@ python3 <dev-tools>/devtools/sync.py survey --project .
 | `[not tracked by git]` | The folder is ignored or was never added | Leave it out of the config unless the user wants it committed |
 | To find what reads these copies | A `git grep` line with the names that point at the copies | Used in step 2 |
 | A plan kept by another planning tool | Spec Kit, OpenSpec, Kiro, BMAD, Task Master or Agent OS files, or a `.planning/` whose roadmap or state the phase tool did not write | No tool moves it. See "Coming from another planning tool" at the end of this file |
-| A planning folder written by GSD | `.planning/` holds a GSD plan | This skill covers the project's copies of the skills only. The plan is moved with the `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`); never run `phase_tool.py setup` on it |
+| A planning folder written by GSD | `.planning/` holds a GSD plan, or, where `.devtools.toml` takes the milestone workflow, keeps it as history | This skill covers the project's copies of the skills only. The `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`) says how the plan goes to either workflow; never run `phase_tool.py setup` on it. Kept as history, it needs nothing more |
 
 In a git project the survey reads the files git tracks or would track, plus the skill and
 agent folders at the top (`.claude/skills`, `.codex/agents`, `skills` …) whatever git
@@ -83,8 +83,11 @@ identical now (`diff -r`); if they are not, find out which one the project treat
 the source before going on. Each folder gets its own entry, so the copies stay identical.
 
 Tell the user which units will be replaced and where, and which are left out, before
-going on. If the survey finds no counterpart, this is not a migration: use
-`examples/phase-project.devtools.toml`.
+going on. If the survey finds no counterpart, this is not a migration: start from the
+example for the workflow the project takes, `examples/phase-project.devtools.toml` or
+`examples/milestone-project.devtools.toml`, and skip the comparison (`compare` needs a
+`.devtools.toml`, and with no copies it has nothing to compare). A project planned with
+GSD follows `move-from-gsd` instead.
 
 ## 2. Before anything changes
 
@@ -323,6 +326,10 @@ python3 <dev-tools>/devtools/sync.py apply --project . --adopt
 ```bash
 python3 <dev-tools>/devtools/sync.py check --project .
 ```
+
+If apply warns that git ignores files it delivered (a `.gitignore` that leaves out
+`.claude/skills/`, say), add an exception for each synced folder before `git add`;
+otherwise the synced files never reach the repository.
 
 Then `git add` the new paths and run `compare` and `survey` again:
 

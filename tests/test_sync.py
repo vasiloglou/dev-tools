@@ -446,3 +446,69 @@ def test_a_plan_the_phase_tool_wrote_is_not_another_tools(shipped, grown, capsys
     (grown / ".planning/ROADMAP.md").write_text("# Roadmap\n\n## Phase 1: Scan\n")
     run("survey", "--project", grown, "--source", shipped)
     assert "another planning tool" not in capsys.readouterr().out
+
+
+def test_apply_says_when_git_ignores_what_it_delivers(source, project, capsys):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    (project / ".gitignore").write_text(".claude/skills/*\n")
+    assert apply(source, project, "--dry-run") == 0
+    err = capsys.readouterr().err
+    assert "warning: git ignores 3 of the files delivered to .claude/skills/demo" in err
+    assert "tools/one.py" not in err, "only the entry whose files git ignores is named"
+    assert apply(source, project) == 0
+    assert "warning: git ignores 3 of the files delivered to .claude/skills/demo" in capsys.readouterr().err
+    (project / ".gitignore").write_text(".claude/skills/*\n!.claude/skills/demo/\n")
+    assert apply(source, project) == 0
+    assert "warning" not in capsys.readouterr().err, "an exception in .gitignore lets them in"
+
+
+def test_apply_outside_git_says_nothing_about_ignored_files(source, project, capsys):
+    assert apply(source, project) == 0
+    assert "warning" not in capsys.readouterr().err
+
+
+def test_compare_before_the_config_exists_says_how_to_write_it(source, project, capsys):
+    (project / ".devtools.toml").unlink()
+    assert run("compare", "--project", project, "--source", source) == 2
+    err = capsys.readouterr().err
+    assert "compare reads the entries it lists" in err and "survey --project" in err and "--toml" in err
+    assert all(example in err for example in sync.EXAMPLES)
+
+
+def test_every_example_the_tools_name_exists():
+    assert all((sync.SOURCE_ROOT / example).is_file() for example in sync.EXAMPLES)
+
+
+def test_the_starter_for_a_project_with_no_copies_points_to_the_examples(shipped, tmp_path, capsys):
+    bare = tmp_path / "bare"
+    (bare / ".claude/skills/deploy").mkdir(parents=True)
+    (bare / ".claude/skills/deploy/SKILL.md").write_text("How Acme deploys.\n")
+    out = starter(shipped, bare, capsys)
+    assert "[[sync]]" not in out and "nothing here to migrate" in out
+    assert all(f"#   {example}" in out for example in sync.EXAMPLES)
+    assert "skills/move-from-gsd/SKILL.md" in out
+
+
+def test_the_survey_tells_a_gsd_plan_kept_as_history_from_one_not_moved(shipped, grown, capsys):
+    (grown / ".planning").mkdir()
+    (grown / ".planning/PROJECT.md").write_text("# Acme\n")
+    run("survey", "--project", grown, "--source", shipped)
+    out = capsys.readouterr().out
+    assert "from_gsd.py converts the plan" in out and "stays as history" in out
+    (grown / ".devtools.toml").write_text('[[sync]]\nsource = "skills/milestone/process-phase"\n'
+                                          'dest = ".claude/skills/process-phase"\n')
+    run("survey", "--project", grown, "--source", shipped)
+    out = capsys.readouterr().out
+    assert "GSD's plan, kept as history" in out and "from_gsd.py is not run on it" in out
+
+
+def test_the_milestone_example_applies_as_it_is(tmp_path):
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples/milestone-project.devtools.toml").read_text())
+    assert run("apply", "--project", project) == 0
+    synced = sorted(json.loads((project / ".devtools-receipt.json").read_text())["files"])
+    assert ".claude/skills/process-phase/references/milestone-record-format.md" in synced
+    assert not any("{{devtools:" in (project / path).read_text() for path in synced)
+    assert run("check", "--project", project) == 0

@@ -62,6 +62,8 @@ TOKEN = re.compile(r"\{\{devtools:([a-z_]+)\}\}")
 TODO = "TODO"  # a value the starter config could not know; apply and compare refuse it
 # Read from this checkout, never copied into a project.
 NOT_FOR_PROJECTS = {"skills/adopt-devtools", "skills/move-from-gsd"}
+# A .devtools.toml to start from, for a project with no copies of the skills: one per workflow.
+EXAMPLES = ["examples/phase-project.devtools.toml", "examples/milestone-project.devtools.toml"]
 PRUNE = {".git", "node_modules", ".venv", "venv", "site-packages", ".tox", ".cache",
          ".mypy_cache", ".pytest_cache", ".ruff_cache"} | SKIP_DIRS
 
@@ -238,6 +240,28 @@ def write_atomic(path: Path, data: bytes, mode: int) -> None:
         raise
 
 
+def ignored_by_git(project: Path, paths: list[str]) -> list[str]:
+    """The paths git would leave out of the repository: ignored and not tracked. Empty outside git."""
+    if not paths:
+        return []
+    done = subprocess.run(["git", "-C", str(project), "check-ignore", "--stdin", "-z"],
+                          input="\0".join(paths) + "\0", capture_output=True, text=True)
+    return sorted(p for p in done.stdout.split("\0") if p) if done.returncode in (0, 1) else []
+
+
+def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> None:
+    """Say, per entry, when git ignores files the sync delivers: they would stay out of the repository."""
+    left_out = set(ignored_by_git(project, sorted(wanted)))
+    for entry in config.get("sync", []):
+        dest = str(entry.get("dest", "")).rstrip("/")
+        mine = sorted(p for p in left_out if p == dest or p.startswith(dest + "/"))
+        if mine:
+            print(f"warning: git ignores {len(mine)} of the files delivered to {dest} ({mine[0]}"
+                  + (", ..." if len(mine) > 1 else "") + "): they stay out of the repository until "
+                  f"an exception in .gitignore lets them in (`git check-ignore -v {mine[0]}` names the rule)",
+                  file=sys.stderr)
+
+
 def cmd_apply(args) -> int:
     project = args.project.resolve()
     config = read_config(project)
@@ -260,6 +284,7 @@ def cmd_apply(args) -> int:
             if action["do"] != "keep":
                 print(f"{action['do']}: {action['dest']}")
         print("dry run:", json.dumps(counts, sort_keys=True))
+        warn_if_ignored(project, config, wanted)
         return 0
     # The journal names what this run intends, so an interrupted run can be finished by running apply again.
     journal = {"files": {dest: digest(item["data"]) for dest, item in wanted.items()}}
@@ -278,6 +303,7 @@ def cmd_apply(args) -> int:
     write_atomic(project / RECEIPT, (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8"), 0o644)
     (project / JOURNAL).unlink()
     print("applied:", json.dumps(counts, sort_keys=True))
+    warn_if_ignored(project, config, wanted)
     if set(counts) - {"keep"}:
         for command in config.get("after_apply", []):
             print("after_apply:", command, flush=True)
@@ -560,9 +586,18 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
     except (OSError, UnicodeDecodeError):
         gsd = False
     if gsd:
-        lines += ["", "## A planning folder written by GSD",
-                  ".planning/: its plan is moved with devtools/from_gsd.py (skills/move-from-gsd/SKILL.md), "
-                  "not by the sync and not by `phase_tool.py setup`"]
+        sources = []
+        if (project / CONFIG).is_file():
+            sources = [str(entry.get("source", "")) for entry in read_config(project).get("sync", [])]
+        lines += ["", "## A planning folder written by GSD"]
+        if any(source.startswith("skills/milestone/") for source in sources):
+            lines.append(f".planning/: GSD's plan, kept as history. {CONFIG} takes the milestone workflow, which "
+                         "reads .planning/PROJECT.md as it is and writes its records under .planning/milestones/; "
+                         "from_gsd.py is not run on it")
+        else:
+            lines.append(".planning/: not moved by the sync, and not by `phase_tool.py setup`. "
+                         "skills/move-from-gsd/SKILL.md says how to choose: to the phase workflow, devtools/from_gsd.py "
+                         "converts the plan; under the milestone workflow it stays as history")
     others = other_plans(project, planning if not gsd else None)
     if others:
         lines += ["", "## A plan kept by another planning tool"]
@@ -771,6 +806,13 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
         lines[3:3] = ["", "# If a synced script generates files, run it after a sync (no shell: `env NAME=value command`):",
                       '# after_apply = ["<interpreter> <script> write"]']
     missing = [unit["source"] for unit in result["units"] if not result["found"][unit["source"]]]
+    if len(missing) == len(result["units"]):
+        lines += ["# No counterpart found: the project keeps no copy of what dev-tools ships, so there is",
+                  "# nothing here to migrate. Start from the example for the workflow the project takes,",
+                  "# in the dev-tools checkout:"]
+        lines += [f"#   {example}" for example in EXAMPLES]
+        lines.append("# A project planned with GSD reads skills/move-from-gsd/SKILL.md first.")
+        return lines
     if missing:
         lines.append("# Shipped, with no counterpart found here (add an entry to take one):")
         lines += [f"#   {source}" for source in missing]
@@ -897,6 +939,10 @@ def row_note(row: dict) -> str:
 
 def cmd_compare(args) -> int:
     project, source_root = args.project.resolve(), args.source.resolve()
+    if not (project / CONFIG).is_file():
+        raise SyncError(f"{project / CONFIG} not found: compare reads the entries it lists. Write it first: "
+                        f"`sync.py survey --project {args.project} --toml` prints a starter for a project with its own "
+                        f"copies of the skills; a project without any starts from an example ({', '.join(EXAMPLES)})")
     config = read_config(project)
     wanted = desired_files(source_root, config, project)
     warn_if_dirty(source_root, config)
