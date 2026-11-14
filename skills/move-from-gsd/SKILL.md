@@ -1,6 +1,6 @@
 ---
 name: move-from-gsd
-description: Move a project that was planned and built with GSD (get-shit-done, gsd-core) to the dev-tools phase workflow, keeping its phases, requirements, decisions and history. Use when asked to move, migrate, transition or convert a GSD project to dev-tools, or to stop using GSD in a repository whose .planning/ folder GSD wrote. Surveys the GSD planning folder (the root plan and any workstreams), installs the phase skills, converts STATE.md, ROADMAP.md and REQUIREMENTS.md to the dev-tools format, carries decisions and constraints, archives GSD's own files, removes GSD's install from the project and checks the result with the phase tool. Not for a project that already keeps its own copies of the dev-tools skills (use adopt-devtools) or for a new project (use the example .devtools.toml and phase_tool.py setup).
+description: Move a project that was planned and built with GSD (get-shit-done, gsd-core) to the dev-tools phase workflow, keeping its phases, requirements, decisions and history, or to the milestone workflow, keeping GSD's plans as history. Use when asked to move, migrate, transition or convert a GSD project to dev-tools, or to stop using GSD in a repository whose .planning/ folder GSD wrote. Surveys the GSD planning folder (the root plan and any workstreams), installs the phase skills, converts STATE.md, ROADMAP.md and REQUIREMENTS.md to the dev-tools format, carries decisions and constraints, archives GSD's own files, removes GSD's install from the project and checks the result with the phase tool. Not for a project that already keeps its own copies of the dev-tools skills (use adopt-devtools) or for a new project (use the example .devtools.toml and phase_tool.py setup).
 ---
 
 # move-from-gsd
@@ -20,7 +20,7 @@ changes:
 | `config.json` | Settings in `.devtools.toml` | Archived; nothing in it carries over |
 | A phase GSD did not finish (plans, summaries, perhaps a verification) | The same phase, taken up from its discussion | Carried as `context_approved` at most. GSD's plans, summaries and verification move to `gsd/` inside the phase folder, as input to a new plan |
 | Phases marked PAUSED, DEFERRED or BACKLOG, and backlog entries `999.x` | Nothing: an open phase is in the queue | Listed at the end of the new roadmap, not as phases |
-| Workstreams (`.planning/workstreams/<name>/`, each a plan of its own) | One plan | The move reads one plan: the root's or one workstream's. The owner says which |
+| Workstreams (`.planning/workstreams/<name>/`, each a plan of its own) | One plan | The move reads one plan: the root's or one workstream's. The owner says which. Where each is a stretch of work of its own, see "Moving to the milestone workflow" |
 | Milestones, `MILESTONES.md`, `milestones/`, `RETROSPECTIVE.md` | No milestone layer: a roadmap of phases | Left in place as history. Each phase block names the GSD milestone it belonged to |
 | `codebase/` (a map of the code) | The component index | Left in place; the index replaces it (step 7) |
 | `/gsd-*` commands and `gsd-*` agents | `/process-phase` and the `phase-*` agents | GSD's install inside the project is removed (step 6) |
@@ -46,6 +46,19 @@ Both commands take the answers of step 2: `--planning-dir`, `--numbering`,
 `--complete`, `--open`. `convert` also takes `--root-plan`, `--base-branch` and
 `--ignored-plan`.
 
+## Phase workflow or milestone workflow
+
+Decide this with the user before anything is written, with the survey (step 1) in front
+of them. The phase workflow keeps one roadmap: each phase number once, one current
+phase. Most of this file is the move to it. The milestone workflow
+(`skills/milestone/`) keeps each milestone's records in a folder of its own,
+`.planning/milestones/<milestone>/`, and reads `.planning/PROJECT.md` as it is. It fits
+a project whose GSD work is a series of milestones that are each a stretch of work of
+their own: several workstreams, phase numbers that start again in each, milestones run
+side by side on their own branches. One roadmap cannot hold those; `convert` would move
+one plan and leave the rest unread. For that project, follow "Moving to the milestone
+workflow" at the end of this file instead of steps 2 to 7.
+
 ## Rules
 
 - Work on a new branch of the project, from a clean working tree. Never on its base
@@ -53,6 +66,8 @@ Both commands take the answers of step 2: `--planning-dir`, `--numbering`,
 - You may change only: the planning folder's top-level files; `.devtools.toml`, the
   receipt and the synced paths; GSD's own files inside the project (step 6); the
   instruction files, where they speak of GSD; and the project-owned `project.md`.
+  On the way to the milestone workflow, also the dated notes at the top of GSD's files,
+  `.gitignore` as far as the synced folders need, and the migration record.
   No product code and no test.
 - The folder of a finished phase is the record of work done under GSD: change nothing
   in it. In the folder of a phase GSD did not finish, `convert` moves GSD's plans,
@@ -274,12 +289,14 @@ Only what is checked in to this repository; ask the user before removing anythin
    `.agents` and every other folder at the top of the project whose name starts with a
    dot (`.cursor`, `.windsurf`, `.github` …).
 2. **Hooks and settings.** `.claude/settings.json` and `.claude/settings.local.json`
-   (and the other tools' settings) may run GSD's hooks or status line. The survey lists
-   each settings file that calls GSD, with the number of calls and whether git tracks
-   it. Remove those entries, and only those. A file git does not track
-   (`settings.local.json`) is each developer's own: say in the report that every
-   teammate has to remove the entries from theirs, or their sessions will call hook
-   files that are gone.
+   (and the other tools' settings) may run GSD's hooks or status line, and their
+   permission rules may allow GSD's commands. The survey lists each settings file that
+   names GSD: how many times it calls GSD (hooks, the status line), how many permission
+   rules name it, and whether git tracks the file. Remove those entries, and only
+   those; a stale permission rule runs nothing, but it allows a command that is gone. A
+   file git does not track (`settings.local.json`) is each developer's own: say in the
+   report that every teammate has to remove the entries from theirs, or their sessions
+   will call hook files that are gone.
 3. **Instruction files.** In `CLAUDE.md`, `AGENTS.md` and the like, GSD writes blocks
    between `<!-- GSD:… -->` marks and the project may have added its own lines about
    `/gsd-*` commands. Replace them with a few lines: the plan is in `.planning/`, the
@@ -341,3 +358,54 @@ Commit on the branch, with a message that names the dev-tools commit. Show the u
 - what they do differently from now on: one command (`/process-phase`) in place of
   GSD's discuss, plan, execute and verify commands; tests agreed before code; no
   milestone commands, since a new stretch of work is new phases added to `ROADMAP.md`.
+
+## Moving to the milestone workflow
+
+Nothing is converted: GSD's files stay where they are, as the history of the work done
+under GSD, and the next milestone is the first under the new workflow. The Rules above
+apply, with these files in place of the converted ones.
+
+1. **Where work stands.** From the survey's `Plans GSD keeps here`, find any milestone
+   GSD left under way. The user chooses: finish it under GSD first, or carry its open
+   phases into the first new milestone, where `start-milestone` harvests them. Keep the
+   output of the project's tests and checks, and `git rev-parse HEAD:.planning`, to
+   compare in step 6. Then create the branch.
+2. **Install the skills.** Copy `<dev-tools>/examples/milestone-project.devtools.toml`
+   to `.devtools.toml`, set `planning_dir`, and add an entry per skill for each other
+   agent runtime, as in step 3. Run `sync apply --dry-run`, then `sync apply`. If apply
+   warns that git ignores the files it delivered, let them in: an exception per synced
+   folder (`!.claude/skills/process-phase/`) works where the rule is `.claude/skills/*`;
+   a rule that excludes the parent folder itself (`.claude/skills/`) has to become
+   `.claude/skills/*` first. `git check-ignore -v <a synced file>` prints nothing once it
+   is let in.
+3. **Mark GSD's files as history.** Do not run `from_gsd.py convert`. At the top of each
+   GSD file that says where work stands (the root `STATE.md`, `ROADMAP.md`,
+   `MILESTONES.md`), add a dated note: the file is history, records go in
+   `.planning/milestones/<milestone>/`, the rules are in `project.md`. Change nothing
+   else in `.planning/`: tests and the project's own skills may read those files. Keep
+   `PROJECT.md`; the milestone skills read it.
+4. **Write `references/project.md`** in the process-phase skill folder. Run
+   `grep -rn 'project\.md' .claude/skills/start-milestone .claude/skills/process-milestone .claude/skills/process-phase`
+   to see what it is expected to answer: the review instrument, the test and gate
+   commands, the standing design rules, the project's scaffold step. Carry into it the
+   working rules GSD's files and the instruction files hold (step 6.4), `config.json`'s
+   review settings as review bars, and say:
+   - which of `.planning/`'s files are maintained from now on and which are history;
+   - where carryovers come from: GSD's close records and its deferred items, which
+     `start-milestone` harvests;
+   - how a milestone's folder is named, where GSD's milestone names have spaces or
+     other characters a folder name should not.
+   Record what became of each rule as `adopt-devtools` step 6 does, in the record file
+   that step names.
+5. **Take GSD out of the project**: step 6, except that the instruction files name
+   `start-milestone`, `process-milestone` and `process-phase`, say that GSD's files
+   are history, and keep their references to `.planning/PROJECT.md`.
+6. **Check.** There is no process tool to run. Stage the change, then:
+   - `sync check --project .` is clean;
+   - the project's tests and checks give what step 1 kept;
+   - `git diff --stat HEAD -- .planning` shows only the notes of step 3;
+   - reading the three `SKILL.md` and `project.md` as an agent starting the next
+     milestone would, each hook is answered and each carried rule is reachable.
+7. **Finish**: commit, and tell the user why this workflow, which of GSD's plans stay
+   as history, the carryovers for the first milestone, the questions for the owner, and
+   the next command (`start-milestone <milestone>`).

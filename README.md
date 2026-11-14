@@ -113,15 +113,24 @@ python3 path/to/dev-tools/devtools/from_gsd.py convert --project . --dry-run
   GSD's plans for it kept as input in a `gsd/` folder inside the phase folder. Phases GSD
   had paused or left in its backlog are listed, not queued.
 
+A GSD project whose milestones are each a stretch of work of their own (several
+workstreams, phase numbers that start again) can take the milestone workflow instead:
+nothing is converted, GSD's files stay as history, and the guide's last section has the
+steps.
+
 Only GSD has a converter. `sync.py survey` names a plan kept by another planning tool (Spec Kit,
 OpenSpec, Kiro, BMAD, Task Master, Agent OS, or a `.planning/` folder in another format), and
 `skills/adopt-devtools/SKILL.md`, "Coming from another planning tool", says how it is carried
 by hand.
 
-See `examples/phase-project.devtools.toml` for a complete project file, and
+See `examples/phase-project.devtools.toml` for a complete project file
+(`examples/milestone-project.devtools.toml` for the milestone workflow), and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
-pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project follows
-the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
+pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project on
+the phase workflow follows the first sync with
+`python3 .claude/skills/process-phase/scripts/phase_tool.py setup`. The milestone workflow has no
+setup command: it needs the planning folder with a `PROJECT.md`, which the project's own
+scaffold step writes (its `references/project.md` names it).
 
 The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool
 runs on 3.9.

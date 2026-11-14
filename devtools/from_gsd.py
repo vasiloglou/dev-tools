@@ -444,17 +444,44 @@ def tool_folders(project: Path) -> list:
     return RUNTIMES + dotted
 
 
+GSD_NAME = re.compile(r"gsd-[a-z0-9-]+|get-shit-done")
+
+
+def gsd_entries(text: str) -> tuple:
+    """(calls, permissions) in a settings file: the strings that name GSD outside its
+    `permissions` block (hooks, the status line: what runs), and the permission rules that
+    name it (what an agent is allowed to run). A file that is not JSON is read as calls."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return len(GSD_NAME.findall(text)), 0
+    counts = [0, 0]
+
+    def walk(value, allowed):
+        if isinstance(value, dict):
+            for key, inner in value.items():
+                walk(inner, allowed or (key == "permissions" and value is data))
+        elif isinstance(value, list):
+            for inner in value:
+                walk(inner, allowed)
+        elif isinstance(value, str) and GSD_NAME.search(value):
+            counts[1 if allowed else 0] += 1
+    walk(data, False)
+    return counts[0], counts[1]
+
+
 def hook_files(project: Path) -> list:
-    """Settings files that still call GSD: its hooks and status line are wired there, and the
-    files they name go when GSD is taken out. One that git does not track is each developer's own."""
+    """Settings files that still name GSD: its hooks and status line are wired there, and the
+    files they name go when GSD is taken out; permission rules may allow its commands. One that
+    git does not track is each developer's own."""
     out = []
     for runtime in tool_folders(project):
         for name in HOOK_FILES:
-            calls = len(re.findall(r"gsd-[a-z0-9-]+|get-shit-done", read(project / runtime / name)))
-            if calls:
+            calls, permissions = gsd_entries(read(project / runtime / name))
+            if calls or permissions:
                 where = "%s/%s" % (runtime, name)
                 inside = git(project, "rev-parse", "--is-inside-work-tree") == "true"
-                out.append({"file": where, "calls": calls,
+                out.append({"file": where, "calls": calls, "permissions": permissions,
                             "tracked": bool(git(project, "ls-files", "--", where)) if inside else None})
     return out
 
@@ -833,8 +860,8 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
     hooks = hook_files(project)
     private = [h["file"] for h in hooks if h["tracked"] is False]
     if private:
-        notes.append("%s call(s) GSD and git does not track %s: each developer has their own copy, and it goes on "
-                     "calling GSD's files after they are removed. Tell the team to take the GSD lines out of theirs"
+        notes.append("%s name(s) GSD and git does not track %s: each developer has their own copy, and its GSD lines "
+                     "go on naming GSD's files after they are removed. Tell the team to take the GSD lines out of theirs"
                      % (", ".join(private), "it" if len(private) == 1 else "them"))
 
     # GSD may keep more than one plan in a project, and the move reads one.
@@ -852,7 +879,9 @@ def build(project: Path, planning_dir: str = ".planning", numbering: str = "", c
     elif others:
         notes.append("GSD keeps %d workstream(s) here, each with a plan of its own%s. A move reads one plan. Pass "
                      "--root-plan to move this one and leave the workstreams as history, or survey one of them with "
-                     "--planning-dir %s/workstreams/<name>"
+                     "--planning-dir %s/workstreams/<name>. Where each plan is a stretch of work of its own, the "
+                     "milestone workflow keeps them all as history and converts nothing (skills/move-from-gsd/SKILL.md, "
+                     "\"Moving to the milestone workflow\")"
                      % (len(others), ", and names '%s' as the one in use" % streams["active"] if streams["active"] else "",
                         planning_dir.rstrip("/")))
     base = default_branch(project)
@@ -1296,7 +1325,12 @@ def survey_lines(model: dict) -> list:
     if model["install"]:
         out.append("  'survey --installed' prints every path")
     for hook in model["hooks"]:
-        out.append("  %s calls GSD %d time(s)%s" % (hook["file"], hook["calls"], {
+        allows = "names GSD in %d permission rule(s)" % hook["permissions"]
+        if not hook["calls"]:
+            said = allows + "; nothing in it calls GSD"
+        else:
+            said = "calls GSD %d time(s)" % hook["calls"] + (" and " + allows if hook["permissions"] else "")
+        out.append("  %s %s%s" % (hook["file"], said, {
             True: ": take those lines out with the files", None: "",
             False: " and git does not track it: each developer has their own copy"}[hook["tracked"]]))
     for other in model["elsewhere"]:
