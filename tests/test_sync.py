@@ -500,7 +500,53 @@ def test_the_survey_tells_a_gsd_plan_kept_as_history_from_one_not_moved(shipped,
                                           'dest = ".claude/skills/process-phase"\n')
     run("survey", "--project", grown, "--source", shipped)
     out = capsys.readouterr().out
-    assert "GSD's plan, kept as history" in out and "from_gsd.py is not run on it" in out
+    assert "takes the milestone workflow, not applied yet" in out and "from_gsd.py is not run on it" in out
+    assert "under .planning/milestones/" in out
+
+
+def test_the_gsd_history_line_says_whether_the_milestone_skills_are_synced_and_where_records_go(tmp_path, capsys):
+    project = tmp_path / "gsd-project"
+    (project / ".planning").mkdir(parents=True)
+    (project / ".planning/PROJECT.md").write_text("# Acme\n")
+    (project / ".devtools.toml").write_text(
+        (sync.SOURCE_ROOT / "examples/milestone-project.devtools.toml").read_text().replace('".planning"', '"docs/plan"'))
+    run("survey", "--project", project)
+    assert "not applied yet" in capsys.readouterr().out
+    assert run("apply", "--project", project) == 0
+    capsys.readouterr()
+    run("survey", "--project", project)
+    out = capsys.readouterr().out
+    assert "takes the milestone workflow, synced here. Its records go under docs/plan/milestones/" in out
+    assert "the notes on GSD's files, project.md" in out, "being synced is not the whole move"
+
+
+def test_an_exception_under_a_folder_excluded_whole_is_still_warned_about(source, project, capsys):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    (project / ".gitignore").write_text(".claude/skills/\n!.claude/skills/demo/\n")
+    assert apply(source, project) == 0
+    err = capsys.readouterr().err
+    assert "warning: git ignores 3 of the files delivered to .claude/skills/demo" in err
+    assert "works only when no parent folder is excluded as a whole" in err
+
+
+def test_settings_written_beside_a_file_are_warned_about_with_their_entry(source, project, capsys):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    (project / ".devtools.toml").write_text('[[sync]]\nsource = "scripts/one.py"\ndest = "tools/one.py"\n'
+                                             '[sync.settings."one.settings.json"]\nlimit = 3\n')
+    (project / ".gitignore").write_text("*.settings.json\n")
+    assert apply(source, project) == 0
+    assert "warning: git ignores 1 of the files delivered to tools/one.py (tools/one.settings.json)" \
+        in capsys.readouterr().err
+
+
+def test_a_git_error_is_reported_not_taken_for_nothing_ignored(source, project, capsys):
+    import subprocess
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    (project / ".git/index").write_bytes(b"not an index")
+    assert apply(source, project) == 0
+    assert "warning: could not ask git which delivered files it ignores" in capsys.readouterr().err
 
 
 def test_the_milestone_example_applies_as_it_is(tmp_path):

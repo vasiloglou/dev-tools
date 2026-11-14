@@ -246,7 +246,22 @@ def ignored_by_git(project: Path, paths: list[str]) -> list[str]:
         return []
     done = subprocess.run(["git", "-C", str(project), "check-ignore", "--stdin", "-z"],
                           input="\0".join(paths) + "\0", capture_output=True, text=True)
-    return sorted(p for p in done.stdout.split("\0") if p) if done.returncode in (0, 1) else []
+    if done.returncode in (0, 1):
+        return sorted(p for p in done.stdout.split("\0") if p)
+    inside = subprocess.run(["git", "-C", str(project), "rev-parse", "--is-inside-work-tree"],
+                            capture_output=True, text=True).stdout.strip() == "true"
+    if inside:  # a git project, and git could not answer: say so rather than report nothing ignored
+        reason = (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[0]
+        print(f"warning: could not ask git which delivered files it ignores ({reason})", file=sys.stderr)
+    return []
+
+
+def entry_paths(entry: dict, wanted: dict[str, dict]) -> list[str]:
+    """The delivered paths that come from one [[sync]] entry: under its dest, or the dest itself,
+    and the settings files it writes (beside a file dest)."""
+    dest = str(entry.get("dest", "")).rstrip("/")
+    beside = {(Path(dest).parent / name).as_posix() for name in entry.get("settings", {})}
+    return sorted(p for p in wanted if p == dest or p.startswith(dest + "/") or p in beside)
 
 
 def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> None:
@@ -254,11 +269,12 @@ def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> Non
     left_out = set(ignored_by_git(project, sorted(wanted)))
     for entry in config.get("sync", []):
         dest = str(entry.get("dest", "")).rstrip("/")
-        mine = sorted(p for p in left_out if p == dest or p.startswith(dest + "/"))
+        mine = [p for p in entry_paths(entry, wanted) if p in left_out]
         if mine:
             print(f"warning: git ignores {len(mine)} of the files delivered to {dest} ({mine[0]}"
                   + (", ..." if len(mine) > 1 else "") + "): they stay out of the repository until "
-                  f"an exception in .gitignore lets them in (`git check-ignore -v {mine[0]}` names the rule)",
+                  f".gitignore lets them in. An exception (`!{dest}/`) works only when no parent folder is "
+                  f"excluded as a whole; `git check-ignore -v {mine[0]}` names the rule to change",
                   file=sys.stderr)
 
 
@@ -586,14 +602,17 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
     except (OSError, UnicodeDecodeError):
         gsd = False
     if gsd:
-        sources = []
-        if (project / CONFIG).is_file():
-            sources = [str(entry.get("source", "")) for entry in read_config(project).get("sync", [])]
+        entries = read_config(project).get("sync", []) if (project / CONFIG).is_file() else []
+        milestone = [e for e in entries if str(e.get("source", "")).startswith("skills/milestone/")]
         lines += ["", "## A planning folder written by GSD"]
-        if any(source.startswith("skills/milestone/") for source in sources):
-            lines.append(f".planning/: GSD's plan, kept as history. {CONFIG} takes the milestone workflow, which "
-                         "reads .planning/PROJECT.md as it is and writes its records under .planning/milestones/; "
-                         "from_gsd.py is not run on it")
+        if milestone:
+            records = str(milestone[0].get("values", {}).get("planning_dir", ".planning")).rstrip("/")
+            synced = all(any(m == str(e.get("dest", "")).rstrip("/") or m.startswith(str(e.get("dest", "")).rstrip("/") + "/")
+                             for m in managed) for e in milestone)
+            lines.append(f".planning/: {CONFIG} takes the milestone workflow" + (", synced here" if synced else
+                         ", not applied yet") + f". Its records go under {records}/milestones/, and GSD's plan stays "
+                         "as history: from_gsd.py is not run on it. skills/move-from-gsd/SKILL.md, \"Moving to the "
+                         "milestone workflow\", says what else the move needs (the notes on GSD's files, project.md)")
         else:
             lines.append(".planning/: not moved by the sync, and not by `phase_tool.py setup`. "
                          "skills/move-from-gsd/SKILL.md says how to choose: to the phase workflow, devtools/from_gsd.py "

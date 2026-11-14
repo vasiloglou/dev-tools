@@ -126,8 +126,11 @@ by hand.
 See `examples/phase-project.devtools.toml` for a complete project file
 (`examples/milestone-project.devtools.toml` for the milestone workflow), and
 `examples/components-check.yml` for a GitHub Actions job that checks the index on every
-pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project follows
-the first sync with `python3 .claude/skills/process-phase/scripts/phase_tool.py setup`.
+pull request (`examples/rules-check.yml` does the same for a project's own rules). A new project on
+the phase workflow follows the first sync with
+`python3 .claude/skills/process-phase/scripts/phase_tool.py setup`. The milestone workflow has no
+setup command: it needs the planning folder with a `PROJECT.md`, which the project's own
+scaffold step writes (its `references/project.md` names it).
 
 The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool
 runs on 3.9.

@@ -1325,7 +1325,7 @@ def survey_lines(model: dict) -> list:
     if model["install"]:
         out.append("  'survey --installed' prints every path")
     for hook in model["hooks"]:
-        allows = "allows GSD's commands in %d permission rule(s)" % hook["permissions"]
+        allows = "names GSD in %d permission rule(s)" % hook["permissions"]
         if not hook["calls"]:
             said = allows + "; nothing in it calls GSD"
         else:

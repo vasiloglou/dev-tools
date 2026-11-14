@@ -7,8 +7,10 @@
 # The project's own rules for the skills go in
 # .claude/skills/process-phase/references/project.md, which the sync never touches.
 #
-# If the project's .gitignore leaves out .claude/skills/, apply says so: add an exception
-# for each folder below, or the synced files stay out of the repository.
+# If the project's .gitignore leaves the synced files out, apply says so. Under a rule
+# `.claude/skills/*`, add `!.claude/skills/<name>/` for each folder below; a rule that
+# excludes `.claude/skills/` itself must become `.claude/skills/*` first, since git does not
+# look inside an excluded folder. `git check-ignore -v <file>` names the rule.
 
 [[sync]]
 source = "skills/milestone/start-milestone"

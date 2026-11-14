@@ -66,6 +66,8 @@ workflow" at the end of this file instead of steps 2 to 7.
 - You may change only: the planning folder's top-level files; `.devtools.toml`, the
   receipt and the synced paths; GSD's own files inside the project (step 6); the
   instruction files, where they speak of GSD; and the project-owned `project.md`.
+  On the way to the milestone workflow, also the dated notes at the top of GSD's files,
+  `.gitignore` as far as the synced folders need, and the migration record.
   No product code and no test.
 - The folder of a finished phase is the record of work done under GSD: change nothing
   in it. In the folder of a phase GSD did not finish, `convert` moves GSD's plans,
@@ -371,8 +373,11 @@ apply, with these files in place of the converted ones.
 2. **Install the skills.** Copy `<dev-tools>/examples/milestone-project.devtools.toml`
    to `.devtools.toml`, set `planning_dir`, and add an entry per skill for each other
    agent runtime, as in step 3. Run `sync apply --dry-run`, then `sync apply`. If apply
-   warns that git ignores the files it delivered, add a `.gitignore` exception for each
-   synced folder.
+   warns that git ignores the files it delivered, let them in: an exception per synced
+   folder (`!.claude/skills/process-phase/`) works where the rule is `.claude/skills/*`;
+   a rule that excludes the parent folder itself (`.claude/skills/`) has to become
+   `.claude/skills/*` first. `git check-ignore -v <a synced file>` prints nothing once it
+   is let in.
 3. **Mark GSD's files as history.** Do not run `from_gsd.py convert`. At the top of each
    GSD file that says where work stands (the root `STATE.md`, `ROADMAP.md`,
    `MILESTONES.md`), add a dated note: the file is history, records go in
@@ -390,7 +395,8 @@ apply, with these files in place of the converted ones.
      `start-milestone` harvests;
    - how a milestone's folder is named, where GSD's milestone names have spaces or
      other characters a folder name should not.
-   Record what became of each rule as `adopt-devtools` step 6 does, in its record file.
+   Record what became of each rule as `adopt-devtools` step 6 does, in the record file
+   that step names.
 5. **Take GSD out of the project**: step 6, except that the instruction files name
    `start-milestone`, `process-milestone` and `process-phase`, say that GSD's files
    are history, and keep their references to `.planning/PROJECT.md`.

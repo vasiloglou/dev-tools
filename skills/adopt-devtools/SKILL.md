@@ -33,6 +33,7 @@ stands for `python3 <dev-tools>/devtools/sync.py` (Python 3.11 or newer).
 - You may change only:
   - `.devtools.toml`, the receipt, the synced paths, and the record of this migration
     (step 6 says where it goes);
+  - `.gitignore`, only as far as the synced folders need to reach the repository (step 7);
   - the project-owned rule files (`references/project.md`, the instruction files);
   - the old copies you remove, and pointers to a renamed skill, wherever they are (the
     name itself, also inside one of the project's own skills; a record of history, such
@@ -71,7 +72,7 @@ python3 <dev-tools>/devtools/sync.py survey --project .
 | `[not tracked by git]` | The folder is ignored or was never added | Leave it out of the config unless the user wants it committed |
 | To find what reads these copies | A `git grep` line with the names that point at the copies | Used in step 2 |
 | A plan kept by another planning tool | Spec Kit, OpenSpec, Kiro, BMAD, Task Master or Agent OS files, or a `.planning/` whose roadmap or state the phase tool did not write | No tool moves it. See "Coming from another planning tool" at the end of this file |
-| A planning folder written by GSD | `.planning/` holds a GSD plan, or, where `.devtools.toml` takes the milestone workflow, keeps it as history | This skill covers the project's copies of the skills only. The `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`) says how the plan goes to either workflow; never run `phase_tool.py setup` on it. Kept as history, it needs nothing more |
+| A planning folder written by GSD | `.planning/` holds a GSD plan, or, where `.devtools.toml` takes the milestone workflow, keeps it as history | This skill covers the project's copies of the skills only. The `move-from-gsd` skill (`<dev-tools>/skills/move-from-gsd/SKILL.md`) says how the plan goes to either workflow; never run `phase_tool.py setup` on it. Kept as history, the survey says whether the milestone skills are synced yet; the notes on GSD's files and `project.md` are still `move-from-gsd`'s steps |
 
 In a git project the survey reads the files git tracks or would track, plus the skill and
 agent folders at the top (`.claude/skills`, `.codex/agents`, `skills` …) whatever git
@@ -117,6 +118,9 @@ GSD follows `move-from-gsd` instead.
 4. Create the branch.
 
 ## 3. Write `.devtools.toml`
+
+A project with no copies of the skills (step 1) already has its `.devtools.toml`, copied
+from an example: set its values, skip the starter below and step 4, and go on with step 5.
 
 ```bash
 python3 <dev-tools>/devtools/sync.py survey --project . --toml > .devtools.toml
@@ -327,9 +331,12 @@ python3 <dev-tools>/devtools/sync.py apply --project . --adopt
 python3 <dev-tools>/devtools/sync.py check --project .
 ```
 
-If apply warns that git ignores files it delivered (a `.gitignore` that leaves out
-`.claude/skills/`, say), add an exception for each synced folder before `git add`;
-otherwise the synced files never reach the repository.
+If apply warns that git ignores files it delivered, change `.gitignore` before `git add`,
+or the synced files never reach the repository. An exception (`!.claude/skills/process-phase/`)
+is enough where the rule excludes the folder's contents (`.claude/skills/*`). Where it
+excludes a parent folder as a whole (`.claude/skills/`), git never looks inside it and no
+exception below it works: change that rule to `.claude/skills/*` first. Confirm with
+`git check-ignore -v <a synced file>`, which prints nothing once the file is let in.
 
 Then `git add` the new paths and run `compare` and `survey` again:
 

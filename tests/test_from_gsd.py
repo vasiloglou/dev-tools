@@ -736,15 +736,16 @@ def test_the_survey_finds_gsd_in_any_tools_folder_and_the_settings_that_call_it(
 
 def test_the_survey_tells_permission_rules_from_calls(project):
     write(project, ".claude/settings.json", json.dumps({"permissions": {"allow": [
-        "Skill(gsd-next)", "Bash(node ~/.claude/get-shit-done/bin/gsd-tools.cjs:*)", "Bash(git status)"]}}))
+        "Skill(gsd-next)", "Bash(node ~/.claude/get-shit-done/bin/gsd-tools.cjs:*)", "Bash(git status)"],
+        "deny": ["Skill(gsd-update)"]}}))
     write(project, ".codex/settings.json", json.dumps({
         "permissions": {"allow": ["Skill(gsd-plan-phase)"]},
         "hooks": {"Stop": [{"command": "node .codex/hooks/gsd-check-update.js"}]}}))
     git(project, "add", "-A")
     code, out = run("survey", "--project", str(project))
-    assert "  .claude/settings.json allows GSD's commands in 2 permission rule(s); nothing in it calls GSD: " \
-        "take those lines out with the files" in out, "a rule that names GSD twice is one rule, and no call"
-    assert "  .codex/settings.json calls GSD 1 time(s) and allows GSD's commands in 1 permission rule(s)" in out
+    assert "  .claude/settings.json names GSD in 3 permission rule(s); nothing in it calls GSD: " \
+        "take those lines out with the files" in out, "a rule that names GSD twice is one rule, a deny rule is counted, and none is a call"
+    assert "  .codex/settings.json calls GSD 1 time(s) and names GSD in 1 permission rule(s)" in out
 
 
 def test_what_gsd_says_elsewhere_is_carried(project):
