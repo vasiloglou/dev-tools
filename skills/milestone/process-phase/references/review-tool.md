@@ -111,7 +111,7 @@ python3 <skill>/scripts/review_tool.py status <the reviews folder>
 
 `status` reports every round under the path: its run (a round not run or
 still running is unfinished), and each ledger row that is incomplete, still
-open, fixed without being reproduced, fixed with no regression test named, or
+open, fixed without being reproduced, fixed with nothing in Notes, or
 fixed at a commit that does not exist. Then, for every file any round read, the latest round that
 read it decides: `reviewed` when the file still has those bytes and that round's
 review finished, `unreviewed` otherwise. **A repaired file is unreviewed until a

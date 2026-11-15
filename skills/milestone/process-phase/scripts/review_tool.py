@@ -154,6 +154,43 @@ def shown(root: Path, path: Path) -> str:
         return str(path.resolve())
 
 
+def unquote(path: str) -> str:
+    """A path as git prints it in a diff header: C-quoted when it holds a special byte."""
+    if not (len(path) >= 2 and path[0] == path[-1] == '"'):
+        return path
+    out, i, body = bytearray(), 0, path[1:-1]
+    escapes = {"a": 7, "b": 8, "t": 9, "n": 10, "v": 11, "f": 12, "r": 13, '"': 34, "\\": 92}
+    while i < len(body):
+        if body[i] == "\\" and i + 1 < len(body):
+            if body[i + 1] in "01234567" and re.match(r"[0-7]{3}", body[i + 1:i + 4]):
+                out.append(int(body[i + 1:i + 4], 8))
+                i += 4
+                continue
+            out.append(escapes.get(body[i + 1], ord(body[i + 1])))
+            i += 2
+            continue
+        out += body[i].encode("utf-8")
+        i += 1
+    return out.decode("utf-8", errors="replace")
+
+
+def strip_prefix(path: str) -> str:
+    return re.sub(r"^[a-z]/", "", unquote(path))
+
+
+def header_paths(line: str) -> list[str]:
+    """Both paths of a 'diff --git' line, quoted or not."""
+    rest = line[len("diff --git "):]
+    quoted = re.match(r'("(?:[^"\\]|\\.)*"|\S+) ("(?:[^"\\]|\\.)*")$', rest) or \
+        re.match(r'("(?:[^"\\]|\\.)*") (.*)$', rest)
+    if quoted:
+        return [strip_prefix(quoted.group(1)), strip_prefix(quoted.group(2))]
+    half = len(rest) // 2
+    if len(rest) % 2 == 1 and rest[half] == " " and rest[:half][2:] == rest[half + 1:][2:]:
+        return [strip_prefix(rest[:half]), strip_prefix(rest[half + 1:])]  # a/x y b/x y
+    return [strip_prefix(part) for part in rest.split(" ")]
+
+
 def split_diff(text: str) -> list[tuple[list[str], str]]:
     """(paths, block) for each file of a unified git diff. The paths come from the block's
     header only, the lines before its first hunk, and name both sides of a rename or copy."""
@@ -163,15 +200,16 @@ def split_diff(text: str) -> list[tuple[list[str], str]]:
         if line.startswith("diff --git "):
             if lines:
                 blocks.append((paths, "".join(lines)))
-            match = re.match(r'diff --git "?(?:[a-z]/)?(.*?)"? "?(?:[a-z]/)?(.*?)"?$', bare)
-            paths, lines, header = (list(match.groups()) if match else []), [line], True
+            paths, lines, header = header_paths(bare), [line], True
             continue
         if header and (line.startswith("@@") or line.startswith("Binary files")):
             header = False
         elif header:
-            side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) (?:[a-z]/)?(.*)$", bare)
-            if side and (side.group(1) or side.group(2)) != "dev/null":
-                paths.append(side.group(1) or side.group(2))
+            side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) (.*)$", bare)
+            if side:
+                path = unquote(side.group(1)) if side.group(1) else strip_prefix(side.group(2))
+                if path != "dev/null":
+                    paths.append(path)
         lines.append(line)
     if lines:
         blocks.append((paths, "".join(lines)))
@@ -184,7 +222,7 @@ def without_secrets(text: str) -> tuple[str, list[str]]:
     kept, dropped = [], []
     for paths, block in split_diff(text):
         if any(looks_secret(p) for p in paths):
-            dropped += [p for p in paths if p not in dropped]
+            dropped += [p for p in dict.fromkeys(paths) if p not in dropped]
         else:
             kept.append(block)
     return "".join(kept), dropped
@@ -241,13 +279,26 @@ def cmd_brief(args, settings) -> int:
     if args.base:
         if git(root, "rev-parse", "--verify", "--quiet", args.base + "^{commit}", check=False).returncode:
             raise Stop("--base %s is not a commit here" % args.base)
-        # Fixed a/ and b/ prefixes, whatever the diff.noprefix or diff.mnemonicPrefix settings.
-        diff = git(root, "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "diff", "--no-color",
-                   "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/", args.base, "--").stdout
-        diff, tainted = without_secrets(diff)
-        changed = git(root, "diff", "--name-only", "-z", args.base, "--").stdout.split("\0")
+        # Which files changed, from git itself (-z: no quoting), with renames found whatever
+        # diff.renames says. An entry that names a credential file on either side is left out
+        # whole, and only the other entries are diffed.
+        fixed = ["-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.renames=true"]
+        fields = git(root, *fixed, "diff", "--name-status", "-z", "-M", args.base, "--").stdout.split("\0")
+        entries, i = [], 0
+        while i < len(fields) and fields[i]:
+            width = 3 if fields[i][0] in "RC" else 2
+            entries.append(fields[i + 1:i + width])
+            i += width
+        tainted = [p for entry in entries if any(looks_secret(q) for q in entry) for p in entry]
+        kept = [p for entry in entries if not any(looks_secret(q) for q in entry) for p in entry]
+        diff = ""
+        if kept:
+            diff = git(root, *fixed, "diff", "--no-color", "--no-ext-diff", "-M", "--src-prefix=a/",
+                       "--dst-prefix=b/", args.base, "--", *[":(literal)" + p for p in kept]).stdout
+            diff, more = without_secrets(diff)
+            tainted += more
         untracked = git(root, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0")
-        for rel in [p for p in changed + untracked if p]:
+        for rel in [p for p in kept + untracked if p]:
             add(rel, named=False)
         notes += ["new: %s (not tracked yet, so not in the diff: read it whole)" % p
                   for p in untracked if p and any(f["path"] == p for f in files)]
@@ -305,8 +356,11 @@ def brief_text(root: Path, out: Path, brief: dict) -> str:
     if pr:
         lines.append("Pull request #%s, %s, at head `%s` (base `%s`). Its diff is `%s`."
                      % (pr["number"], pr["url"], pr["head"], pr["base"], diff))
-        if brief["head"] == pr["head"]:
+        if brief["head"] == pr["head"] and not brief["dirty"]:
             lines.append("Your checkout is at that head, so the files in it are the PR's.")
+        elif brief["head"] == pr["head"]:
+            lines.append("Your checkout is at that head, with uncommitted changes. Read a file as the PR has "
+                         "it with `git show %s:<path>`." % pr["head"])
         elif git(root, "cat-file", "-e", pr["head"] + "^{commit}", check=False).returncode == 0:
             lines.append("Your checkout is not at that head. Read a file as the PR has it with "
                          "`git show %s:<path>`." % pr["head"])
@@ -515,22 +569,33 @@ def run_state(run: dict) -> str:
 
 
 def split_row(line: str) -> list[str]:
-    cells = re.split(r"(?<!\\)\|", line.strip())
-    return [c.strip().replace("\\|", "|") for c in cells[1:-1]]
+    """The cells of a table row, with or without its outer pipes."""
+    line = line.strip()
+    line = line[1:] if line.startswith("|") else line
+    line = line[:-1] if line.endswith("|") and not line.endswith("\\|") else line
+    return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line)]
 
 
 def ledger_rows(text: str) -> list[dict]:
-    """The rows of every table line after the header whose first column is Id, blank lines or not."""
-    rows, header = [], None
+    """The rows of the findings table: from its Id header to the next heading or table,
+    blank lines and rows written without their outer pipes included."""
+    rows, header, separators = [], None, 0
     for line in text.splitlines():
-        if not line.strip().startswith("|"):
-            continue
-        cells = split_row(line)
+        bare = line.strip()
         if header is None:
-            if cells and cells[0] == "Id":
-                header = cells
+            if bare.startswith("|") and split_row(bare)[:1] == ["Id"]:
+                header = split_row(bare)
             continue
-        if all(set(c) <= set("-: ") for c in cells):
+        if bare.startswith("#"):
+            break
+        if "|" not in bare:
+            continue
+        cells = split_row(bare)
+        if all(c and set(c) <= set("-: ") for c in cells):
+            separators += 1
+            if separators > 1:  # a new table began: the row before this line was its header
+                rows.pop()
+                break
             continue
         rows.append(dict(zip(header, cells + [""] * (len(header) - len(cells)))))
     return rows
@@ -604,6 +669,14 @@ def cmd_status(args, settings) -> int:
                 state, " (%s)" % run.get("note") if run.get("note") else
                 " (exit %s)" % run.get("exit") if run.get("exit") is not None else ""))
         review = out / "review.md"
+        if state == "done":
+            if not review.is_file() or not review.read_text(encoding="utf-8", errors="replace").strip():
+                problems.append("review.md is missing or empty")
+            elif sha256(review) not in (run.get("review_sha256"), run.get("sanitized_sha256")):
+                problems.append("review.md is not the reviewer's output: its SHA-256 matches neither run.json "
+                                "digest")
+            if not (out / "BRIEF.md").is_file() or sha256(out / "BRIEF.md") != run.get("brief_sha256"):
+                problems.append("BRIEF.md changed after the review read it")
         if review.is_file() and home in review.read_text(encoding="utf-8", errors="replace"):
             problems.append("review.md names this machine's home folder: review_tool.py sanitize %s" % out)
         report.append({"round": shown(root, out), "subject": brief.get("subject"), "state": state,
@@ -612,8 +685,6 @@ def cmd_status(args, settings) -> int:
         own = [f for f in brief.get("files", []) if (root / f["path"]).resolve().parent == out.resolve()]
         problems += changed_files(root, out, {"files": own})  # the round's own diff.patch
         for f in brief.get("files", []):
-            if f in own:
-                continue
             if f["path"] not in latest or brief["created"] >= latest[f["path"]][0]:
                 latest[f["path"]] = (brief["created"], shown(root, out), f["sha256"], state)
     coverage = []
@@ -673,10 +744,15 @@ def cmd_post(args, settings) -> int:
         raise Stop("pass --pr N: this round is not a PR review")
     if (out / "posted.json").is_file() and not args.again:
         raise Stop("already posted (%s): pass --again to post once more" % read_json(out / "posted.json").get("url"))
+    review = sha256(out / "review.md") if (out / "review.md").is_file() else None
+    if review not in (run.get("review_sha256"), run.get("sanitized_sha256")):
+        raise Stop("review.md is not the reviewer's output (see review_tool.py status): nothing posted")
     reviewed = (brief.get("pr") or {}).get("head") or brief.get("head")
     current = pr_view(number)["head"]
     lines = ["**Independent review** by %s (%s) of `%s`." % (run["reviewer"], run["model"], reviewed),
-             "Brief SHA-256 `%s`, review SHA-256 `%s`." % (run["brief_sha256"], run["review_sha256"])]
+             "Brief SHA-256 `%s`, review SHA-256 `%s`%s." % (
+                 run["brief_sha256"], run["review_sha256"],
+                 " (sanitized, SHA-256 `%s`)" % review if review != run["review_sha256"] else "")]
     if current != reviewed:
         lines.append("> The PR head is now `%s`. This review did not read it." % current)
     lines += ["", (out / "review.md").read_text(encoding="utf-8").rstrip(), ""]
@@ -722,6 +798,11 @@ def cmd_sanitize(args, settings) -> int:
                     "The reviewer's words are otherwise unchanged; run.json holds the SHA-256 of the original. -->\n"
                     % count) + text
         path.write_text(text, encoding="utf-8")
+        if name == "review.md":
+            run = read_json(out / "run.json")
+            if run:
+                run["sanitized_sha256"] = sha256(path)
+                write_json(out / "run.json", run)
         print("%s: replaced %d absolute path(s)" % (name, count))
     return 0
 
