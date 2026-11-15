@@ -95,5 +95,10 @@ def test_nothing_to_release_without_a_plugin_change(repo):
     subprocess.run([sys.executable, str(repo / "devtools/build_plugins.py")], cwd=repo, check=True,
                    capture_output=True)
     commit(repo, "Bump only")
-    # The manifests carry the version, so a bump alone is a plugin change.
+    # The manifests carry the version, but a bump with nothing else in it is no release.
+    done = release(repo, "tag", "--dry-run")
+    assert done.returncode == 2 and "nothing to release" in done.stderr
+    assert release(repo, "status").returncode == 0
+    change_a_skill(repo)
+    commit(repo, "Change review-pr")
     assert release(repo, "tag", "--dry-run").returncode == 0

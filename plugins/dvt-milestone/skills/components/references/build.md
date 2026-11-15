@@ -10,7 +10,7 @@ them is separate work.
 
 ## 1. Set up and generate what can be generated
 
-1. Check the settings in `components_index.settings.json` beside the script:
+1. Check the settings in `.devtools/components_index.settings.json` in the project:
    `package_dir` is the folder that holds the package (for example `src/<package>`), and
    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`

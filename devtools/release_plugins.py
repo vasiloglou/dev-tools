@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import shutil
 import subprocess
 import sys
@@ -83,9 +84,27 @@ def next_version(current: str, part: str) -> str:
     raise Stop(f"bump takes patch, minor, major or a version, not {part!r}")
 
 
+def only_version(tag: str, path: str) -> bool:
+    """True when a plugin manifest differs from the tag's in its version alone."""
+    if not path.endswith("/.claude-plugin/plugin.json") or not (ROOT / path).is_file():
+        return False
+    try:
+        before = json.loads(git("show", f"{tag}:{path}", check=False) or "null")
+        after = json.loads((ROOT / path).read_text(encoding="utf-8"))
+    except ValueError:
+        return False
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        return False
+    before.pop("version", None)
+    after.pop("version", None)
+    return before == after
+
+
 def changed_since(tag: str) -> list[str]:
-    """Files under plugins/ that differ between the tag and the working tree."""
-    return [line for line in git("diff", "--name-only", tag, "--", "plugins").splitlines() if line]
+    """Files under plugins/ that differ between the tag and the working tree. A manifest whose
+    version alone changed is not a change: a bump with nothing in it is no release."""
+    paths = [line for line in git("diff", "--name-only", tag, "--", "plugins").splitlines() if line]
+    return [path for path in paths if not only_version(tag, path)]
 
 
 def cmd_status(args) -> int:

@@ -31,7 +31,7 @@ Coders and parallelism are per developer. Resolve them once per Implement sessio
 - **Fallback.** When no configured coder is on PATH, the pool is `claude`. Tell the user in one line and continue with §2.2's Claude Code coder. When the pool is empty (`claude` missing too), stop and ask the user. Check each coder once before its first task (`codex --version`, `gemini --version`, `claude --version`).
 - Team defaults: `coders = ["codex"]`, 4 tracks, 4 sessions per account. Accounts, homes and other personal paths go in the local file only.
 
-Both files have the same shape, and every part is optional. Tables merge; a value or a list in the local file replaces the team's. The two paths are settings in `coder_pool.settings.json` beside the script. Never put keys or tokens in either file.
+Both files have the same shape, and every part is optional. Tables merge; a value or a list in the local file replaces the team's. The two paths are settings in `.devtools/coder_pool.settings.json` in the project. Never put keys or tokens in either file.
 
 ```toml
 [roles]

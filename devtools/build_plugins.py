@@ -92,6 +92,7 @@ REWRITES = [
     (r"`references/project\.md`\s+beside the process-phase skill", f"`{PROJECT_RULES}`"),
     (r"(?:\.claude/skills/process-phase/|\.\./process-phase/)?references/project\.md", PROJECT_RULES),
     (r"`project\.md`", f"`{PROJECT_RULES}`"),
+    (r"`(\w+)\.settings\.json`(\s+)beside the script", r"`.devtools/\1.settings.json`\2in the project"),
     (r"(?:\.claude/skills/[\w-]+/)?(?<![\w.}-])scripts/(\w+)\.settings\.json", r".devtools/\1.settings.json"),
     (r"skills/phase/pytest/phase_selection\.py", "${CLAUDE_PLUGIN_ROOT}/skills/process-phase/pytest/phase_selection.py"),
     (r"\.claude/skills/(process-phase|phase-tests|components|start-milestone|process-milestone|review-pr)\b",

@@ -21,7 +21,7 @@ does; this skill is how you use and maintain it. The entry format is defined in
 | **Review** | Asked to audit the index; searches keep missing; before planning a large piece of work; after a large merge | [`references/review.md`](references/review.md) |
 
 Paths below assume the default settings (`docs_dir` = `docs/components`, script at
-`scripts/`). A project changes them in `components_index.settings.json` beside the script
+`scripts/`). A project changes them in `.devtools/components_index.settings.json` in the project
 (`package_dir`, `import_prefix`, `extra_source_dirs`, `docs_dir`, `script_path`, `verb_list`).
 
 | File | What it is | Edit? |

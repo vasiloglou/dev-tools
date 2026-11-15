@@ -71,6 +71,8 @@ def test_no_text_points_into_a_synced_copy(plugin):
         assert "{{devtools:" not in text, path
         assert not re.search(r"\.claude/skills/[\w-]+", text), path
         assert "references/project.md" not in text, path
+        # A plugin reads each script's settings from the project's .devtools/, never beside the script.
+        assert not re.search(r"settings\.json`\s+beside", text), path
 
 
 def test_a_rewrite_that_matches_nothing_fails_the_build(monkeypatch):
