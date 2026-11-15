@@ -152,7 +152,8 @@ claude plugin install dvt-phase@dvt
 ```
 
 `dvt-phase` holds the phase workflow, its helper agents and the component index;
-`dvt-milestone` holds the milestone workflow, `review-pr` and the component index. Their
+`dvt-milestone` holds the milestone workflow, `review-pr` and the component index. Both
+hold `handle-issue`. Their
 skills and agents are named after the plugin: `/dvt-phase:process-phase`,
 `dvt-phase:phase-implementer`, `/dvt-milestone:review-pr`. `--scope project` records the
 plugin in the project's `.claude/settings.json`, so every teammate gets it.

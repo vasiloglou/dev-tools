@@ -10,7 +10,7 @@ description: Gets an independent review of a GitHub pull request from the other 
 An independent review of one pull request, by a reviewer in the other harness,
 kept as a review round: brief, the reviewer's words, findings ledger. Every rule
 for the round lives in process-phase's
-[review helper reference](../process-phase/references/review-tool.md); read it
+[review helper reference](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-tool.md); read it
 before the first command. This skill is the order of the steps and cites the
 rules; it does not restate them. If `.devtools/project.md`
 exists, read it too: a project that names its own review instrument for pull
@@ -67,10 +67,10 @@ findings ledger" has the columns).
 - **Reproduce before believing.** Run each finding against the PR's head (`git
   show <head>:<path>`, or a checkout the owner agreed to) and record what
   happened. A reviewer's plausible reading is not a defect
-  (`../process-phase/references/review-and-record.md`).
+  (`${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-and-record.md`).
 - **Triage before fixing anything:** each finding is `blocking`, `hardening` or
   `completeness`, by the table in
-  `../process-phase/references/review-convergence.md`, "Relevance is not
+  `${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-convergence.md`, "Relevance is not
   severity".
 - **The PR's code is not yours to change** unless the owner asks. A finding the
   PR's author still has to repair stays `open`. A repaired head is new bytes: it

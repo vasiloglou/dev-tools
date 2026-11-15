@@ -116,8 +116,8 @@ actual approval. Planning authorship is not approval or publication authority.
 
 Prepare detailed contracts only for the first ready phase, at
 `notes/phase-<ID>-spec.md`, following the
-[spec note contract](../process-phase/references/spec-note-contract.md) and
-[standing rules](../process-phase/references/standing-rules.md). Authoring this
+[spec note contract](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/spec-note-contract.md) and
+[standing rules](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/standing-rules.md). Authoring this
 draft does not run process-phase or record its owner gate. If required decisions
 or inputs are absent, retain a clearly blocked draft naming those gaps; do not
 claim execution readiness. Later phases remain actionable outlines until their
@@ -128,7 +128,7 @@ A milestone-local README can link the canonical plan/spec, readiness, pending
 decisions and next action. Do not add a global STATE.md, duplicate roadmap, empty
 review/evidence records or implementation-started status merely because planning
 files exist. Material execution records follow the
-[milestone record format](../process-phase/references/milestone-record-format.md)
+[milestone record format](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/milestone-record-format.md)
 when execution is explicitly selected.
 
 ## Verify and hand off
@@ -142,16 +142,16 @@ fill a plan. Missing measurements remain missing evidence.
 Plan review and milestone close are held to the project's plan-review bar
 (`.devtools/project.md`; default: one independent reviewer in a different
 tool) and the bounded convergence rules from
-[process-phase review guidance](../process-phase/references/review-convergence.md).
+[process-phase review guidance](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-convergence.md).
 Select a review instrument explicitly; using this skill does not activate
 any review instrument or authorize reviewer subagents. Where the project names
 none, the one to offer is process-phase's
-[review helper](../process-phase/references/review-tool.md), with
+[review helper](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-tool.md), with
 `--subject plan`. Never claim a review
 opinion over amended bytes that were not reviewed.
 
 The plan review and the plan gate are recorded in the plan-gate record of the
-[milestone record format](../process-phase/references/milestone-record-format.md).
+[milestone record format](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/milestone-record-format.md).
 Before that record exists, say in the plan's status line and in the report
 whether the plan review ran (instrument and reviewed SHA-256) or did not (and
 why), so an unreviewed plan never reads as reviewed.
