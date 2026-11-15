@@ -7,18 +7,13 @@ Steps 4, 5 and 6 of the protocol.
 ### Invocation
 
 Use the project's review instrument (`references/project.md`) where it defines
-one for a phase diff. Where none is defined: one reviewer in a different tool,
-at high reasoning effort, reading the diff with the repository read-only,
-prompt on **stdin** rather than argv:
+one for a phase diff. Where none is defined: the review helper,
+[`review-tool.md`](review-tool.md), with `--subject phase --base <the commit the
+phase began from>`. It runs one reviewer in the other harness, read-only, with
+the brief in a file and stdin closed, and keeps the answer word for word.
 
-```
-codex exec --ephemeral --model <model> \
-    --config model_reasoning_effort="xhigh" --sandbox read-only \
-    --color never --skip-git-repo-check -  < review-prompt-pN.txt
-```
-
-Prompt on stdin is not a style preference: argv exposes reviewed-artifact bytes
-to shell quoting, argument-length limits and the process list.
+The prompt names only the brief's path. Reviewed bytes never go in argv: argv
+exposes them to shell quoting, argument-length limits and the process list.
 
 ### What the prompt carries
 
@@ -34,7 +29,9 @@ where this claim is false" gets findings.
 - **Every fix carries a regression test proven to fail pre-fix.** Not "a test
   covering the area" — the specific test, run against the pre-fix code, observed
   red. Without that step a fix has no evidence it fixed anything.
-- **Retain the findings verbatim**, in `notes/phase-N-<reviewer>-review.md`.
+- **Retain the findings verbatim**: the round's `review.md`, beside its brief
+  and its findings ledger (`notes/reviews/phase-N-r1/` with the helper; a
+  project with its own instrument may keep `notes/phase-N-<reviewer>-review.md`).
 - **State that one reviewer is one reviewer.** The record says so in its boundary
   section. A single-reviewer read mistaken for a multi-reviewer bar is a named
   register risk.
@@ -47,8 +44,9 @@ where this claim is false" gets findings.
 Reviewer output routinely contains absolute paths from the machine it ran on.
 Committing it verbatim writes the operator's home directory into the milestone's
 evidence. Sanitize to a
-placeholder, and **say in the file's own header that it was edited** — retained-
-verbatim evidence that was modified must declare the modification.
+placeholder (`review_tool.py sanitize` does), and **say in the file's own header
+that it was edited** — retained-verbatim evidence that was modified must declare
+the modification.
 
 ### Record what the review confirmed, not only what it found
 

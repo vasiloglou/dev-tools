@@ -32,7 +32,7 @@ names; this table is the contract.
 | 1 | **Spec** | `notes/phase-N-spec.md` | **STOP** |
 | 2 | **Owner gate** — approve or amend; optional review over the spec bytes | owner decisions, recorded in the spec with a mark | **STOP** |
 | 3 | **Implement + verify** | code + tests; the plan's section 9 row and the phase's impact-closure gates run | no |
-| 4 | **Adversarial review of the diff** | `notes/phase-N-<reviewer>-review.md` + one regression test per finding | no |
+| 4 | **Adversarial review of the diff** | the review round (`notes/reviews/phase-N-r1/`: brief, review, findings ledger) + one regression test per finding | no |
 | 5 | **Refactoring review** | the record's `Refactoring review` section | no |
 | 6 | **Record + commit** | `milestones/<milestone>/NNN-phase-N.md` + a commit in the record contract's grammar | done; a STOP only as step 6 says |
 
@@ -237,7 +237,10 @@ A single reviewer is admissible for a phase diff **and the record must say
 tool) remains the bar for plan review and milestone close. Invocation, prompt
 shape, the reproduce-before-believe rule, the retained-evidence sanitization
 trap, and what a review that finds nothing still owes are in
-[`references/review-and-record.md`](references/review-and-record.md).
+[`references/review-and-record.md`](references/review-and-record.md). Where the
+project names no instrument of its own, the review helper
+([`references/review-tool.md`](references/review-tool.md)) writes the brief,
+runs the reviewer in the other harness and keeps the findings ledger.
 
 Every finding is reproduced before it is believed, every fix carries a
 regression test **proven to fail against the pre-fix code**, and the reviewer's

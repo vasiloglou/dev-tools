@@ -1,0 +1,32 @@
+# Example .devtools.toml for a project that uses the milestone workflow.
+# Copy it to the project root, adjust the values, then run:
+#   python3 <dev-tools>/devtools/sync.py apply --project .
+# The project's own rules go in .claude/skills/process-phase/references/project.md, which the
+# sync never touches.
+
+[[sync]]
+source = "skills/milestone/start-milestone"
+dest = ".claude/skills/start-milestone"
+values = { planning_dir = ".planning" }
+
+[[sync]]
+source = "skills/milestone/process-milestone"
+dest = ".claude/skills/process-milestone"
+values = { planning_dir = ".planning" }
+
+[[sync]]
+source = "skills/milestone/process-phase"
+dest = ".claude/skills/process-phase"
+values = { planning_dir = ".planning" }
+
+# The review helper (scripts/review_tool.py). Every key is optional; these are the defaults.
+[sync.settings."scripts/review_tool.settings.json"]
+# codex, claude, or auto: the other harness from the one driving the work.
+reviewer = "auto"
+# The Codex model; empty for Codex's own default.
+codex_model = ""
+codex_effort = "high"
+# The Claude model for claude -p, when Codex drives.
+claude_model = "opus"
+# A review still running after this many minutes is stopped and recorded as failed.
+timeout_minutes = 60
