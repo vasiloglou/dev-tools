@@ -1,0 +1,4 @@
+interface:
+  display_name: "Handle Issue"
+  short_description: "Triage, reproduce and route a GitHub issue"
+  default_prompt: "Use $handle-issue to look at issue <N>."
