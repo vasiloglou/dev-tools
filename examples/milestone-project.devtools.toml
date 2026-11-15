@@ -45,6 +45,12 @@ timeout_minutes = 60
 source = "skills/milestone/review-pr"
 dest = ".claude/skills/review-pr"
 
+# handle-issue reads a GitHub issue, reproduces and classes it, and routes it to a fix, the
+# plan or a reply. It has no values or settings of its own.
+[[sync]]
+source = "skills/handle-issue"
+dest = ".claude/skills/handle-issue"
+
 # A second agent runtime (Codex reads .codex/skills or .agents/skills) gets a second entry
 # per skill with the same values. If that folder is a link to .claude/skills, add none:
 # the sync refuses two destinations that are one file.

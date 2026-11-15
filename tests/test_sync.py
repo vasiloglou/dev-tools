@@ -573,3 +573,19 @@ def test_review_pr_finds_process_phase_beside_it_in_the_milestone_example(tmp_pa
     cited.discard("../process-phase/references/project.md")
     assert "../process-phase/scripts/review_tool.py" in cited
     assert [path for path in sorted(cited) if not (skill / path).is_file()] == []
+
+
+@pytest.mark.parametrize("example", ["phase-project.devtools.toml", "milestone-project.devtools.toml"])
+def test_both_examples_deliver_handle_issue_and_it_passes_the_skill_check(tmp_path, example):
+    # handle-issue works in either workflow, so each example ships it, and the copy must meet
+    # the phase tool's skill rules (name, description, no backticked file it lacks).
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples" / example).read_text())
+    assert run("apply", "--project", project) == 0
+    skill = project / ".claude/skills/handle-issue"
+    assert (skill / "SKILL.md").is_file()
+    spec = importlib.util.spec_from_file_location("phase_tool", sync.SOURCE_ROOT / "skills/phase/process-phase/scripts/phase_tool.py")
+    phase_tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(phase_tool)
+    assert phase_tool.check_skill(project, skill) == []

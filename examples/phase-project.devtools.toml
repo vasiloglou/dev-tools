@@ -90,6 +90,12 @@ docs_dir = "docs/components"
 script_path = "scripts/components_index.py"
 # verb_list = "shared"   # for a large catalog: list only the verbs two or more entries use
 
+# handle-issue reads a GitHub issue, reproduces and classes it, and routes it to a fix, the
+# plan or a reply. It has no values or settings of its own.
+[[sync]]
+source = "skills/handle-issue"
+dest = ".claude/skills/handle-issue"
+
 # Optional: a GitHub Actions job that runs the index check on every pull request.
 # [[sync]]
 # source = "examples/components-check.yml"
