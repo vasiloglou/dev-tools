@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "dvt": {
+      "source": {
+        "source": "github",
+        "repo": "vasiloglou/dev-tools"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "dvt-milestone@dvt": true
+  }
+}

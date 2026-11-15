@@ -16,6 +16,12 @@ Nobody else can approve or merge.
    uv run --no-project --with pytest python -m pytest tests -q
    ```
 
+   In Claude Code, this repository's `.claude/settings.json` turns on the released
+   `dvt-milestone` plugin (`/dvt-milestone:review-pr`, `/dvt-milestone:handle-issue` and the
+   rest). Claude Code offers to add the `dvt` marketplace and install it the first time you
+   trust the folder. It is the released version, not your branch: to try a changed skill,
+   run `claude --plugin-dir plugins/dvt-milestone` after `python3 devtools/build_plugins.py`.
+
 4. **Open a pull request against `main`.** Say what changed and why, and link the issue
    if there is one. One purpose per pull request.
 5. **Review.** You may be asked for changes before it is merged.
