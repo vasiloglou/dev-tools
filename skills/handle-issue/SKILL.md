@@ -77,7 +77,10 @@ route with the reason. The owner chooses; nothing below starts before they do.
   behaviour in the same change. The commit says what prompted it: the issue,
   and for a wording change the sentence that was misread. The pull request body
   links the issue with `Fixes #<N>` and says how it was reproduced. Opening it
-  is an outward action (below). Offer `review-pr` for it once it is open.
+  is an outward action (below). Once it is open, offer an independent review
+  with the `review-pr` skill if the project has it (the milestone workflow
+  delivers it beside its process-phase); otherwise offer the review the
+  project's own workflow uses for a change.
 - **Put it on the plan.** For a `capability`, or a defect too large for one
   pull request. In a project with the phase workflow, draft the ROADMAP
   amendment (a later phase's bullet, or an inserted `N.M` phase, as
@@ -129,10 +132,19 @@ while working, or the owner's request:
 
 ## Triaging the backlog
 
-When asked to triage the open issues, read them all
-(`gh issue list --state open --limit 200 --json number,title,labels,updatedAt`,
-then `gh issue view` for each), and work steps 1 and 2 for each one. Report
-one table, oldest first: number, title, class, evidence in a line, recommended
-route. Nothing is posted, labelled or closed during triage; the owner picks
+When asked to triage the open issues, read them all. `gh issue list` stops at
+its `--limit` without saying so, so list them page by page instead:
+
+```bash
+gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
+    --jq '.[] | select(.pull_request == null) | [.number, .created_at, .title] | @tsv'
+```
+
+The endpoint returns pull requests too; the `select` leaves them out. Then
+`gh issue view` each one and work steps 1 and 2 for it. Report one table,
+oldest first: number, title, class, evidence in a line, recommended route. The
+report starts with how many open issues there are and how many the table
+covers; when the owner limits the pass (a label, the newest twenty) or it
+stops early, it says which issues are not in it. Nothing is posted, labelled or closed during triage; the owner picks
 issues from the table, and each picked issue goes through step 3 and 4 on its
 own.
