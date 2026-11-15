@@ -7,7 +7,9 @@ default instrument for all of them: it writes the brief, runs the reviewer, and
 keeps the findings ledger. A project whose `references/project.md` names an
 instrument of its own uses that one; a project that takes this one names it
 there, with any settings it changed. Below, `<skill>` is this skill's folder in
-the project, for example `.claude/skills/process-phase`.
+the project, for example `.claude/skills/process-phase`. A request to review a
+pull request is taken by the `review-pr` skill, which runs these steps in order
+and follows this file.
 
 Using the helper is not consent to a review. The owner's choice of instrument,
 and of a paid model, still comes first (`review-convergence.md`, the project's
@@ -18,6 +20,9 @@ plan-review bar); the helper only makes the chosen review the same every time.
 Put each round in its own folder under the milestone's notes, named for its
 subject and round, for example
 `{{devtools:planning_dir}}/milestones/<milestone>/notes/reviews/phase-3-r1/`.
+A pull request that belongs to no milestone has its rounds under
+`{{devtools:planning_dir}}/reviews/`, for example
+`{{devtools:planning_dir}}/reviews/pr-42-r1/`.
 `brief` creates the folder, refuses one that already holds files, and nothing
 afterwards rewrites the brief: a second round is a second folder.
 
