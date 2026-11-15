@@ -29,7 +29,7 @@
 
 <section><div class="wrap">
   <div class="section-head">
-    <h2>Three skills, three jobs</h2>
+    <h2>Four skills, four jobs</h2>
   </div>
   <div class="grid">
     <div class="card">
@@ -43,6 +43,10 @@
     <div class="card">
       <h3><code>process-milestone</code></h3>
       <p>Walks the whole milestone: picks the next phase whose prerequisites are met, runs it, and at the end sweeps every open question and writes the closing record.</p>
+    </div>
+    <div class="card">
+      <h3><code>review-pr</code></h3>
+      <p>Has a pull request reviewed by the other tool: a neutral question at the PR's head, the reviewer's answer kept word for word, each finding reproduced and classed. It shows you the comment it would post and posts it only when you say so.</p>
     </div>
   </div>
 </div></section>
@@ -193,7 +197,7 @@ Counts: 1 finding, 1 blocking, 0 hardening,
     <div>
       <h3>The same review every time</h3>
       <p>A helper script, <code>review_tool.py</code>, ships with the skills. It writes the brief: the question without the author's answer, each file to read with its fingerprint, and a rule against opening credential files. It then starts the reviewer in the other tool (Codex, read-only, when Claude Code does the work; Claude Code in plan mode when Codex does) in the background, and keeps its answer word for word.</p>
-      <p>Each finding goes in a ledger: reproduced or not, its class, what was done, and the commit that holds the repair. <strong>A repaired file counts as unreviewed until a later round reads its new bytes</strong>, and the helper's <code>status</code> says which files those are. For a pull request it reviews the diff at the PR's head, and posts the result as a comment only when you approve.</p>
+      <p>Each finding goes in a ledger: reproduced or not, its class, what was done, and the commit that holds the repair. <strong>A repaired file counts as unreviewed until a later round reads its new bytes</strong>, and the helper's <code>status</code> says which files those are. For a pull request (ask for one with <code>review-pr</code>) it reviews the diff at the PR's head, and posts the result as a comment only when you approve.</p>
     </div>
     <div>
 <pre class="code"><span class="dim"># one review round, one folder</span>

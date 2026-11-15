@@ -39,6 +39,12 @@ claude_model = "opus"
 # A review still running after this many minutes is stopped and recorded as failed.
 timeout_minutes = 60
 
+# review-pr drives process-phase's review helper for a pull request, so it goes in the same
+# skills folder as process-phase. It has no values or settings of its own.
+[[sync]]
+source = "skills/milestone/review-pr"
+dest = ".claude/skills/review-pr"
+
 # A second agent runtime (Codex reads .codex/skills or .agents/skills) gets a second entry
 # per skill with the same values. If that folder is a link to .claude/skills, add none:
 # the sync refuses two destinations that are one file.

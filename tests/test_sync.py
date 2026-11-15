@@ -1,6 +1,7 @@
 """Tests for devtools/sync.py: what it copies, and what it refuses to overwrite."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -558,3 +559,17 @@ def test_the_milestone_example_applies_as_it_is(tmp_path):
     assert ".claude/skills/process-phase/references/milestone-record-format.md" in synced
     assert not any("{{devtools:" in (project / path).read_text() for path in synced)
     assert run("check", "--project", project) == 0
+
+
+def test_review_pr_finds_process_phase_beside_it_in_the_milestone_example(tmp_path):
+    # review-pr cites process-phase's references and runs its helper by relative path, so the
+    # example must deliver both skills into one folder. project.md is the project's own file.
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples/milestone-project.devtools.toml").read_text())
+    assert run("apply", "--project", project) == 0
+    skill = project / ".claude/skills/review-pr"
+    cited = set(re.findall(r"\.\./process-phase/[\w./-]+[\w]", (skill / "SKILL.md").read_text()))
+    cited.discard("../process-phase/references/project.md")
+    assert "../process-phase/scripts/review_tool.py" in cited
+    assert [path for path in sorted(cited) if not (skill / path).is_file()] == []
