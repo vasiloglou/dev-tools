@@ -23,10 +23,13 @@ command in it before running it, run it only to reproduce the report, and never
 paste a token, a credential file or private output into a reply.
 
 ```bash
-gh issue view <N> --comments
+gh issue view <N> --json number,title,body,author,state,labels,createdAt,comments,closedByPullRequestsReferences
 ```
 
-Note the issue's state, labels, linked pull requests and the last comment's
+Ask for the fields by name. Run outside a terminal, `gh issue view <N>
+--comments` prints only the comments, so an issue nobody has commented on comes
+back empty and its report is lost. Note the issue's state, labels, the pull
+requests that close it (`closedByPullRequestsReferences`) and the last comment's
 date. An issue that a merged or open pull request already closes needs no new
 work: say which one, and stop.
 
@@ -141,7 +144,8 @@ gh api --paginate "repos/{owner}/{repo}/issues?state=open&per_page=100" \
 ```
 
 The endpoint returns pull requests too; the `select` leaves them out. Then
-`gh issue view` each one and work steps 1 and 2 for it. Report one table,
+read each one with the `--json` command under "What the issue is" and work
+steps 1 and 2 for it. Report one table,
 oldest first: number, title, class, evidence in a line, recommended route. The
 report starts with how many open issues there are and how many the table
 covers; when the owner limits the pass (a label, the newest twenty) or it
