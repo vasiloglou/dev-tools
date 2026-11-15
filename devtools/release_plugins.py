@@ -144,9 +144,12 @@ def cmd_bump(args) -> int:
 
 
 def notes(previous: str | None, version: str) -> str:
-    span = f"{previous}..HEAD" if previous else "HEAD"
-    log = git("log", "--no-merges", "--format=- %s (%h)", span, "--", *SOURCES)
-    return f"dvt plugins {version}\n\n" + (log or "- First release.") + "\n"
+    """The commits since the last release that touched what the plugins are built from. The first
+    release has no earlier one to count from, and its history predates the plugins, so it says so."""
+    if not previous:
+        return f"dvt plugins {version}\n\n- First release.\n"
+    log = git("log", "--no-merges", "--format=- %s (%h)", f"{previous}..HEAD", "--", *SOURCES)
+    return f"dvt plugins {version}\n\n" + (log or "- No commit message names the change.") + "\n"
 
 
 def cmd_tag(args) -> int:

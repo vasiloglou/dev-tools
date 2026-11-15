@@ -19,6 +19,10 @@ def git(repo: Path, *args: str) -> str:
 def repo(tmp_path):
     for name in COPIED:
         shutil.copytree(ROOT / name, tmp_path / name, ignore=shutil.ignore_patterns("__pycache__"))
+    # Start every test from 0.1.0 with no release, whatever version this repository is at.
+    (tmp_path / "devtools/PLUGIN_VERSION").write_text("0.1.0\n")
+    subprocess.run([sys.executable, str(tmp_path / "devtools/build_plugins.py")], cwd=tmp_path, check=True,
+                   capture_output=True)
     git(tmp_path, "init", "-q", "-b", "main")
     git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.com", "add", "-A")
     git(tmp_path, "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "start")
@@ -44,6 +48,9 @@ def change_a_skill(repo: Path) -> None:
 
 def test_the_first_release_tags_the_version_in_the_tree(repo):
     assert release(repo, "status").returncode == 1
+    preview = release(repo, "tag", "--dry-run")
+    # The history before the first release predates the plugins: the notes do not list it.
+    assert preview.stdout.rstrip().endswith("- First release.") and "start" not in preview.stdout.split("\n\n", 2)[-1]
     done = release(repo, "tag")
     assert done.returncode == 0, done.stderr
     version = (repo / "devtools/PLUGIN_VERSION").read_text().strip()

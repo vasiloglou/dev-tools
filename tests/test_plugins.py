@@ -172,3 +172,14 @@ def test_a_rule_change_in_a_plugin_project_needs_a_decision(installed):
     (project / ".devtools/project.md").write_text("# Project rules\n\nA new rule.\n")
     done = run(project, tool, "check", "--all")
     assert done.returncode == 1 and "rule-dec" in done.stdout and ".devtools/project.md" in done.stdout
+
+
+@pytest.mark.parametrize("example, plugin", [("examples/phase-project.devtools.toml", "dvt-phase"),
+                                             ("examples/milestone-project.devtools.toml", "dvt-milestone")])
+def test_every_skill_a_project_syncs_is_in_its_workflows_plugin(example, plugin):
+    import tomllib
+    config = tomllib.loads((ROOT / example).read_text())
+    synced = {entry["source"] for entry in config["sync"] if (ROOT / entry["source"] / "SKILL.md").is_file()}
+    assert synced
+    assert synced <= set(build_plugins.PLUGINS[plugin]["skills"].values()), synced - set(
+        build_plugins.PLUGINS[plugin]["skills"].values())

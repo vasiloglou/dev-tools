@@ -48,14 +48,14 @@ Auto advances through satisfied owner gates; it does not manufacture evidence,
 skip required reviews, waive stricter scope limits or authorize paid calls,
 reserved data, broad historical suites, publication, opt-in gates or PR merge.
 Follow the repository's `AGENTS.md` and `CONTRIBUTING.md` where present. An
-[opt-in gate](../process-phase/references/architect-overrides.md) needs
+[opt-in gate](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/architect-overrides.md) needs
 its own explicit current owner request for subject and scope.
 
 ## Resolve readiness before execution
 
 Read `.planning/PROJECT.md`, the whole effective canonical milestone plan,
 amendments, the plan-gate record
-([milestone record format](../process-phase/references/milestone-record-format.md))
+([milestone record format](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/milestone-record-format.md))
 and any retained plan-review notes, applicable question registers and prior
 phase/close records. Resolve all output beneath
 `.planning/milestones/<milestone>/`; reject paths escaping the repository or
@@ -81,11 +81,11 @@ a different tool) remains binding where the plan or protocol requires it.
 Explicitly selected review tools/delegation can be used within their scope and
 credential contract.
 Where the project names none, the instrument to offer is process-phase's
-[review helper](../process-phase/references/review-tool.md) (`--subject plan`,
+[review helper](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-tool.md) (`--subject plan`,
 `phase`, `close` or `pr`).
 If no instrument is selected, finish reviewable preparation and request that
 specific missing choice; auto is not a tool selection. Follow the
-[review convergence rules](../process-phase/references/review-convergence.md)
+[review convergence rules](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/review-convergence.md)
 and never relabel one reviewer as a multi-reviewer review.
 
 ## Run the ready phases
@@ -143,7 +143,7 @@ retired with its reason. A repair is a plan amendment and falls under the close
 ruling; the close record cites the amended plan's SHA-256.
 
 Write the next numbered milestone close record using the
-[milestone record format](../process-phase/references/milestone-record-format.md).
+[milestone record format](${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/milestone-record-format.md).
 Include phase
 record references, exact exit-gate commands/results, artifact SHA-256s, review
 scope/findings/dispositions, refuted premises, question sweep, residuals and
