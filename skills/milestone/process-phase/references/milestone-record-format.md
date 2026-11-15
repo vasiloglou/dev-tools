@@ -35,7 +35,14 @@ Layout:
       003-phase-2.md
       ...
       NNN-close.md
+      notes/                          # the plan, the phase specs, reviews word for word
+        <milestone-name>-plan.md
+        phase-1-spec.md
+        phase-1-<reviewer>-review.md
+      evidence/                       # saved output a record points to
 ```
+
+**`notes/` is always the milestone's own**: `{{devtools:planning_dir}}/milestones/<milestone-name>/notes/`. Every `notes/…` path in the workflow skills means that folder. Phase numbers start again in each milestone and milestones can run side by side, so a `notes/` shared between milestones would hold two `phase-1-spec.md`.
 
 The directory is **append-only**. A record is never edited after its commit — a correction is a **new** record, with the next number, citing the record it corrects by path and sha256. Deleting or rewriting a record destroys evidence the same way editing a retained attempt would.
 

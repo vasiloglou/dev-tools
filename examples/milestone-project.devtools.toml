@@ -1,8 +1,16 @@
 # Example .devtools.toml for a project that uses the milestone workflow.
-# Copy it to the project root, adjust the values, then run:
+# Copy it to the project root, set planning_dir, then run:
 #   python3 <dev-tools>/devtools/sync.py apply --project .
-# The project's own rules go in .claude/skills/process-phase/references/project.md, which the
-# sync never touches.
+#
+# `values` fills the planning folder into the skills' text. Each milestone's records go in
+# <planning_dir>/milestones/<milestone>/. The one script, process-phase's review helper
+# (scripts/review_tool.py), takes the settings below. The project's own rules for the skills
+# go in .claude/skills/process-phase/references/project.md, which the sync never touches.
+#
+# If the project's .gitignore leaves the synced files out, apply says so. Under a rule
+# `.claude/skills/*`, add `!.claude/skills/<name>/` for each folder below; a rule that
+# excludes `.claude/skills/` itself must become `.claude/skills/*` first, since git does not
+# look inside an excluded folder. `git check-ignore -v <file>` names the rule.
 
 [[sync]]
 source = "skills/milestone/start-milestone"
@@ -30,3 +38,11 @@ codex_effort = "high"
 claude_model = "opus"
 # A review still running after this many minutes is stopped and recorded as failed.
 timeout_minutes = 60
+
+# A second agent runtime (Codex reads .codex/skills or .agents/skills) gets a second entry
+# per skill with the same values. If that folder is a link to .claude/skills, add none:
+# the sync refuses two destinations that are one file.
+# [[sync]]
+# source = "skills/milestone/process-phase"
+# dest = ".agents/skills/process-phase"
+# values = { planning_dir = ".planning" }
