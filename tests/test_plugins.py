@@ -69,7 +69,7 @@ def test_no_text_points_into_a_synced_copy(plugin):
     for path in markdown(plugin):
         text = path.read_text()
         assert "{{devtools:" not in text, path
-        assert not re.search(r"\.claude/skills/[\w-]+", text), path
+        assert not re.search(r"\.claude/(skills|agents)/[\w-]+", text), path
         assert "references/project.md" not in text, path
         # A plugin reads each script's settings from the project's .devtools/, never beside the script.
         assert not re.search(r"settings\.json`\s+beside", text), path
@@ -158,3 +158,17 @@ def test_rules_check_in_a_plugin_uses_the_plugins_own_scripts(installed):
 def test_claude_validates_the_plugins_and_the_marketplace(folder):
     done = subprocess.run(["claude", "plugin", "validate", folder], cwd=ROOT, capture_output=True, text=True)
     assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_a_rule_change_in_a_plugin_project_needs_a_decision(installed):
+    plugin, project = installed("dvt-phase")
+    tool = plugin / "skills/process-phase/scripts/phase_tool.py"
+    who = ["-c", "user.name=t", "-c", "user.email=t@example.com"]
+    subprocess.run(["git", "checkout", "-q", "-b", "main"], cwd=project, check=True)
+    assert run(project, tool, "setup").returncode == 0
+    subprocess.run(["git", "add", "-A"], cwd=project, check=True)
+    subprocess.run(["git", *who, "commit", "-q", "-m", "setup"], cwd=project, check=True)
+    subprocess.run(["git", "checkout", "-q", "-b", "feature"], cwd=project, check=True)
+    (project / ".devtools/project.md").write_text("# Project rules\n\nA new rule.\n")
+    done = run(project, tool, "check", "--all")
+    assert done.returncode == 1 and "rule-dec" in done.stdout and ".devtools/project.md" in done.stdout

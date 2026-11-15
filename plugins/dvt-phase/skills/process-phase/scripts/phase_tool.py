@@ -1292,7 +1292,10 @@ PROCESS_SKILL = Path(SETTINGS["process_skill"])
 # `prove.md` §4, `templates/PLAN.md` §2, prove.md "Goals and targets".
 TEMPLATE_CITE = re.compile(r"`?(?:templates/([\w.-]+\.md)|(prove\.md))`?\s*(?:§\s*(\d+)|\"([^\"]+)\")")
 TEMPLATE_HEADING = re.compile(r"^#{2,}\s+(?:(\d+)\.\s+)?(.+?)\s*$", re.M)
-RULE_FILE = re.compile("^" + re.escape(SETTINGS["process_skill"]) + r"/(SKILL\.md|references/[^/]+\.md|templates/[^/]+\.md)$")
+# A synced copy's rule text is the skill's own files in the project. A plugin install's are the
+# plugin's, so in the project only its rules for the skill are, in .devtools/project.md.
+RULE_FILE = (re.compile(r"^\.devtools/project\.md$") if PLUGIN else
+             re.compile("^" + re.escape(SETTINGS["process_skill"]) + r"/(SKILL\.md|references/[^/]+\.md|templates/[^/]+\.md)$"))
 DEC_ROW = re.compile(r"^\|\s*(DEC-\d{3})\s*\|", re.M)
 # Words after a `§N` citation that say nothing about the section's heading.
 CITE_STOPWORDS = frozenset("a an and are as at by each for from gets has have in into is it its of on or per "

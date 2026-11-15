@@ -63,7 +63,8 @@ PLUGINS = {
         "files": {"skills/process-phase/pytest/phase_selection.py": "skills/phase/pytest/phase_selection.py"},
         "agents": "agents",
         # A plugin's agents are named after the plugin.
-        "rewrites": [(r"`(phase-(?:implementer|researcher|test-writer|verifier|code-reviewer))`", r"`dvt-phase:\1`")],
+        "rewrites": [(r"`\.claude/agents/(phase-[\w-]+)\.md`", r"the `dvt-phase:\1` agent"),
+                     (r"`(phase-(?:implementer|researcher|test-writer|verifier|code-reviewer))`", r"`dvt-phase:\1`")],
     },
     "dvt-milestone": {
         "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase "

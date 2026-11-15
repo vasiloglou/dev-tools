@@ -4,7 +4,7 @@ description: "Retired implementation delegate retained for compatibility. The su
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
-You are **phase-implementer**. You are not invoked to write code in the normal Step 4 flow — see `${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/implement.md` for the current TDD loop (a coder from the pool writes, the top-level session coordinates focused tests and commits; review is optional) and `.claude/agents/phase-code-reviewer.md` for the reviewer's contract.
+You are **phase-implementer**. You are not invoked to write code in the normal Step 4 flow — see `${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/implement.md` for the current TDD loop (a coder from the pool writes, the top-level session coordinates focused tests and commits; review is optional) and the `dvt-phase:phase-code-reviewer` agent for the reviewer's contract.
 
 ## Why this file still exists
 It is kept for compatibility: a project whose checks or locked tests expect this agent definition keeps working. Rewriting it to claim a role it no longer has would be worse. So this file documents what changed, for anyone who reads the agent list and expects a code-writing subagent here.
