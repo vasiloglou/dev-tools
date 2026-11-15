@@ -155,30 +155,36 @@ def shown(root: Path, path: Path) -> str:
 
 
 def split_diff(text: str) -> list[tuple[list[str], str]]:
-    """(paths, block) for each file of a unified git diff: both sides, so a rename names both."""
-    blocks, paths, lines = [], [], []
+    """(paths, block) for each file of a unified git diff. The paths come from the block's
+    header only, the lines before its first hunk, and name both sides of a rename or copy."""
+    blocks, paths, lines, header = [], [], [], False
     for line in text.splitlines(keepends=True):
+        bare = line.rstrip("\n")
         if line.startswith("diff --git "):
             if lines:
                 blocks.append((paths, "".join(lines)))
-            match = re.match(r'diff --git "?a/(.*?)"? "?b/(.*?)"?$', line.rstrip("\n"))
-            paths, lines = (list(match.groups()) if match else []), [line]
-        else:
-            side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) [ab]/(.*)$", line.rstrip("\n"))
-            if side and lines:
+            match = re.match(r'diff --git "?(?:[a-z]/)?(.*?)"? "?(?:[a-z]/)?(.*?)"?$', bare)
+            paths, lines, header = (list(match.groups()) if match else []), [line], True
+            continue
+        if header and (line.startswith("@@") or line.startswith("Binary files")):
+            header = False
+        elif header:
+            side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) (?:[a-z]/)?(.*)$", bare)
+            if side and (side.group(1) or side.group(2)) != "dev/null":
                 paths.append(side.group(1) or side.group(2))
-            lines.append(line)
+        lines.append(line)
     if lines:
         blocks.append((paths, "".join(lines)))
     return blocks
 
 
 def without_secrets(text: str) -> tuple[str, list[str]]:
+    """The diff without any block that names a credential file on either side, and every
+    path those blocks name: a credential renamed to an innocent name is still one."""
     kept, dropped = [], []
     for paths, block in split_diff(text):
-        secret = [p for p in paths if looks_secret(p)]
-        if secret:
-            dropped += [p for p in secret if p not in dropped]
+        if any(looks_secret(p) for p in paths):
+            dropped += [p for p in paths if p not in dropped]
         else:
             kept.append(block)
     return "".join(kept), dropped
@@ -210,7 +216,7 @@ def cmd_brief(args, settings) -> int:
             rel = path.relative_to(root).as_posix()
         except ValueError:
             raise Stop("%s is outside the repository" % rel)
-        if looks_secret(rel):
+        if looks_secret(rel) or rel in tainted:
             if named:
                 raise Stop("%s looks like a credential file; a brief never lists one" % rel)
             left_out.append(rel)
@@ -231,11 +237,14 @@ def cmd_brief(args, settings) -> int:
 
     head = git(root, "rev-parse", "HEAD", check=False).stdout.strip()
     dirty = bool(git(root, "status", "--porcelain", "--untracked-files=no", check=False).stdout.strip())
-    diff, pr = None, None
+    diff, pr, tainted = None, None, []
     if args.base:
         if git(root, "rev-parse", "--verify", "--quiet", args.base + "^{commit}", check=False).returncode:
             raise Stop("--base %s is not a commit here" % args.base)
-        diff = git(root, "diff", "--no-color", "--no-ext-diff", args.base, "--").stdout
+        # Fixed a/ and b/ prefixes, whatever the diff.noprefix or diff.mnemonicPrefix settings.
+        diff = git(root, "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "diff", "--no-color",
+                   "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/", args.base, "--").stdout
+        diff, tainted = without_secrets(diff)
         changed = git(root, "diff", "--name-only", "-z", args.base, "--").stdout.split("\0")
         untracked = git(root, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0")
         for rel in [p for p in changed + untracked if p]:
@@ -244,7 +253,7 @@ def cmd_brief(args, settings) -> int:
                   for p in untracked if p and any(f["path"] == p for f in files)]
     if args.pr is not None:
         pr = pr_view(args.pr)
-        diff = run_gh(["pr", "diff", str(args.pr)])
+        diff, tainted = without_secrets(run_gh(["pr", "diff", str(args.pr)]))
         if pr_view(args.pr)["head"] != pr["head"]:
             raise Stop("PR #%s moved while the brief was written: write it again" % args.pr)
     for rel in args.file:
@@ -252,8 +261,7 @@ def cmd_brief(args, settings) -> int:
 
     out.mkdir(parents=True, exist_ok=True)
     if diff is not None:
-        diff, dropped = without_secrets(diff)
-        left_out += [p for p in dropped if p not in left_out]
+        left_out += [p for p in tainted if p not in left_out]
         (out / "diff.patch").write_text(diff, encoding="utf-8")
         files.insert(0, {"path": shown(root, out / "diff.patch"), "sha256": sha256(out / "diff.patch")})
     brief = {
@@ -274,9 +282,9 @@ def cmd_brief(args, settings) -> int:
     (out / "BRIEF.md").write_text(brief_text(root, out, brief), encoding="utf-8")
     write_json(out / "brief.json", brief)
     (out / "FINDINGS.md").write_text(ledger_text(out), encoding="utf-8")
-    print("wrote %s/BRIEF.md: %d files, SHA-256 %s" % (args.dir, len(files), sha256(out / "BRIEF.md")))
     for rel in left_out:
-        print("left out: %s (looks like a credential file)" % rel)
+        print("left out: %s (a credential file, or a rename of one)" % rel)
+    print("wrote %s/BRIEF.md: %d files, SHA-256 %s" % (args.dir, len(files), sha256(out / "BRIEF.md")))
     print("next: review_tool.py run %s" % args.dir)
     return 0
 
@@ -314,7 +322,7 @@ def brief_text(root: Path, out: Path, brief: dict) -> str:
                      % (brief["head"][:12], " with uncommitted changes" if brief["dirty"] else ""))
     lines += ["- %s" % note for note in brief["notes"]]
     lines += ["- deleted: %s" % rel for rel in brief["deleted"]]
-    lines += ["- left out: %s (looks like a credential file; do not open it)" % rel for rel in brief["left_out"]]
+    lines += ["- left out: %s (a credential file, or a rename of one; do not open it)" % rel for rel in brief["left_out"]]
     lines += ["", "## What to read", "",
               "Paths are relative to the repository root, the directory you start in. Before you rely",
               "on a file, check its SHA-256 (`shasum -a 256 <path>`); if one differs, say so first in",
@@ -512,12 +520,10 @@ def split_row(line: str) -> list[str]:
 
 
 def ledger_rows(text: str) -> list[dict]:
-    """The rows of the table whose first column is Id (the first such table only)."""
+    """The rows of every table line after the header whose first column is Id, blank lines or not."""
     rows, header = [], None
     for line in text.splitlines():
         if not line.strip().startswith("|"):
-            if header is not None:
-                break
             continue
         cells = split_row(line)
         if header is None:
@@ -603,9 +609,11 @@ def cmd_status(args, settings) -> int:
         report.append({"round": shown(root, out), "subject": brief.get("subject"), "state": state,
                        "reviewer": run.get("reviewer"), "model": run.get("model"),
                        "findings": len(rows), "problems": problems})
+        own = [f for f in brief.get("files", []) if (root / f["path"]).resolve().parent == out.resolve()]
+        problems += changed_files(root, out, {"files": own})  # the round's own diff.patch
         for f in brief.get("files", []):
-            if (root / f["path"]).resolve().parent == out.resolve():
-                continue  # the round's own diff.patch
+            if f in own:
+                continue
             if f["path"] not in latest or brief["created"] >= latest[f["path"]][0]:
                 latest[f["path"]] = (brief["created"], shown(root, out), f["sha256"], state)
     coverage = []

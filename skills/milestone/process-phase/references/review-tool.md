@@ -48,7 +48,9 @@ environment, and asks for numbered findings with file, line, consequence and
 reproduction, what was checked and found true, what could not be checked, and
 a verdict line. A file that looks like a credential file (`.env`, keys,
 `auth.json`, `secrets.json`; not `.env.example`) is refused when named and left
-out of a diff, renamed or not, with a note in the brief saying so. A PR that
+out of a diff, with a note in the brief saying so. A diff block that names one
+on either side is dropped whole, and a credential renamed to an innocent name is
+not listed under its new name either. A PR that
 moves while its brief is written is refused: the diff must be the head's.
 
 ## Running the reviewer

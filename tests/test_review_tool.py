@@ -406,3 +406,58 @@ def test_f6_a_fixed_finding_names_its_regression_test(project):
     fill(project, "reviews/plan-r1", ["F1", "wrong total", "yes", "blocking", "fixed", "HEAD", ""])
     code, out = review(project, "status", "reviews/plan-r1")
     assert "F1: fixed, with no regression test in Notes" in out
+
+
+# Regression tests for the second round's findings (R2-F1 to R2-F5).
+
+def test_r2_f1_a_credential_diff_is_left_out_under_any_diff_prefix_setting(project):
+    base = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    (project / ".gitignore").write_text("")
+    (project / ".env").write_text("TOKEN=hunter2\n")
+    base = commit(project, "track .env")
+    (project / ".env").write_text("TOKEN=hunter3\n")
+    subprocess.run(["git", "-C", str(project), "config", "diff.noprefix", "true"], check=True)
+    code, out = review(project, "brief", "reviews/p-r1", "--subject", "phase", "--base", base, "--question", "q")
+    assert code == 0, out
+    assert "hunter" not in (project / "reviews/p-r1/diff.patch").read_text() and "left out: .env" in out
+
+
+def test_r2_f2_the_new_name_of_a_renamed_credential_file_is_not_listed(project):
+    lines = ['  "setting_%d": %d,' % (i, i) for i in range(12)]
+    (project / "auth.json").write_text("{\n" + "\n".join(lines) + '\n  "token": "hunter2"\n}\n')
+    base = commit(project, "add auth")
+    subprocess.run(["git", "-C", str(project), "mv", "auth.json", "config.json"], check=True)
+    code, out = review(project, "brief", "reviews/p-r1", "--subject", "phase", "--base", base, "--question", "q")
+    assert code == 0, out
+    data = json.loads((project / "reviews/p-r1/brief.json").read_text())
+    assert "config.json" not in [f["path"] for f in data["files"]] and "config.json" in data["left_out"]
+
+
+def test_r2_f3_a_rounds_own_diff_that_changed_fails_status(project):
+    review(project, "brief", "reviews/pr7", "--subject", "pr", "--pr", "7", "--question", "q")
+    review(project, "run", "reviews/pr7", "--wait")
+    ledger = project / "reviews/pr7/FINDINGS.md"
+    ledger.write_text(ledger.read_text() + "\nNo findings.\n")
+    assert review(project, "status", "reviews/pr7")[0] == 0
+    (project / "reviews/pr7/diff.patch").write_text("edited\n")
+    code, out = review(project, "status", "reviews/pr7")
+    assert code == 1 and "problem: changed since the brief: reviews/pr7/diff.patch" in out
+
+
+def test_r2_f4_a_removed_line_that_reads_like_a_file_name_keeps_its_diff(project):
+    (project / "notes/guide.md").write_text("Never commit\n-- a/.env\nfiles.\n")
+    base = commit(project, "guide")
+    (project / "notes/guide.md").write_text("Never commit\nfiles.\n")
+    code, out = review(project, "brief", "reviews/p-r1", "--subject", "phase", "--base", base, "--question", "q")
+    assert code == 0, out
+    assert "notes/guide.md" in (project / "reviews/p-r1/diff.patch").read_text() and "left out" not in out
+
+
+def test_r2_f5_a_ledger_row_after_a_blank_line_is_still_read(project):
+    plan_brief(project)
+    review(project, "run", "reviews/plan-r1", "--wait")
+    ledger = project / "reviews/plan-r1/FINDINGS.md"
+    ledger.write_text(ledger.read_text() + "| F1 | a | yes | completeness | rejected | | style only |\n\n"
+                      "| F2 | b | yes | blocking | open | | |\n")
+    code, out = review(project, "status", "reviews/plan-r1")
+    assert code == 1 and "F2: still open" in out and "2 finding(s)" in out
