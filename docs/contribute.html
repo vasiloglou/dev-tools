@@ -103,9 +103,10 @@
     <tr><td><code>skills/adopt-devtools/</code></td><td>How an agent moves an existing project to the shared skills.</td></tr>
     <tr><td><code>agents/</code></td><td>Helper agents the phase steps hand work to.</td></tr>
     <tr><td><code>devtools/sync.py</code></td><td>The sync command.</td></tr>
+    <tr><td><code>plugins/</code></td><td>The Claude Code plugins <code>dvt-phase</code> and <code>dvt-milestone</code>, generated from the skills by <code>devtools/build_plugins.py</code>. After changing a skill or an agent, run <code>python3 devtools/release_plugins.py bump</code>, which raises the plugin version and rebuilds them, and commit the result with the change.</td></tr>
     <tr><td><code>examples/</code></td><td>A complete project file, and a GitHub Actions job that checks the index.</td></tr>
     <tr><td><code>docs/</code></td><td>This site.</td></tr>
-    <tr><td><code>tests/</code></td><td>Tests for the sync command and the scripts.</td></tr>
+    <tr><td><code>tests/</code></td><td>Tests for the sync command, the plugin build and release, and the scripts.</td></tr>
   </table></div>
 </div></section>
 

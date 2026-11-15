@@ -27,6 +27,11 @@ project that takes the next update. The bar is the same for prose as for code.
 
 - **A script change comes with a test.** `devtools/sync.py` and the scripts under
   `skills/` are tested in `tests/`. A fix arrives with a test that fails without it.
+- **The plugins are rebuilt, and released under a new version.** `plugins/` is generated:
+  after changing a skill or an agent, run `python3 devtools/release_plugins.py bump`, which
+  raises the plugin version and rebuilds `plugins/`, and commit both with the change. The
+  tests fail while `plugins/` is stale. The maintainer tags the release after the merge
+  (`release_plugins.py tag --github`).
 - **A wording change says what prompted it.** Name the run where the agent went wrong,
   or the sentence it misread.
 - **Shared skills stay general.** A rule that only makes sense in one project belongs in

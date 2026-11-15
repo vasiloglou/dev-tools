@@ -227,12 +227,41 @@ def load_settings(path: Path) -> dict:
     return settings
 
 
-SETTINGS = load_settings(Path(__file__).resolve().with_suffix('.settings.json'))
+def plugin_root(script: Path):
+    '''The plugin install that holds this script, or None. A plugin keeps it in
+    <plugin>/skills/<skill>/scripts/, beside <plugin>/.claude-plugin/plugin.json; a synced copy is
+    in a project, under .claude/skills/ or scripts/.'''
+    folder = script.parents[3] if len(script.parents) > 3 else None
+    return folder if folder and script.parent.parent.parent.name == 'skills' \
+        and (folder / '.claude-plugin' / 'plugin.json').is_file() else None
+
+
+def checkout_root() -> Path:
+    '''The git checkout that holds the working directory, or the working directory.'''
+    here = Path.cwd().resolve()
+    return next((folder for folder in (here, *here.parents) if (folder / '.git').exists()), here)
+
+
+# A plugin install is shared by every project, so its settings are the project's own, in
+# .devtools/, and the index script and the phase tool are the plugin's own copies unless
+# those settings name others.
+PLUGIN = plugin_root(Path(__file__).resolve())
+SETTINGS_FILE = (checkout_root() / '.devtools' / 'rules_check.settings.json' if PLUGIN
+                 else Path(__file__).resolve().with_suffix('.settings.json'))
+SETTINGS = load_settings(SETTINGS_FILE)
+if PLUGIN:
+    _named = json.loads(SETTINGS_FILE.read_text(encoding='utf-8')) if SETTINGS_FILE.is_file() else {}
+    SETTINGS.update({key: str(path) for key, path in {
+        'index_script': Path(__file__).resolve().with_name('components_index.py'),
+        'phase_script': PLUGIN / 'skills' / 'process-phase' / 'scripts' / 'phase_tool.py'}.items()
+        if key not in _named})
 
 
 def places(root: Path) -> tuple[str, str]:
     """The rules file and the layers file: beside the catalog, where the index script reads the layers."""
     settings = (root / SETTINGS['index_script']).with_suffix('.settings.json')
+    if PLUGIN and Path(SETTINGS['index_script']).is_relative_to(PLUGIN):
+        settings = root / '.devtools' / 'components_index.settings.json'
     try:
         folder = json.loads(settings.read_text(encoding='utf-8')).get('docs_dir') if settings.is_file() else None
     except (ValueError, AttributeError) as exc:

@@ -42,9 +42,31 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = SCRIPT_DIR.parent / "templates"
 GATES_FILE = SCRIPT_DIR / "gates.json"
 
+
+
+def plugin_root(script: Path):
+    """The plugin install that holds this script, or None. A plugin keeps it in
+    <plugin>/skills/<skill>/scripts/, beside <plugin>/.claude-plugin/plugin.json; a synced copy is
+    in a project, under .claude/skills/ or scripts/."""
+    folder = script.parents[3] if len(script.parents) > 3 else None
+    return folder if folder and script.parent.parent.parent.name == "skills" \
+        and (folder / ".claude-plugin" / "plugin.json").is_file() else None
+
+
+def checkout_root() -> Path:
+    """The git checkout that holds the working directory, or the working directory."""
+    here = Path.cwd().resolve()
+    return next((folder for folder in (here, *here.parents) if (folder / ".git").exists()), here)
+
+
 # Project settings live beside this script so that a copied skill directory carries them
-# (acceptance fixtures copy the skills tree and run this file with the system python3).
-SETTINGS_FILE = Path(__file__).resolve().with_suffix(".settings.json")
+# (acceptance fixtures copy the skills tree and run this file with the system python3). A
+# plugin install is shared by every project, so there they are the project's own, in .devtools/.
+PLUGIN = plugin_root(Path(__file__).resolve())
+# How the skill text names this script in a plugin install (Claude Code fills the variable in).
+PLUGIN_TOOL = "${CLAUDE_PLUGIN_ROOT}/skills/process-phase/scripts/phase_tool.py"
+SETTINGS_FILE = (checkout_root() / ".devtools" / "phase_tool.settings.json" if PLUGIN
+                 else Path(__file__).resolve().with_suffix(".settings.json"))
 DEFAULT_SETTINGS = {
     "planning_dir": ".planning",
     "acceptance_dir": "tests/acceptance",
@@ -507,7 +529,7 @@ def cmd_setup(pl: Planning, args) -> dict:
     base = args.base_branch or (branch if branch and branch != "HEAD" else "main")
     subs = {"{{NAME}}": args.name or pl.root.name, "{{DATE}}": today(), "{{BASE}}": base,
             "{{RELEASE}}": args.release_branch or base,
-            "{{TOOL}}": rel(pl.root, Path(__file__).resolve())}
+            "{{TOOL}}": PLUGIN_TOOL if PLUGIN else rel(pl.root, Path(__file__).resolve())}
     source = TEMPLATES_DIR / "planning"
     if not source.is_dir():
         raise ToolError("NO_TEMPLATES", "%s is missing" % source, "sync the whole process-phase skill directory")
@@ -1256,7 +1278,7 @@ def check_capabilities(pl: Planning) -> list:
         return []
     target = pl.root / SETTINGS["capabilities_target"]
     try:
-        generator = runpy.run_path(str(SCRIPT_DIR.parents[3] / script))
+        generator = runpy.run_path(str(pl.root / script))
         expected = generator["build_index"](pl.root).encode("utf-8")
         if target.is_file() and target.read_bytes() == expected:
             return []
@@ -1270,7 +1292,10 @@ PROCESS_SKILL = Path(SETTINGS["process_skill"])
 # `prove.md` §4, `templates/PLAN.md` §2, prove.md "Goals and targets".
 TEMPLATE_CITE = re.compile(r"`?(?:templates/([\w.-]+\.md)|(prove\.md))`?\s*(?:§\s*(\d+)|\"([^\"]+)\")")
 TEMPLATE_HEADING = re.compile(r"^#{2,}\s+(?:(\d+)\.\s+)?(.+?)\s*$", re.M)
-RULE_FILE = re.compile("^" + re.escape(SETTINGS["process_skill"]) + r"/(SKILL\.md|references/[^/]+\.md|templates/[^/]+\.md)$")
+# A synced copy's rule text is the skill's own files in the project. A plugin install's are the
+# plugin's, so in the project only its rules for the skill are, in .devtools/project.md.
+RULE_FILE = (re.compile(r"^\.devtools/project\.md$") if PLUGIN else
+             re.compile("^" + re.escape(SETTINGS["process_skill"]) + r"/(SKILL\.md|references/[^/]+\.md|templates/[^/]+\.md)$"))
 DEC_ROW = re.compile(r"^\|\s*(DEC-\d{3})\s*\|", re.M)
 # Words after a `§N` citation that say nothing about the section's heading.
 CITE_STOPWORDS = frozenset("a an and are as at by each for from gets has have in into is it its of on or per "
@@ -1304,7 +1329,7 @@ def citation_words(rest: str):
 def check_template_citations(pl: Planning) -> list:
     """Each ``prove.md §N`` / ``templates/X.md §N`` (or quoted heading) in the skill exists, and the words
     after a ``§N`` match that section's heading (same number, changed title)."""
-    skill = pl.root / PROCESS_SKILL
+    skill = SCRIPT_DIR.parent if PLUGIN else pl.root / PROCESS_SKILL
     files = [skill / "SKILL.md", *sorted((skill / "references").glob("*.md"))]
     issues, cache = [], {}
 
