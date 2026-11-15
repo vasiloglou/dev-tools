@@ -111,8 +111,9 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
     return settings
 
 
-def now() -> str:
-    return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+def now(precise: bool = False) -> str:
+    stamp = datetime.datetime.now(datetime.timezone.utc)
+    return (stamp if precise else stamp.replace(microsecond=0)).isoformat()
 
 
 def sha256(path: Path) -> str:
@@ -120,7 +121,8 @@ def sha256(path: Path) -> str:
 
 
 def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess:
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True, check=check)
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, check=check,
+                          encoding="utf-8", errors="replace")
 
 
 def repo_root() -> Path:
@@ -152,26 +154,33 @@ def shown(root: Path, path: Path) -> str:
         return str(path.resolve())
 
 
-def split_diff(text: str) -> list[tuple[str, str]]:
-    """(path, block) for each file of a unified git diff."""
-    blocks, path, lines = [], "", []
+def split_diff(text: str) -> list[tuple[list[str], str]]:
+    """(paths, block) for each file of a unified git diff: both sides, so a rename names both."""
+    blocks, paths, lines = [], [], []
     for line in text.splitlines(keepends=True):
         if line.startswith("diff --git "):
             if lines:
-                blocks.append((path, "".join(lines)))
-            match = re.match(r'diff --git "?a/.*? "?b/(.*?)"?$', line.rstrip("\n"))
-            path, lines = (match.group(1) if match else ""), [line]
+                blocks.append((paths, "".join(lines)))
+            match = re.match(r'diff --git "?a/(.*?)"? "?b/(.*?)"?$', line.rstrip("\n"))
+            paths, lines = (list(match.groups()) if match else []), [line]
         else:
+            side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) [ab]/(.*)$", line.rstrip("\n"))
+            if side and lines:
+                paths.append(side.group(1) or side.group(2))
             lines.append(line)
     if lines:
-        blocks.append((path, "".join(lines)))
+        blocks.append((paths, "".join(lines)))
     return blocks
 
 
 def without_secrets(text: str) -> tuple[str, list[str]]:
     kept, dropped = [], []
-    for path, block in split_diff(text):
-        (dropped.append(path) if path and looks_secret(path) else kept.append(block))
+    for paths, block in split_diff(text):
+        secret = [p for p in paths if looks_secret(p)]
+        if secret:
+            dropped += [p for p in secret if p not in dropped]
+        else:
+            kept.append(block)
     return "".join(kept), dropped
 
 
@@ -184,6 +193,8 @@ def cmd_brief(args, settings) -> int:
         raise Stop("%s already exists: a round is never rewritten; start the next round in a new folder" % args.dir)
     if not args.question.strip():
         raise Stop("--question is empty")
+    if args.base and args.pr is not None:
+        raise Stop("--base and --pr are two different diffs: pass one")
     if args.subject == "pr" and args.pr is None:
         raise Stop("--subject pr needs --pr N")
     if args.subject == "phase" and not args.base:
@@ -234,6 +245,8 @@ def cmd_brief(args, settings) -> int:
     if args.pr is not None:
         pr = pr_view(args.pr)
         diff = run_gh(["pr", "diff", str(args.pr)])
+        if pr_view(args.pr)["head"] != pr["head"]:
+            raise Stop("PR #%s moved while the brief was written: write it again" % args.pr)
     for rel in args.file:
         add(rel, named=True)
 
@@ -248,7 +261,7 @@ def cmd_brief(args, settings) -> int:
         "subject": args.subject,
         "question": args.question.strip(),
         "claims": [c.strip() for c in args.claim if c.strip()],
-        "created": now(),
+        "created": now(precise=True),
         "head": head,
         "dirty": dirty,
         "base": args.base,
@@ -409,7 +422,7 @@ def cmd_run(args, settings) -> int:
     if args.dry_run:
         print(shlex.join(part.replace("{dir}", shown(root, out)) for part in argv))
         return 0
-    problems = changed_files(root, out, brief) + preconditions(name)
+    problems = changed_files(root, out, brief) or preconditions(name)
     if problems:
         print("\n".join(problems))
         print("not started: nothing was launched")
@@ -433,6 +446,12 @@ def watch(root: Path, out: Path) -> int:
     run = read_json(out / "run.json")
     run.update(state="running", pid=os.getpid())
     write_json(out / "run.json", run)
+    changed = changed_files(root, out, read_json(out / "brief.json"))
+    if changed:  # the bytes moved between run's check and this start
+        run.update(state="failed", exit=None, finished=now(), review_sha256=None,
+                   note="not started: " + "; ".join(changed))
+        write_json(out / "run.json", run)
+        return 1
     argv = [part.replace("{dir}", str(out.resolve())) for part in run["argv"]]
     note, code = "", None
     with open(out / "review.log", "ab") as log:
@@ -548,6 +567,8 @@ def ledger_problems(root: Path, out: Path, finished: bool) -> tuple[list[dict], 
                 problems.append("%s: fixed, with no commit or tag for the repaired bytes" % fid)
             elif git(root, "rev-parse", "--verify", "--quiet", where + "^{commit}", check=False).returncode:
                 problems.append("%s: Repaired at %r is not a commit or tag here" % (fid, where))
+            if not row.get("Notes"):
+                problems.append("%s: fixed, with no regression test in Notes" % fid)
         elif disposition in ("deferred", "rejected") and not row.get("Notes"):
             problems.append("%s: %s, with no %s in Notes" % (fid, disposition,
                                                             "target" if disposition == "deferred" else "reason"))
@@ -561,11 +582,18 @@ def cmd_status(args, settings) -> int:
         raise Stop("no review rounds under %s" % ", ".join(args.paths))
     home = str(Path.home())
     report, latest = [], {}
+    # Oldest first, ties by folder name, so the order the paths were given never matters.
+    found = sorted(set(p.resolve() for p in found),
+                   key=lambda p: (read_json(p / "brief.json").get("created", ""), p.as_posix()))
     for out in found:
         brief, run = read_json(out / "brief.json"), read_json(out / "run.json")
         state = run_state(run)
         rows, problems = ledger_problems(root, out, state == "done")
-        if state in ("failed", "stopped"):
+        if state == "not run":
+            problems.insert(0, "not run yet: review_tool.py run %s" % shown(root, out))
+        elif state in ("starting", "running"):
+            problems.insert(0, "still %s" % state)
+        elif state in ("failed", "stopped"):
             problems.insert(0, "the review %s%s: see review.log" % (
                 state, " (%s)" % run.get("note") if run.get("note") else
                 " (exit %s)" % run.get("exit") if run.get("exit") is not None else ""))

@@ -48,7 +48,8 @@ environment, and asks for numbered findings with file, line, consequence and
 reproduction, what was checked and found true, what could not be checked, and
 a verdict line. A file that looks like a credential file (`.env`, keys,
 `auth.json`, `secrets.json`; not `.env.example`) is refused when named and left
-out of a diff, with a note in the brief saying so.
+out of a diff, renamed or not, with a note in the brief saying so. A PR that
+moves while its brief is written is refused: the diff must be the head's.
 
 ## Running the reviewer
 
@@ -64,6 +65,8 @@ python3 <skill>/scripts/review_tool.py run <dir>
 - **Preconditions first.** `run` checks that every listed file still has the
   bytes the brief names, and that the reviewer's CLI is on PATH (and, for Codex,
   `codex login status`). If either fails, nothing is launched; tell the owner.
+  The background watcher checks the bytes once more just before it starts the
+  reviewer, and records a failed run if they moved.
   Each CLI uses its own login; the helper reads no `.env` and passes no key.
 - **In the background, stdin closed.** A review takes minutes, so `run` starts
   it detached and returns; `--wait` keeps it in the foreground. The reviewer's
@@ -104,9 +107,10 @@ of `review-convergence.md` still decides whether another round pays.
 python3 <skill>/scripts/review_tool.py status <the reviews folder>
 ```
 
-`status` reports every round under the path: its run, and each ledger row that
-is incomplete, still open, fixed without being reproduced, or fixed at a commit
-that does not exist. Then, for every file any round read, the latest round that
+`status` reports every round under the path: its run (a round not run or
+still running is unfinished), and each ledger row that is incomplete, still
+open, fixed without being reproduced, fixed with no regression test named, or
+fixed at a commit that does not exist. Then, for every file any round read, the latest round that
 read it decides: `reviewed` when the file still has those bytes and that round's
 review finished, `unreviewed` otherwise. **A repaired file is unreviewed until a
 later round's brief lists its new bytes and that round finishes**, which is the

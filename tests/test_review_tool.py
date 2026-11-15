@@ -20,9 +20,10 @@ SCRIPT = ".claude/skills/process-phase/scripts/review_tool.py"
 FAKE_CODEX = r'''#!/usr/bin/env python3
 import json, os, sys, time
 args = sys.argv[1:]
-if args[:2] == ["login", "status"]:
-    sys.exit(int(os.environ.get("FAKE_LOGIN", "0")))
 with open(os.environ["FAKE_LOG"], "a") as log:
+    if args[:2] == ["login", "status"]:
+        log.write(json.dumps({"tool": "codex", "argv": args}) + "\n")
+        sys.exit(int(os.environ.get("FAKE_LOGIN", "0")))
     log.write(json.dumps({"tool": "codex", "argv": args, "stdin": sys.stdin.read(), "cwd": os.getcwd()}) + "\n")
 time.sleep(float(os.environ.get("FAKE_SLEEP", "0")))
 print("codex log line")
@@ -170,7 +171,7 @@ def test_run_starts_codex_read_only_with_stdin_closed_and_keeps_the_review(proje
     plan_brief(project)
     code, out = review(project, "run", "reviews/plan-r1", "--wait", typed="the owner's answer\n")
     assert code == 0, out
-    [call] = calls(project)
+    [call] = [c for c in calls(project) if c["argv"][:1] != ["login"]]
     assert call["tool"] == "codex" and call["stdin"] == "" and Path(call["cwd"]).resolve() == project.resolve()
     assert call["argv"][:2] == ["exec", "--ephemeral"]
     assert ["--sandbox", "read-only"] == call["argv"][call["argv"].index("--sandbox"):][:2]
@@ -205,7 +206,8 @@ def test_run_refuses_bytes_that_changed_after_the_brief_and_a_codex_that_is_not_
     (project / "notes/plan.md").write_text("# Plan\n\nPhase 1 adds totals and averages.\n")
     code, out = review(project, "run", "reviews/plan-r1", "--wait")
     assert code == 1 and "changed since the brief: notes/plan.md" in out
-    assert calls(project) == [] and not (project / "reviews/plan-r1/run.json").exists()
+    assert [c["argv"] for c in calls(project)] == [["login", "status"]]
+    assert not (project / "reviews/plan-r1/run.json").exists()
 
 
 def test_run_in_the_background_returns_at_once_and_status_follows_it(project):
@@ -326,3 +328,81 @@ def test_settings_choose_the_model_and_an_unknown_setting_is_an_error(project):
     settings.write_text(json.dumps({"reviewr": "codex"}))
     code, out = review(project, "run", "reviews/plan-r1", "--dry-run")
     assert code == 1 and "unknown setting(s): reviewr" in out
+
+
+# Regression tests for the findings of the first review of this helper (F1 to F6).
+
+def test_f1_a_credential_file_renamed_away_is_still_left_out_of_the_diff(project):
+    lines = ['  "setting_%d": %d,' % (i, i) for i in range(12)]
+    (project / "auth.json").write_text("{\n" + "\n".join(lines) + '\n  "token": "hunter2"\n}\n')
+    base = commit(project, "add auth")
+    subprocess.run(["git", "-C", str(project), "mv", "auth.json", "config.json"], check=True)
+    (project / "config.json").write_text("{\n" + "\n".join(lines) + '\n  "token": "hunter3"\n}\n')
+    assert "rename from auth.json" in subprocess.run(["git", "-C", str(project), "diff", base], capture_output=True,
+                                                    text=True).stdout
+    code, out = review(project, "brief", "reviews/p-r1", "--subject", "phase", "--base", base, "--question", "q")
+    assert code == 0, out
+    diff = (project / "reviews/p-r1/diff.patch").read_text()
+    assert "hunter2" not in diff and "left out: auth.json" in out
+
+
+def test_f2_a_pr_that_moves_while_the_brief_is_written_is_refused(project):
+    flip = project.parent / "flip"
+    gh = project.parent / "bin/gh"
+    gh.write_text(gh.read_text().replace(
+        '"headRefOid": os.environ.get("FAKE_HEAD", "a" * 40)',
+        '"headRefOid": ("c" * 40 if os.path.exists(%r) else "a" * 40)' % str(flip)).replace(
+        'elif args[:2] == ["pr", "diff"]:', 'elif args[:2] == ["pr", "diff"]:\n    open(%r, "w").close()' % str(flip)))
+    code, out = review(project, "brief", "reviews/pr7", "--subject", "pr", "--pr", "7", "--question", "q")
+    assert code == 2 and "moved while" in out
+    assert not (project / "reviews/pr7").exists()
+
+
+def test_f3_a_changed_file_stops_the_run_before_any_command(project):
+    plan_brief(project)
+    (project / "notes/plan.md").write_text("changed\n")
+    code, out = review(project, "run", "reviews/plan-r1", "--wait")
+    assert code == 1 and calls(project) == []
+
+
+def test_f3_the_watcher_checks_the_bytes_again_before_it_starts_the_reviewer(project):
+    plan_brief(project)
+    out_dir = project / "reviews/plan-r1"
+    run = {"state": "starting", "reviewer": "codex", "argv": ["codex", "exec", "-o", "{dir}/review.md", "x"],
+           "stdout": "review.log", "timeout_minutes": 1, "brief_sha256": sha(out_dir / "BRIEF.md")}
+    (out_dir / "run.json").write_text(json.dumps(run))
+    (project / "notes/plan.md").write_text("changed after run checked it\n")
+    code, out = review(project, "_watch", str(out_dir))
+    assert code == 1 and calls(project) == []
+    run = json.loads((out_dir / "run.json").read_text())
+    assert run["state"] == "failed" and "changed since the brief: notes/plan.md" in run["note"]
+
+
+def test_f4_an_unfinished_round_fails_status_even_with_nothing_to_cover(project):
+    review(project, "brief", "reviews/pr7", "--subject", "pr", "--pr", "7", "--question", "q")
+    code, out = review(project, "status", "reviews/pr7")
+    assert code == 1 and "problem: not run yet" in out
+
+
+def test_f5_coverage_does_not_depend_on_the_order_rounds_are_named(project):
+    plan_brief(project, "reviews/a")
+    plan_brief(project, "reviews/b")
+    review(project, "run", "reviews/a", "--wait")
+    review(project, "run", "reviews/b", "--wait", FAKE_EXIT="3")
+    for name in ("a", "b"):
+        path = project / "reviews" / name / "brief.json"
+        data = json.loads(path.read_text())
+        data["created"] = "2026-01-01T00:00:00+00:00"
+        path.write_text(json.dumps(data))
+    first = review(project, "status", "reviews/a", "reviews/b", "--format", "json")[1]
+    second = review(project, "status", "reviews/b", "reviews/a", "--format", "json")[1]
+    assert json.loads(first)["coverage"] == json.loads(second)["coverage"]
+    assert json.loads(first)["coverage"][0]["state"] == "unreviewed"
+
+
+def test_f6_a_fixed_finding_names_its_regression_test(project):
+    plan_brief(project)
+    review(project, "run", "reviews/plan-r1", "--wait")
+    fill(project, "reviews/plan-r1", ["F1", "wrong total", "yes", "blocking", "fixed", "HEAD", ""])
+    code, out = review(project, "status", "reviews/plan-r1")
+    assert "F1: fixed, with no regression test in Notes" in out
