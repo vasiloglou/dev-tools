@@ -62,6 +62,8 @@ def test_each_skill_is_named_after_its_folder(plugin):
         name = re.search(r"^name: (\S+)$", path.read_text(), re.M).group(1)
         assert name == path.parent.name
         assert f"Installed from the `{plugin}` plugin" in path.read_text()
+        # Codex installs the same plugin but leaves ${CLAUDE_PLUGIN_ROOT} empty: the note says what it is.
+        assert "two levels above this file" in path.read_text() and "Codex leaves it empty" in path.read_text()
 
 
 @pytest.mark.parametrize("plugin", PLUGINS)

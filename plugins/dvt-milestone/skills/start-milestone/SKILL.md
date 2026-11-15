@@ -3,7 +3,7 @@ name: start-milestone
 description: Prepare or resume a development milestone plan, turning requirements and carryovers into phased deliverables, measurable gates and the first draft phase spec. Use when asked to start, plan or initialize a repository milestone. Does not execute phases or close a milestone.
 ---
 
-> **Installed from the `dvt-milestone` plugin.** This copy is shared by every project, so the project's own files live in the project: its rules for these skills in `.devtools/project.md`, and each script's settings in `.devtools/<script>.settings.json` (the same keys a synced copy keeps beside the script; a missing file means the defaults). The scripts are under `${CLAUDE_PLUGIN_ROOT}/skills/` and are run from the project root. The planning folder is `.planning`.
+> **Installed from the `dvt-milestone` plugin.** This copy is shared by every project, so the project's own files live in the project: its rules for these skills in `.devtools/project.md`, and each script's settings in `.devtools/<script>.settings.json` (the same keys a synced copy keeps beside the script; a missing file means the defaults). The scripts are under `${CLAUDE_PLUGIN_ROOT}/skills/` and are run from the project root. `${CLAUDE_PLUGIN_ROOT}` is the plugin's folder, two levels above this file (`<plugin>/skills/<skill>/SKILL.md`): Claude Code fills it in, Codex leaves it empty, so under Codex write that folder's path in its place. The planning folder is `.planning`.
 
 # Start Milestone
 

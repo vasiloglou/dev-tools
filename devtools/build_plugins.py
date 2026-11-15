@@ -119,8 +119,10 @@ def note(plugin: str) -> str:
             f"project's own files live in the project: its rules for these skills in `{PROJECT_RULES}`, "
             "and each script's settings in `.devtools/<script>.settings.json` (the same keys a synced "
             "copy keeps beside the script; a missing file means the defaults). The scripts are under "
-            "`${CLAUDE_PLUGIN_ROOT}/skills/` and are run from the project root. The planning folder is "
-            f"`{VALUES['planning_dir']}`.\n")
+            "`${CLAUDE_PLUGIN_ROOT}/skills/` and are run from the project root. `${CLAUDE_PLUGIN_ROOT}` is "
+            "the plugin's folder, two levels above this file (`<plugin>/skills/<skill>/SKILL.md`): Claude "
+            "Code fills it in, Codex leaves it empty, so under Codex write that folder's path in its place. "
+            f"The planning folder is `{VALUES['planning_dir']}`.\n")
 
 
 def rewrite(text: str, plugin: str, origin: str, hits: dict) -> str:

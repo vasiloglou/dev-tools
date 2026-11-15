@@ -171,7 +171,8 @@ claude plugin install dvt-milestone@dvt</pre>
     </div>
     <div>
       <p>Skills and agents are named after the plugin: <code>/dvt-phase:process-phase</code>, <code>/dvt-milestone:review-pr</code>. A plugin is one copy every project shares, so the project keeps its own files in <code>.devtools/</code>: its rules in <code>.devtools/project.md</code>, and each script&#39;s settings in <code>.devtools/&lt;script&gt;.settings.json</code>, with the same keys a synced copy keeps beside the script.</p>
-      <p>Use the sync instead when you change the skills themselves, use Codex (Codex has no plugins), run the component index in CI, or keep a planning folder other than <code>.planning</code> on the milestone workflow.</p>
+      <p>Codex installs the same plugins from the same marketplace: <code>codex plugin marketplace add vasiloglou/dev-tools</code>, then <code>codex plugin add dvt-milestone@dvt</code>. Codex leaves <code>${CLAUDE_PLUGIN_ROOT}</code> empty, so each skill says where the plugin&#39;s folder is: two levels above its <code>SKILL.md</code>.</p>
+      <p>Use the sync instead when you change the skills themselves, run the component index in CI, keep a planning folder other than <code>.planning</code> on the milestone workflow, or want Codex to take the skills for one project only (<code>codex plugin add</code> installs for the user, in every project).</p>
     </div>
   </div>
 </div></section>
