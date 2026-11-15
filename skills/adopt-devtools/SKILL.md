@@ -150,7 +150,8 @@ own copies had written into them, so every setting is a decision about this proj
   out of the project, and two destinations that are one file (one runtime's skills
   folder linked to another's). Deliver to one of the two; the link serves the other.
 - **`values`** fill `{{devtools:<name>}}` in shipped text. The milestone workflow needs
-  only these; it ships no script and has no settings.
+  only these, and settings for its one script, process-phase's review helper
+  (`scripts/review_tool.settings.json`), all of which have defaults.
 - **`replaces`** names an old copy under another name, so that `compare` reads it.
   Nothing deletes it; you do, in step 7.
 - **A command to run after a sync.** If a synced script generates files (the component

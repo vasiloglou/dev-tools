@@ -189,6 +189,23 @@ Counts: 1 finding, 1 blocking, 0 hardening,
       <p class="caption">Lines taken from the review note of the trial run. Line breaks added to fit.</p>
     </div>
   </div>
+  <div class="feature flip">
+    <div>
+      <h3>The same review every time</h3>
+      <p>A helper script, <code>review_tool.py</code>, ships with the skills. It writes the brief: the question without the author's answer, each file to read with its fingerprint, and a rule against opening credential files. It then starts the reviewer in the other tool (Codex, read-only, when Claude Code does the work; Claude Code in plan mode when Codex does) in the background, and keeps its answer word for word.</p>
+      <p>Each finding goes in a ledger: reproduced or not, its class, what was done, and the commit that holds the repair. <strong>A repaired file counts as unreviewed until a later round reads its new bytes</strong>, and the helper's <code>status</code> says which files those are. For a pull request it reviews the diff at the PR's head, and posts the result as a comment only when you approve.</p>
+    </div>
+    <div>
+<pre class="code"><span class="dim"># one review round, one folder</span>
+review_tool.py brief notes/reviews/phase-3-r1 \
+    --subject phase --base &lt;phase base&gt; \
+    --question "Does phase 3 meet its criteria?"
+review_tool.py run notes/reviews/phase-3-r1
+<span class="dim"># fill FINDINGS.md, repair, then</span>
+review_tool.py status notes/reviews</pre>
+      <p class="caption">The commands of one round; the reference in the skill has the rest.</p>
+    </div>
+  </div>
 </div></section>
 
 <section class="band"><div class="wrap">

@@ -78,6 +78,9 @@ plan-review bar (`references/project.md`; default: one independent reviewer in
 a different tool) remains binding where the plan or protocol requires it.
 Explicitly selected review tools/delegation can be used within their scope and
 credential contract.
+Where the project names none, the instrument to offer is process-phase's
+[review helper](../process-phase/references/review-tool.md) (`--subject plan`,
+`phase`, `close` or `pr`).
 If no instrument is selected, finish reviewable preparation and request that
 specific missing choice; auto is not a tool selection. Follow the
 [review convergence rules](../process-phase/references/review-convergence.md)
@@ -118,8 +121,11 @@ the same PR for the named work when appropriate. Preserve unrelated user changes
 
 After all mandatory phases have their own completed gates and records, evaluate
 the milestone's actual exit predicates and impact closure. Perform the required
-independent close review; phase reviews do not substitute for it. Review only
-within explicitly selected instrument/credential/agent authority.
+independent close review; phase reviews do not substitute for it. Before
+citing any review, run the helper's `status` over the milestone's review
+rounds where they exist: a file it calls unreviewed carries no review
+opinion. Review only within explicitly selected instrument/credential/agent
+authority.
 
 Sweep inherited and newly discovered questions. Every row is resolved with
 evidence, accepted as an explicit residual, or deferred to a named owner/target.

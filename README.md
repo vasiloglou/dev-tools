@@ -27,7 +27,10 @@ prompt. The reasoning is on the site:
   compare the plans with the agreed tests and with each other (two plans meant to run side
   by side that name the same file), and the change with the plans.
 - **Milestone workflow.** A reviewed plan, a spec you approve before any code, an
-  independent review of each change, and numbered records that are never edited.
+  independent review of each change, and numbered records that are never edited. A
+  review helper writes the brief, runs the reviewer in the other tool (Codex from Claude
+  Code, Claude Code from Codex) and keeps a findings ledger; a repaired file counts as
+  unreviewed until a later round reads it.
 - **Component index.** A searchable map of what the code already does, so existing code
   is reused instead of written again. The agent can build it for a codebase that has
   none, check it against every change, and review it from the top: repair the index and
@@ -133,7 +136,7 @@ setup command: it needs the planning folder with a `PROJECT.md`, which the proje
 scaffold step writes (its `references/project.md` names it).
 
 The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool
-runs on 3.9.
+and the review helper run on 3.9.
 
 ## What is here
 
@@ -142,8 +145,8 @@ runs on 3.9.
 | `skills/phase/process-phase/` | The phase workflow. `scripts/phase_tool.py` owns the status transitions and checks, and `phase_tool.py setup` writes a new project's starter planning files. `scripts/coder_pool.py show` prints which coding assistants Implement may run in parallel and how many at once, from a team file and each developer's own. |
 | `skills/phase/phase-tests/` | How a phase's acceptance tests are written and locked. |
 | `skills/phase/pytest/phase_selection.py` | A pytest plugin: `pytest --phase NN` runs one phase's acceptance tests, and plain `pytest` leaves out phases that are not complete. |
-| `agents/` | Helper agents the phase steps hand work to (test writer, researcher, implementer, verifier, code reviewer). |
-| `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. |
+| `agents/` | Helper agents the phase workflow's steps hand work to (test writer, researcher, implementer, verifier, code reviewer). Phase workflow only: the milestone workflow's review runs in a different tool. |
+| `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`. `process-phase/scripts/review_tool.py` writes a review brief, runs the reviewer in the other tool in the background, and reports which files a finished review covers; for a PR it reviews the diff at its head and posts the result only with the owner's approval. |
 | `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, lists leads for a review, and writes the index as facts. `scripts/rules_check.py` is optional and a trial: it checks a project's own rules about its components (layers, and rules it writes) with GND, and reports only what a change added. |
 | `skills/adopt-devtools/` | How an agent moves an existing project from its own process skills to these, without losing the project's rules. Read from this checkout; never copied into a project. |
 | `skills/move-from-gsd/` | How an agent moves a project planned with GSD to the phase workflow, keeping its phases, requirements, decisions and history. Read from this checkout; never copied into a project. |
