@@ -47,8 +47,26 @@ try:
 except ImportError:  # Python 3.9 and 3.10
     tomllib = None
 
-# Project settings live beside this script, as for phase_tool.py.
-SETTINGS_FILE = Path(__file__).resolve().with_suffix(".settings.json")
+def plugin_root(script: Path):
+    """The plugin install that holds this script, or None. A plugin keeps it in
+    <plugin>/skills/<skill>/scripts/, beside <plugin>/.claude-plugin/plugin.json; a synced copy is
+    in a project, under .claude/skills/ or scripts/."""
+    folder = script.parents[3] if len(script.parents) > 3 else None
+    return folder if folder and script.parent.parent.parent.name == "skills" \
+        and (folder / ".claude-plugin" / "plugin.json").is_file() else None
+
+
+def checkout_root() -> Path:
+    """The git checkout that holds the working directory, or the working directory."""
+    here = Path.cwd().resolve()
+    return next((folder for folder in (here, *here.parents) if (folder / ".git").exists()), here)
+
+
+# Project settings live beside this script, as for phase_tool.py; a plugin install reads the
+# project's own, in .devtools/.
+PLUGIN = plugin_root(Path(__file__).resolve())
+SETTINGS_FILE = (checkout_root() / ".devtools" / "coder_pool.settings.json" if PLUGIN
+                 else Path(__file__).resolve().with_suffix(".settings.json"))
 DEFAULT_SETTINGS = {
     # The team's file, checked in. Never put keys, tokens or personal paths in it.
     "team_config": ".devtools/coders.toml",

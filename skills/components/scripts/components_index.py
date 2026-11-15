@@ -60,7 +60,8 @@ try:
 except ModuleNotFoundError:  # Python older than 3.11
     sys.exit('components_index.py needs Python 3.11 or newer (this is %d.%d)' % sys.version_info[:2])
 
-# Project settings live beside this script, in components_index.settings.json.
+# Project settings live beside this script, in components_index.settings.json (in a plugin
+# install, in the project's .devtools/components_index.settings.json).
 DEFAULT_SETTINGS = {
     'package_dir': 'src',
     'import_prefix': '',
@@ -86,13 +87,37 @@ def load_settings(path: Path) -> dict:
     return settings
 
 
-SETTINGS = load_settings(Path(__file__).resolve().with_suffix('.settings.json'))
+def plugin_root(script: Path):
+    '''The plugin install that holds this script, or None. A plugin keeps it in
+    <plugin>/skills/<skill>/scripts/, beside <plugin>/.claude-plugin/plugin.json; a synced copy is
+    in a project, under .claude/skills/ or scripts/.'''
+    folder = script.parents[3] if len(script.parents) > 3 else None
+    return folder if folder and script.parent.parent.parent.name == 'skills' \
+        and (folder / '.claude-plugin' / 'plugin.json').is_file() else None
+
+
+def checkout_root() -> Path:
+    '''The git checkout that holds the working directory, or the working directory.'''
+    here = Path.cwd().resolve()
+    return next((folder for folder in (here, *here.parents) if (folder / '.git').exists()), here)
+
+
+# A plugin install is shared by every project: its settings are the project's own, in
+# .devtools/, and the project is the checkout that holds the working directory.
+PLUGIN = plugin_root(Path(__file__).resolve())
+SETTINGS_FILE = (checkout_root() / '.devtools' / 'components_index.settings.json' if PLUGIN
+                 else Path(__file__).resolve().with_suffix('.settings.json'))
+SETTINGS = load_settings(SETTINGS_FILE)
+if PLUGIN and not (SETTINGS_FILE.is_file() and 'script_path' in json.loads(SETTINGS_FILE.read_text(encoding='utf-8'))):
+    # How the generated files and messages name this script: the plugin's copy, which Claude Code fills in.
+    SETTINGS['script_path'] = '${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py'
+
 PACKAGE_DIR = SETTINGS['package_dir'].strip('/')
 PACKAGE = SETTINGS['import_prefix'] or PACKAGE_DIR.rsplit('/', 1)[-1]
 SOURCE_ROOT = PACKAGE_DIR[:len(PACKAGE_DIR) - len(PACKAGE)]
 EXTRA_DIRS = tuple(SETTINGS['extra_source_dirs'])
 LABEL = SETTINGS['script_path']
-ROOT = Path(__file__).resolve().parents[len(Path(LABEL).parts) - 1]
+ROOT = checkout_root() if PLUGIN else Path(__file__).resolve().parents[len(Path(LABEL).parts) - 1]
 BASE = SETTINGS['docs_dir'].strip('/') + '/'
 VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
 GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})

@@ -42,7 +42,8 @@ before they are committed, and says so at the top of ``review.md``.
 Exit codes: 0 ok, 1 a check found something (a changed file, an unfinished ledger, a
 failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git).
 
-Settings live beside this script, in review_tool.settings.json.
+Settings live beside this script, in review_tool.settings.json; when the script runs from a
+plugin install, in the project's .devtools/review_tool.settings.json.
 """
 from __future__ import annotations
 
@@ -60,7 +61,26 @@ import tempfile
 import time
 from pathlib import Path
 
-SETTINGS_FILE = Path(__file__).resolve().with_suffix(".settings.json")
+def plugin_root(script: Path):
+    """The plugin install that holds this script, or None. A plugin keeps it in
+    <plugin>/skills/<skill>/scripts/, beside <plugin>/.claude-plugin/plugin.json; a synced copy is
+    in a project, under .claude/skills/ or scripts/."""
+    folder = script.parents[3] if len(script.parents) > 3 else None
+    return folder if folder and script.parent.parent.parent.name == "skills" \
+        and (folder / ".claude-plugin" / "plugin.json").is_file() else None
+
+
+def checkout_root() -> Path:
+    """The git checkout that holds the working directory, or the working directory."""
+    here = Path.cwd().resolve()
+    return next((folder for folder in (here, *here.parents) if (folder / ".git").exists()), here)
+
+
+# Settings live beside this script in a synced copy. A plugin install is shared by every
+# project, so there they are the project's own, in .devtools/.
+PLUGIN = plugin_root(Path(__file__).resolve())
+SETTINGS_FILE = (checkout_root() / ".devtools" / "review_tool.settings.json" if PLUGIN
+                 else Path(__file__).resolve().with_suffix(".settings.json"))
 DEFAULT_SETTINGS = {
     # codex, claude, or auto: the other harness from the one this script runs under.
     "reviewer": "auto",
