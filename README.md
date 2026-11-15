@@ -168,10 +168,24 @@ lives in the project instead:
 | `python3 .claude/skills/<skill>/scripts/<script>.py` | `python3 ${CLAUDE_PLUGIN_ROOT}/skills/<skill>/scripts/<script>.py`, run from the project root |
 | `{{devtools:planning_dir}}` filled from `.devtools.toml` | `.planning` in the milestone skills' text |
 
+Codex installs the same plugins from the same marketplace:
+
+```bash
+codex plugin marketplace add vasiloglou/dev-tools
+```
+
+```bash
+codex plugin add dvt-milestone@dvt
+```
+
+Codex leaves `${CLAUDE_PLUGIN_ROOT}` empty, so each skill says where the plugin's folder is:
+two levels above its `SKILL.md`. `codex plugin add` has no scope option: it installs the
+plugin for the user, in every project.
+
 Pick the sync when the project changes the skills themselves, keeps a planning folder other
 than `.planning` on the milestone workflow, runs the component index in CI (CI needs a copy
-of `components_index.py` in the project), or uses Codex: Codex has no plugins, so the sync
-is how a Codex project takes the skills. The phase workflow's `pytest --phase` plugin is in
+of `components_index.py` in the project), or wants Codex to take the skills for that project
+only. The phase workflow's `pytest --phase` plugin is in
 the plugin at `skills/process-phase/pytest/phase_selection.py`; copy it to the project's
 `conftest.py`, as the sync would.
 
