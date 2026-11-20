@@ -14,9 +14,11 @@ The script commits, pushes and deletes nothing. `carry` and `pull` copy only wit
 takes `--json`, and `--base <branch>` where the base matters. `check` exits 1
 while a critical or major finding stands, and `write` exits 1 when the file in
 the note's place is not a note (it is left as it is); every other command
-exits 0. A note that lost its snapshot markers is rebuilt around the sections
-it still has. `show`, `list` and `takeover` never print what looks like a key
-in a note: it is replaced with `[removed: looks like a key]`.
+exits 0. With `--json`, `show` prints one document: the note's `path`, the
+`note` text and the `findings` of the check. A note that lost either snapshot
+marker, or both, is rebuilt around the sections it still has. `show`, `list`
+and `takeover` never print what looks like a key in a note: it is replaced
+with `[removed: looks like a key]`.
 
 ## How much to hand over
 
@@ -94,10 +96,19 @@ python3 <tool> carry --dest ../app-second --yes          # another checkout, sam
 | `old` | unchanged since the branch started | only with `--all` |
 | `large` | over `max_mb` (200 MB unless the settings say otherwise) | only with a higher `--max-mb` |
 | `key` | looks like a credential file (`.env`, `.keys`, `*.pem`, names with secret, token or credential) | only with `--with-keys`, and only to the user's own machine |
-| `rebuild` | environments, caches, build output, other worktrees, and the project's `rebuild_paths` | only when `--include` names the path exactly; the receiver rebuilds the rest |
+| `rebuild` | environments, caches, build output, other worktrees, and the project's `rebuild_paths` | only when `--include` names the path exactly: it then gets the kind its name, size and age give it. The receiver rebuilds the rest |
 
 - `--include <path or glob>` (repeatable) narrows the copy to what the next step
-  needs.
+  needs, and `ignored --include` shows what it selects. A name selects that
+  path whole (`runs` is `runs/`, not `runs-private/`) and may lie inside an
+  ignored folder (`runs/experiment-1/`). A glob is matched the way Python's
+  `fnmatch` does, so `*` also crosses `/`: `runs/*.json` selects every JSON
+  file under `runs/`. A glob selects a matching folder whole, else the
+  matching files, and does not reach into a `rebuild` path. Whatever is
+  selected keeps its kind: a key file named by its own path is still `key`.
+- A file the receiving checkout tracks is never copied over, even when the
+  sending checkout ignores it. The plan names it as left alone. For another
+  host the script asks that checkout over ssh what it tracks.
 - The destination must already be a checkout: clone it, or add the worktree,
   first. For another host the script asks over ssh before it plans a copy.
 - A newer file at the destination is kept; nothing is deleted there. A file
@@ -105,6 +116,7 @@ python3 <tool> carry --dest ../app-second --yes          # another checkout, sam
   and named.
 - A key file inside an ignored folder is left out of the folder's copy, and
   `ignored` says how many such paths a folder holds. `--with-keys` sends them.
+  This holds for a `rebuild` folder that `--include` names, too.
 - `ignored` names the paths it treats as rebuildable. If one of them is data
   (a results folder called `target/` or `dist/`), `--include <that path>`
   carries it.

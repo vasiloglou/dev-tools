@@ -9,11 +9,11 @@ leaving fills (goal, done, next step, decisions, standing instructions, what liv
 
     handoff.py write [--to claude|codex|gemini|human|any] [--from WHO] [--machine same|new]
     handoff.py check                      what would be lost if this machine disappeared now
-    handoff.py ignored [--all]            the files git ignores here, by kind
+    handoff.py ignored [--all] [--include GLOB ...]   the files git ignores here, by kind
     handoff.py carry --dest PATH|HOST:PATH [--include GLOB ...] [--with-keys] [--all] [--yes]
     handoff.py list                       hand-offs on local and origin branches
     handoff.py takeover                   note, head, missing files, machine: ready or not
-    handoff.py show                       print the branch's note, then check it
+    handoff.py show                       print the branch's note, then check it (--json: one document)
     handoff.py pull --from-checkout PATH|HOST:PATH [--include GLOB ...] [--with-keys] [--all] [--yes]
     handoff.py doctor                     the machine checks alone
 
@@ -289,7 +289,68 @@ def _max_bytes(max_mb: float | None) -> float:
     return (SETTINGS["max_mb"] if max_mb is None else max_mb) * 1024 * 1024
 
 
-def ignored_inventory(root: Path, *, max_mb: float | None = None, since: float | None = None) -> list[dict]:
+def _key_path(rel: str) -> bool:
+    """The path, or a folder above it, looks like a key file or a folder of them."""
+    parts = PurePosixPath(rel).parts
+    return any(_KEY_FILE.search("/".join(parts[:end])) for end in range(1, len(parts) + 1))
+
+
+def _entry(root: Path, rel: str, *, max_mb: float | None, since: float | None, asked: bool = False) -> dict:
+    """One ignored path, sorted into its kind. ``asked`` is a path ``--include`` names itself: it
+    is sized, dated and searched for key files like any other, even where it would otherwise be
+    left to be rebuilt."""
+    if _rebuilt(rel) and not asked:
+        return {"path": rel, "kind": "rebuild", "bytes": 0, "files": 0}
+    kind = "key" if _key_path(rel) else "carry"
+    size, files, newest, keys = _size(root, rel) if kind == "carry" else (*_size(root, rel)[:3], [])
+    if kind == "carry" and since is not None and newest < since:
+        kind = "old"
+    elif kind == "carry" and size > _max_bytes(max_mb):
+        kind = "large"
+    return {"path": rel, "kind": kind, "bytes": size, "files": files, **({"keys": keys} if keys else {})}
+
+
+_GLOB = re.compile(r"[*?\[]")
+
+
+def _named(rel: str, names: list[str]) -> bool:
+    """A name or glob of ``--include`` selects this path: it, a folder above it, or a match."""
+    bare = rel.rstrip("/")
+    return any(bare == g or bare.startswith(g + "/") or fnmatch.fnmatch(bare, g) or fnmatch.fnmatch(bare, g + "/*")
+               for g in names)
+
+
+def _narrow(root: Path, rel: str, include: list[str]) -> list[str]:
+    """The parts of the ignored path ``rel`` that ``include`` asks for: all of it when a pattern
+    names it or a folder above it, else what the patterns name inside it (a folder ends in /).
+
+    A name matches whole, so ``runs`` is not ``runs-private``. A glob is fnmatch's, where ``*``
+    also crosses ``/``; it selects a matching folder whole, else the matching files, and does not
+    reach into a path left to be rebuilt."""
+    names = [g.rstrip("/") for g in include if g.rstrip("/")]
+    if _named(rel, names):
+        return [rel]
+    if not rel.endswith("/"):
+        return []
+    found = set()
+    for name in names:
+        inside = root / name
+        if name.startswith(rel) and _safe(name) and os.path.lexists(inside):
+            found.add(name + "/" if inside.is_dir() and not inside.is_symlink() else name)
+    globs = [g for g in names if _GLOB.search(g)]
+    for folder, dirs, files in os.walk(root / rel) if globs and not _rebuilt(rel) else ():
+        here = Path(folder).relative_to(root).as_posix()
+        for name in sorted(dirs):
+            if any(fnmatch.fnmatch(f"{here}/{name}", g) for g in globs):
+                found.add(f"{here}/{name}" + ("" if (Path(folder) / name).is_symlink() else "/"))
+                dirs.remove(name)
+        found.update(f"{here}/{name}" for name in files if any(fnmatch.fnmatch(f"{here}/{name}", g) for g in globs))
+    folders = tuple(path for path in found if path.endswith("/"))
+    return sorted(path for path in found if not any(path != folder and path.startswith(folder) for folder in folders))
+
+
+def ignored_inventory(root: Path, *, max_mb: float | None = None, since: float | None = None,
+                      include: list[str] | None = None) -> list[dict]:
     """Files git ignores in this checkout: {path, kind, bytes, files}, largest first.
 
     kind is ``carry`` (another checkout lacks it and cannot rebuild it), ``rebuild``
@@ -297,21 +358,17 @@ def ignored_inventory(root: Path, *, max_mb: float | None = None, since: float |
     ``old`` (nothing in it changed after ``since``, so this branch did not produce it) or
     ``large`` (over ``max_mb``). Directories git ignores whole are one entry ending in /; such
     an entry has ``keys``, the key paths inside it, when there are any.
+
+    ``include`` narrows the list to the paths and globs it names, which may lie inside an ignored
+    folder (see ``_narrow``). A path it names exactly is never ``rebuild``: it gets the kind its
+    name, size and age give it.
     """
     listed = _git(root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard",
                   "--directory", "--no-empty-directory")
-    entries = []
-    for rel in filter(None, listed.split("\0")):
-        if _rebuilt(rel):
-            entries.append({"path": rel, "kind": "rebuild", "bytes": 0, "files": 0})
-            continue
-        kind = "key" if _KEY_FILE.search(rel.rstrip("/")) else "carry"
-        size, files, newest, keys = _size(root, rel) if kind == "carry" else (*_size(root, rel)[:3], [])
-        if kind == "carry" and since is not None and newest < since:
-            kind = "old"
-        elif kind == "carry" and size > _max_bytes(max_mb):
-            kind = "large"
-        entries.append({"path": rel, "kind": kind, "bytes": size, "files": files, **({"keys": keys} if keys else {})})
+    asked = {g.rstrip("/") for g in include or []}
+    entries = [_entry(root, part, max_mb=max_mb, since=since, asked=part.rstrip("/") in asked)
+               for rel in filter(None, listed.split("\0"))
+               for part in (_narrow(root, rel, include) if include else [rel])]
     return sorted(entries, key=lambda e: (-e["bytes"], e["path"]))
 
 
@@ -323,17 +380,19 @@ def _safe(rel) -> bool:
     return norm != "." and ".." not in PurePosixPath(rel).parts and rel.rstrip("/") == norm
 
 
-def _recheck(root: Path, entries: list) -> list[dict]:
+def _recheck(root: Path, entries: list, include: list[str] | None = None) -> list[dict]:
     """A listing another host sent, held to this checkout's rules. A path that leaves the checkout
     or names the checkout itself is dropped. What looks like a key file or a rebuildable path here
-    is treated as one. A path this checkout does not ignore is ``refused``: only ignored files are
-    ever copied."""
-    kept = []
+    is treated as one, unless ``include`` names the rebuildable path exactly, and a path that
+    ``include`` did not ask for is dropped. A path this checkout does not ignore is ``refused``:
+    only ignored files are ever copied."""
+    kept, asked = [], {g.rstrip("/") for g in include or []}
     for entry in entries if isinstance(entries, list) else []:
         rel = entry.get("path") if isinstance(entry, dict) else None
-        if not _safe(rel):
+        if not _safe(rel) or (include and not _named(rel, [g for g in asked if g])):
             continue
-        kind = "rebuild" if _rebuilt(rel) else "key" if _KEY_FILE.search(rel.rstrip("/")) else entry.get("kind")
+        kind = ("rebuild" if _rebuilt(rel) and rel.rstrip("/") not in asked
+                else "key" if _key_path(rel) else entry.get("kind"))
         if kind not in {"carry", "rebuild", "key", "old", "large"}:
             continue
         inside = [k for k in entry.get("keys") or [] if _safe(k) and rel.endswith("/") and k.startswith(rel)]
@@ -357,13 +416,15 @@ def _n(count: int, noun: str, plural: str = "s") -> str:
 
 def _copy_local(root: Path, dest: Path, paths: list[str], exclude: list[str]) -> tuple[int, list[str]]:
     """Copy files under ``paths`` into ``dest``, leaving out ``exclude`` (a folder ends in /); a
-    newer file at the destination stays. Returns how many were copied and the ones refused
-    because a link at the destination would have put them outside it."""
+    newer file at the destination stays. A link is copied as a link, never followed, and only
+    where nothing is in its place. Returns how many were copied and the ones refused because a
+    link at the destination would have put them outside it."""
     home, copied, refused = dest.resolve(), 0, []
     folders = tuple(e for e in exclude if e.endswith("/"))
     for rel in paths:
         source = root / rel
-        files = [source] if not source.is_dir() else sorted(p for p in source.rglob("*") if p.is_file())
+        files = [source] if source.is_symlink() or not source.is_dir() \
+            else sorted(p for p in source.rglob("*") if p.is_symlink() or p.is_file())
         for file in files:
             name = file.relative_to(root).as_posix()
             if name in exclude or name.startswith(folders):
@@ -373,7 +434,7 @@ def _copy_local(root: Path, dest: Path, paths: list[str], exclude: list[str]) ->
             if target.is_symlink() or (parent != home and home not in parent.parents):
                 refused.append(name)
                 continue
-            if target.exists() and target.stat().st_mtime >= file.stat().st_mtime:
+            if target.exists() and (file.is_symlink() or target.stat().st_mtime >= file.lstat().st_mtime):
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file, target, follow_symlinks=False)
@@ -385,24 +446,34 @@ def _is_remote(location: str) -> bool:
     return re.match(r"^[\w.@-]+:.+", location) is not None and not Path(location).exists()
 
 
-def _plan(entries: list[dict], include: list[str] | None, with_keys: bool) -> dict:
-    """Which ignored entries to copy, and which are left with the reason. ``include`` narrows
-    the copy; a rebuildable path it names exactly is carried, since the caller asked for it."""
+def _tracked(root: Path) -> list[str]:
+    """Every file git tracks in the checkout at ``root``."""
+    return _git(root, "ls-files", "-z").split("\0")
+
+
+def _plan(entries: list[dict], with_keys: bool, tracked=(), source: Path | None = None) -> dict:
+    """Which ignored entries to copy, and which are left with the reason.
+
+    ``tracked`` is what the receiving checkout tracks. Such a file is never copied over, whatever
+    the sending checkout ignores: it is left out and named under ``skipped["tracked"]``. ``source``
+    is the sending checkout when it is on this machine, so that only files it has are named."""
     wanted = {"carry", "key"} if with_keys else {"carry"}
-    named = {g.rstrip("/") for g in include or []}
-    if include:
-        entries = [e for e in entries
-                   if any(fnmatch.fnmatch(e["path"], g) or e["path"].startswith(g) for g in include)]
-    chosen = [e for e in entries if e["kind"] in wanted or (e["kind"] == "rebuild" and e["path"].rstrip("/") in named)]
+    chosen = [e for e in entries if e["kind"] in wanted]
+    folders = tuple(e["path"] for e in chosen if e["path"].endswith("/"))
+    files = {e["path"] for e in chosen} - set(folders)
+    held = sorted(t for t in set(tracked) if t and (t in files or t.startswith(folders))
+                  and (source is None or os.path.lexists(source / t)))
+    chosen = [e for e in chosen if e["path"] not in held]
     inside = [] if with_keys else sorted(k for e in chosen for k in e.get("keys", []))
-    skipped = {kind: [e["path"] for e in entries if e["kind"] == kind and e not in chosen]
+    skipped = {kind: [e["path"] for e in entries if e["kind"] == kind]
                for kind in ("large", "key", "old", "rebuild", "refused") if kind not in wanted}
     if not with_keys:
         skipped["key"] = sorted(skipped["key"] + inside)
+    skipped["tracked"] = held
     return {
         "paths": [e["path"] for e in chosen],
         "bytes": sum(e["bytes"] for e in chosen),
-        "exclude": inside,
+        "exclude": sorted(inside + held),
         "skipped": skipped,
         "copied": False,
         "reason": "dry run; pass --yes to copy" if chosen else "nothing to carry",
@@ -430,14 +501,17 @@ SSH = ("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15")
 _REMOTE_PATH = re.compile(r"[\w./~+-]+")
 
 
-def _remote_checkout(host: str, path: str) -> str:
-    """Why host:path cannot receive files; empty when it is a checkout."""
-    done = subprocess.run([*SSH, host, f"test -e {path}/.git"], capture_output=True, text=True, check=False)
+def _remote_tracked(host: str, path: str):
+    """The files the checkout at host:path tracks, as a list, or the reason it cannot receive
+    files."""
+    done = subprocess.run([*SSH, host, f"test -e {path}/.git || exit 3; git -C {path} ls-files -z"],
+                          capture_output=True, text=True, check=False)
     if done.returncode == 0:
-        return ""
-    if done.returncode == 1:
+        return done.stdout.split("\0")
+    if done.returncode == 3:
         return f"{host}:{path} is not a checkout (clone it there first)"
-    return f"could not reach {host}: " + (done.stderr.strip()[-200:] or f"ssh exited {done.returncode}")
+    return f"could not reach {host} or read the checkout there: " \
+        + (done.stderr.strip()[-200:] or f"ssh exited {done.returncode}")
 
 
 def carry(root: Path, dest: str, *, include: list[str] | None = None, max_mb: float | None = None,
@@ -445,20 +519,23 @@ def carry(root: Path, dest: str, *, include: list[str] | None = None, max_mb: fl
     """Copy the ignored files worth carrying to another checkout: a local path or host:path.
 
     A dry run unless ``yes``. Never writes to git, never deletes, never overwrites a newer
-    file. By default only what changed since the branch left ``base``; ``all_ages`` lifts
-    that. Key files go only with ``with_keys``, paths over ``max_mb`` only when raised.
+    file or one the destination tracks. By default only what changed since the branch left
+    ``base``; ``all_ages`` lifts that. ``include`` narrows the copy. Key files go only with
+    ``with_keys``, paths over ``max_mb`` only when raised.
     """
-    since = None if all_ages else branch_start(root, base)
-    plan = _plan(ignored_inventory(root, max_mb=max_mb, since=since), include, with_keys)
-    plan["dest"] = dest
-    remote = _is_remote(dest)
+    remote, tracked = _is_remote(dest), []
     if remote:
         host, path = dest.split(":", 1)
-        why = (f"unsupported characters in remote path {path!r}" if not _REMOTE_PATH.fullmatch(path)
-               else _remote_checkout(host, path.rstrip("/")))
+        found = (f"unsupported characters in remote path {path!r}" if not _REMOTE_PATH.fullmatch(path)
+                 else _remote_tracked(host, path.rstrip("/")))
+        why, tracked = (found, []) if isinstance(found, str) else ("", found)
     else:
-        why = "" if (Path(dest).expanduser() / ".git").exists() \
-            else f"{dest} is not a checkout (clone or add the worktree first)"
+        home = Path(dest).expanduser()
+        why = "" if (home / ".git").exists() else f"{dest} is not a checkout (clone or add the worktree first)"
+        tracked = [] if why else _tracked(home)
+    since = None if all_ages else branch_start(root, base)
+    plan = _plan(ignored_inventory(root, max_mb=max_mb, since=since, include=include), with_keys, tracked, root)
+    plan["dest"] = dest
     if why:
         plan["reason"] = why
         return plan
@@ -471,7 +548,8 @@ def carry(root: Path, dest: str, *, include: list[str] | None = None, max_mb: fl
     return plan
 
 
-def _remote_inventory(root: Path, host: str, path: str, base: str, max_mb: float | None, all_ages: bool):
+def _remote_inventory(root: Path, host: str, path: str, base: str, max_mb: float | None, all_ages: bool,
+                      include: list[str] | None = None):
     """The old checkout's ignored files, listed there by this program sent over ssh on standard
     input, so the other host needs python3 and git and no copy of this script. A list, or the
     reason there is none."""
@@ -479,11 +557,11 @@ def _remote_inventory(root: Path, host: str, path: str, base: str, max_mb: float
         return "pull from another host needs this script as a file"
     limit = SETTINGS["max_mb"] if max_mb is None else max_mb
     command = f"python3 - --repo {path} --base {shlex.quote(base)} --max-mb {limit} ignored --json" \
-        + (" --all" if all_ages else "")
+        + (" --all" if all_ages else "") + "".join(f" --include {shlex.quote(g)}" for g in include or [])
     listed = subprocess.run([*SSH, host, command], input=SCRIPT.read_text(encoding="utf-8"),
                             capture_output=True, text=True, check=False)
     try:
-        return _recheck(root, json.loads(listed.stdout))
+        return _recheck(root, json.loads(listed.stdout), include)
     except ValueError:
         return "could not list ignored files on the source: " + (listed.stderr.strip()[-300:] or "no output")
 
@@ -499,16 +577,17 @@ def pull(root: Path, source: str, *, include: list[str] | None = None, max_mb: f
         host, path = source.split(":", 1)
         if not _REMOTE_PATH.fullmatch(path):
             return _refused(root, f"unsupported characters in remote path {path!r}")
-        entries = _remote_inventory(root, host, path, base or default_base(root), max_mb, all_ages)
+        entries = _remote_inventory(root, host, path, base or default_base(root), max_mb, all_ages, include)
         if isinstance(entries, str):
             return _refused(root, entries)
+        origin = None
     else:
         origin = Path(source).expanduser()
         if not (origin / ".git").exists():
             return _refused(root, f"{source} is not a checkout")
         since = None if all_ages else branch_start(origin, base or default_base(root))
-        entries = ignored_inventory(origin, max_mb=max_mb, since=since)
-    plan = _plan(entries, include, with_keys)
+        entries = ignored_inventory(origin, max_mb=max_mb, since=since, include=include)
+    plan = _plan(entries, with_keys, _tracked(root), origin)
     plan["dest"], plan["source"] = str(root), source
     if not yes or not plan["paths"]:
         return plan
@@ -649,16 +728,16 @@ def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
 def write_note(root: Path, *, base: str | None = None, today: str | None = None, sender: str | None = None,
                to: str | None = None, machine: str | None = None, snap: dict | None = None) -> Path:
     """Create the branch's note, or refresh its snapshot, target and date; filled sections stay.
-    A note that lost its snapshot markers is rebuilt around the sections it still has, and a file
-    that is no note at all is left alone."""
+    A note that lost either snapshot marker, or both, is rebuilt around the sections it still has,
+    and a file that is no note at all is left alone."""
     today = today or datetime.datetime.now().astimezone().date().isoformat()
     snap = snap or snapshot(root, base)
     path = note_path(root, snap["branch"])
     old = path.read_text(encoding="utf-8") if path.is_file() else ""
-    if SNAPSHOT_START in old:
+    if SNAPSHOT_START in old and SNAPSHOT_END in old.split(SNAPSHOT_START, 1)[1]:
         meta = _meta(_frontmatter(old), snap, today, sender, to, machine)
         before, rest = old.split(SNAPSHOT_START, 1)
-        after = rest.split(SNAPSHOT_END, 1)[1] if SNAPSHOT_END in rest else ""
+        after = rest.split(SNAPSHOT_END, 1)[1]
         body = re.sub(r"\A---\n.*?\n---\n", "", before, count=1, flags=re.DOTALL)
         text = _head(meta) + body + _snapshot_text(snap, meta) + _hints(after, int(meta["level"]))
     else:
@@ -987,6 +1066,8 @@ def _render_carry(plan: dict) -> str:
     for kind in ("large", "key"):
         lines += [f"  skipped ({kind}): {p}" for p in plan["skipped"].get(kind, [])]
     lines += [f"  refused (not ignored in this checkout): {p}" for p in plan["skipped"].get("refused", [])]
+    lines += [f"  left alone (git tracks it in the receiving checkout): {p}"
+              for p in plan["skipped"].get("tracked", [])]
     lines += [f"  refused (the path leaves the checkout through a link): {p}" for p in plan.get("refused", [])]
     if plan["skipped"].get("old"):
         lines.append(f"  skipped: {_n(len(plan['skipped']['old']), 'path')} older than the branch (--all)")
@@ -1015,7 +1096,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--dest", default=None, help="carry: the other checkout, a path or host:path")
     parser.add_argument("--from-checkout", dest="source", default=None,
                         help="pull: the old checkout, a path or host:path")
-    parser.add_argument("--include", action="append", help="carry, pull: only these paths or globs (repeatable)")
+    parser.add_argument("--include", action="append",
+                        help="ignored, carry, pull: only these paths or globs, which may lie inside an "
+                             "ignored folder (repeatable)")
     parser.add_argument("--max-mb", type=float, default=None,
                         help="ignored, carry, pull: paths over this size are not carried "
                              f"(default: {SETTINGS['max_mb']})")
@@ -1035,7 +1118,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "ignored":
         since = None if args.all else branch_start(root, args.base)
-        entries = ignored_inventory(root, max_mb=args.max_mb, since=since)
+        entries = ignored_inventory(root, max_mb=args.max_mb, since=since, include=args.include)
         return out(entries, _render_ignored(entries))
     if args.command == "list":
         notes = available(root)
@@ -1066,12 +1149,15 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         print(f"wrote {_relative(path, root)}", file=sys.stderr)
     path = note_path(root, current_branch(root))
-    if args.command == "show":
-        if not path.is_file():
-            print(f"no hand-off note for this branch; notes here: {', '.join(other_notes(root)) or 'none'}")
-            return 0
-        print(_redact(path.read_text(encoding="utf-8")))
+    if args.command == "show" and not path.is_file():
+        others = other_notes(root)
+        return out({"path": _relative(path, root), "note": None, "findings": [], "other_notes": others},
+                   f"no hand-off note for this branch; notes here: {', '.join(others) or 'none'}")
     findings = check_note(root, path, base=args.base, ignored=ignored)
+    if args.command == "show":  # with --json one document: the note and what check says of it
+        note = _redact(path.read_text(encoding="utf-8"))
+        return out({"path": _relative(path, root), "note": note, "findings": findings},
+                   note + "\n" + _render_findings(findings))
     out(findings, _render_findings(findings))
     blocked = any(f["severity"] in {"critical", "major"} for f in findings)
     return 1 if args.command == "check" and blocked else 0

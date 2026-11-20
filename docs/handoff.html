@@ -149,7 +149,7 @@ handoff check:
       <span class="num">What git ignores</span>
       <h3>Run output and local data go checkout to checkout</h3>
       <p>A push does not move the files git ignores: benchmark output, transcripts, a local database. The script lists them by kind and copies the ones this branch produced straight to the other checkout, over ssh for another machine. Nothing ignored is ever added to git.</p>
-      <p>Environments and caches are rebuilt on the other side; they are named, not carried. A file that looks like a key is never copied unless you ask for it by flag, and that holds for one inside an ignored folder too. A copy is a dry run until <code>--yes</code>.</p>
+      <p>Environments and caches are rebuilt on the other side; they are named, not carried. A file that looks like a key is never copied unless you ask for it by flag, and that holds for one inside an ignored folder too. A file the other checkout tracks in git is never copied over. A copy is a dry run until <code>--yes</code>.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · what a push would leave behind</b><em>captured</em></div>

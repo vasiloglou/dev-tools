@@ -89,9 +89,19 @@ Do the whole procedure; do not stop at the note.
 
    Write `none` where nothing applies. Name the file that holds a key; never its
    value.
-3. **Commit the note.** At level 3 push the branch (`git push -u origin <branch>`):
-   a hand-off to another machine is the user's request to push this branch. Never
-   push the base branch or a release branch.
+3. **Check the note, then commit it.**
+
+   ```bash
+   python3 <tool> check
+   ```
+
+   Run it before the commit, so that a key pasted into the note never reaches
+   git history or the remote: remove what it reports as a key or token, and
+   fill each section it names. The note itself still shows as uncommitted here,
+   and at level 3 as unpushed; this step settles both. Commit the note. At
+   level 3 push the branch (`git push -u origin <branch>`): a hand-off to
+   another machine is the user's request to push this branch. Never push the
+   base branch or a release branch.
 4. **Send the ignored files the next step needs.**
 
    ```bash
@@ -103,8 +113,10 @@ Do the whole procedure; do not stop at the note.
    `ignored` lists what git does not hold here, by kind, and names the paths it
    leaves to be rebuilt: if one of those is data, `--include <that path>`
    carries it. `carry` without `--yes` prints the plan; with `--yes` it copies.
-   `--include <path or glob>` narrows it. A key file inside an ignored folder
-   is left out of the folder's copy.
+   `--include <path or glob>` narrows it, also to a path inside an ignored
+   folder (`--include runs/experiment-1/`). A key file inside an ignored folder
+   is left out of the folder's copy, and a file the receiving checkout tracks
+   is never copied over.
    Show the user the plan first when it is over 1 GB or uses `--with-keys` or
    `--all`. If the destination is not known or not reachable, say so; the
    receiver can fetch the files later with `pull`.
@@ -112,7 +124,7 @@ Do the whole procedure; do not stop at the note.
    over ssh: clone or fetch there, switch to the branch, run the project's setup
    command, then `carry`, then `python3 <tool> takeover` on that host, and report
    what it prints.
-6. **Check.**
+6. **Check again**, now that everything is committed and sent.
 
    ```bash
    python3 <tool> check

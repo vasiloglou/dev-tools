@@ -525,7 +525,7 @@ def test_real_rsync_honours_those_exclusions(repo, tmp_path):
     write(repo, "runs/.env", "KEY=x\n")
     dest = tmp_path / "plain"
     dest.mkdir()
-    plan = handoff._plan(handoff.ignored_inventory(repo), None, False)
+    plan = handoff._plan(handoff.ignored_inventory(repo), False)
     done = handoff._rsync(plan, f"{repo}/", f"{dest}/")
     assert done["copied"] is True and (dest / "runs/a/out.json").exists()
     assert not (dest / "runs/.env").exists()
@@ -556,7 +556,7 @@ def test_a_listing_from_another_host_cannot_name_the_checkout_or_a_tracked_path(
             for path in (".", "./", "./runs/", "src/", "src/app/core.py", "runs/", "runs/a/../../src/")]
     kinds = {e["path"]: e["kind"] for e in handoff._recheck(repo, sent)}
     assert kinds == {"src/": "refused", "src/app/core.py": "refused", "runs/": "carry"}
-    plan = handoff._plan(handoff._recheck(repo, sent), None, False)
+    plan = handoff._plan(handoff._recheck(repo, sent), False)
     assert plan["paths"] == ["runs/"] and plan["skipped"]["refused"] == ["src/", "src/app/core.py"]
     # The key paths it names inside a folder are held to the same rules.
     sent = [{"path": "runs/", "kind": "carry", "bytes": 1, "files": 1,
@@ -625,7 +625,7 @@ def test_the_same_machine_needs_no_remote_to_be_ready(repo, tmp_path):
 
 def test_carry_to_another_host_first_asks_whether_the_destination_is_a_checkout(repo, monkeypatch):
     ignored_files(repo)
-    calls, answers = [], {"ssh": 1}
+    calls, answers = [], {"ssh": 3}
     real = subprocess.run
 
     def fake(argv, **kw):
@@ -638,7 +638,8 @@ def test_carry_to_another_host_first_asks_whether_the_destination_is_a_checkout(
     monkeypatch.setattr(handoff.shutil, "which", lambda name: "/usr/bin/" + name)
     plan = handoff.carry(repo, "otherbox:~/work/elsewhere", base="base", yes=True)
     assert plan["copied"] is False and "is not a checkout" in plan["reason"]
-    assert [call[0] for call in calls] == ["ssh"] and calls[0][-2:] == ["otherbox", "test -e ~/work/elsewhere/.git"]
+    assert [call[0] for call in calls] == ["ssh"] and calls[0][-2] == "otherbox"
+    assert calls[0][-1] == "test -e ~/work/elsewhere/.git || exit 3; git -C ~/work/elsewhere ls-files -z"
     answers["ssh"] = 0
     assert handoff.carry(repo, "otherbox:~/work/repo", base="base", yes=True)["copied"] is True
     assert [call[0] for call in calls] == ["ssh", "ssh", "rsync"]
@@ -646,14 +647,23 @@ def test_carry_to_another_host_first_asks_whether_the_destination_is_a_checkout(
     assert "unsupported characters" in refused["reason"] and len(calls) == 3
 
 
-def test_write_keeps_what_a_note_without_its_markers_says(repo):
+@pytest.mark.parametrize("lost", [("START",), ("END",), ("START", "END")])
+def test_write_keeps_what_a_note_without_its_markers_says(repo, lost):
     path = handoff.write_note(repo, base="base", sender="claude", to="codex", machine="same")
     fill(path, handoff.HUMAN_SECTIONS, "ship the cache")
-    path.write_text(path.read_text().replace(handoff.SNAPSHOT_START + "\n", "").replace(handoff.SNAPSHOT_END + "\n", ""))
+    text = path.read_text()
+    for marker in lost:
+        text = text.replace(getattr(handoff, "SNAPSHOT_" + marker) + "\n", "")
+    path.write_text(text)
     handoff.write_note(repo, base="base")
     text = path.read_text()
     assert text.count("ship the cache") == len(handoff.HUMAN_SECTIONS) and handoff.FILL not in text
-    assert text.count(handoff.SNAPSHOT_START) == 1 and "to: codex" in text
+    assert text.count(handoff.SNAPSHOT_START) == 1 and text.count(handoff.SNAPSHOT_END) == 1
+    assert "to: codex" in text and text.count("## Goal") == 1
+
+
+def test_write_leaves_alone_a_file_that_is_no_note(repo):
+    path = handoff.write_note(repo, base="base")
     path.write_text("my own notes about this branch\n")
     with pytest.raises(handoff.HandoffError, match="is not a hand-off note"):
         handoff.write_note(repo, base="base")
@@ -686,7 +696,7 @@ def test_ignored_names_the_paths_it_treats_as_rebuildable(repo):
     text = handoff._render_ignored(handoff.ignored_inventory(repo))
     assert "rebuilt on the other side, not carried: .venv/, src/app/__pycache__/, target/" in text
     # Named exactly, a path the script would have left to be rebuilt is carried.
-    assert handoff._plan(handoff.ignored_inventory(repo), ["target/"], False)["paths"] == ["target/"]
+    assert handoff._plan(handoff.ignored_inventory(repo, include=["target/"]), False)["paths"] == ["target/"]
 
 
 def test_write_sizes_the_ignored_files_once(repo, monkeypatch):
@@ -705,3 +715,172 @@ def test_a_note_for_a_reader_without_the_skills_says_what_to_do_on_arrival(repo)
     assert "Without the dev-takeover skill:" in text and "approves nothing" in text
     same = handoff.write_note(repo, base="base", sender="claude", to="claude", machine="same").read_text()
     assert "Without the dev-takeover skill:" not in same
+
+
+# --- the second review round ---
+
+def test_a_rebuildable_folder_carried_by_name_still_leaves_its_key_files_out(repo, tmp_path):
+    write(repo, ".gitignore", "target/\n")
+    write(repo, "target/model.bin", "weights")
+    write(repo, "target/private.pem", "pem\n")
+    write(repo, "target/secrets/db.json", "{}\n")
+    commit(repo)
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    done = handoff.carry(repo, str(dest), base="base", include=["target/"], yes=True)
+    assert done["copied"] is True and (dest / "target/model.bin").exists()
+    assert not (dest / "target/private.pem").exists() and not (dest / "target/secrets").exists()
+    assert done["skipped"]["key"] == ["target/private.pem", "target/secrets/"]
+    # Named, it is held to the size limit and the branch's age like any other path.
+    small = handoff.carry(repo, str(dest), base="base", include=["target"], max_mb=0.000001)
+    assert small["paths"] == [] and small["skipped"]["large"] == ["target/"]
+    # A key file named by its own path is still a key file.
+    named = handoff.carry(repo, str(dest), base="base", include=["target/secrets/db.json", "target/private.pem"])
+    assert named["paths"] == [] and named["skipped"]["key"] == ["target/private.pem", "target/secrets/db.json"]
+
+
+def test_a_copy_leaves_alone_a_file_the_receiving_checkout_tracks(repo, tmp_path):
+    write(repo, ".gitignore", "report.json\nruns/\n")
+    commit(repo)
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    write(dest, "report.json", "tracked here\n")
+    write(dest, "runs/kept.txt", "tracked here\n")
+    write(dest, "runs/only-here.txt", "tracked here\n")
+    git(dest, "add", "-f", "report.json", "runs/kept.txt", "runs/only-here.txt")
+    git(dest, "commit", "-q", "-m", "track them")
+    for name in ("report.json", "runs/kept.txt"):
+        os.utime(dest / name, (1_000_000_000, 1_000_000_000))
+    write(repo, "report.json", "from the old checkout\n")
+    write(repo, "runs/kept.txt", "from the old checkout\n")
+    write(repo, "runs/out.json", "{}\n")
+    plan = handoff.carry(repo, str(dest), base="base")
+    assert plan["paths"] == ["runs/"] and plan["skipped"]["tracked"] == ["report.json", "runs/kept.txt"]
+    done = handoff.carry(repo, str(dest), base="base", yes=True)
+    assert done["copied"] is True and (dest / "runs/out.json").exists()
+    assert git(dest, "status", "--short") == "" and (dest / "report.json").read_text() == "tracked here\n"
+    assert "left alone (git tracks it in the receiving checkout): report.json" in handoff._render_carry(done)
+    (dest / "runs/out.json").unlink()
+    pulled = handoff.pull(dest, str(repo), base="base", yes=True)
+    assert pulled["skipped"]["tracked"] == ["report.json", "runs/kept.txt"] and (dest / "runs/out.json").exists()
+    assert git(dest, "status", "--short") == ""
+
+
+def test_a_copy_to_or_from_another_host_leaves_tracked_files_alone_too(repo, tmp_path, monkeypatch):
+    ignored_files(repo)
+    calls = []
+    real = subprocess.run
+
+    def fake(argv, **kw):
+        if argv[0] not in {"ssh", "rsync"}:
+            return real(argv, **kw)
+        calls.append(argv)
+        if argv[0] == "ssh" and "ls-files" in argv[-1]:
+            return subprocess.CompletedProcess(argv, 0, "runs/a/out.json\0src/app/core.py\0data.duckdb\0", "")
+        listing = [{"path": "runs/", "kind": "carry", "bytes": 4099, "files": 2},
+                   {"path": "data.duckdb", "kind": "carry", "bytes": 2, "files": 1}]
+        return subprocess.CompletedProcess(argv, 0, json.dumps(listing) if argv[0] == "ssh" else "", "")
+
+    monkeypatch.setattr(handoff.subprocess, "run", fake)
+    monkeypatch.setattr(handoff.shutil, "which", lambda name: "/usr/bin/" + name)
+    done = handoff.carry(repo, "otherbox:~/work/repo", base="base", yes=True)
+    assert done["paths"] == ["runs/"] and done["skipped"]["tracked"] == ["data.duckdb", "runs/a/out.json"]
+    assert calls[-1][0] == "rsync" and "--exclude=/runs/a/out.json" in calls[-1]
+    # Arriving: the receiving checkout is this one, so git here says what it tracks.
+    git(repo, "add", "-f", "runs/a/big.bin")
+    git(repo, "commit", "-q", "-m", "track one")
+    pulled = handoff.pull(repo, "oldbox:~/work/repo", base="base", yes=True)
+    assert pulled["skipped"]["tracked"] == ["runs/a/big.bin"] and "--exclude=/runs/a/big.bin" in calls[-1]
+
+
+def test_include_reaches_inside_an_ignored_folder_and_matches_whole_names(repo, tmp_path):
+    write(repo, ".gitignore", "runs/\nruns-private/\n.venv/\n")
+    for rel in ("runs/experiment-1/out.json", "runs/experiment-2/out.json", "runs/top.json", "runs/log.txt",
+                "runs-private/notes.txt", ".venv/lib/site.json"):
+        write(repo, rel, "{}\n")
+    write(repo, "runs/experiment-1/.env", "KEY=x\n")
+    commit(repo)
+
+    def paths(*globs):
+        return sorted(e["path"] for e in handoff.ignored_inventory(repo, include=list(globs)))
+
+    assert paths("runs") == ["runs/"] == paths("runs/")
+    assert paths("runs*") == ["runs-private/", "runs/"]
+    assert paths("runs/experiment-1/") == ["runs/experiment-1/"] == paths("runs/experiment-1")
+    assert paths("runs/*.json") == ["runs/experiment-1/out.json", "runs/experiment-2/out.json", "runs/top.json"]
+    assert paths("runs/exp*") == ["runs/experiment-1/", "runs/experiment-2/"]
+    assert paths("runs/top.json", "runs/nothing", "runs/../.gitignore", "runs/experiment-1/../log.txt") == ["runs/top.json"]
+    assert paths("runs/experiment-1/", "runs/*out.json") == ["runs/experiment-1/", "runs/experiment-2/out.json"]
+    # A glob does not reach into a path left to be rebuilt; its exact name does.
+    assert paths("*.json") == ["runs/experiment-1/out.json", "runs/experiment-2/out.json", "runs/top.json"]
+    assert paths(".venv/lib/") == [".venv/lib/"]
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    done = handoff.carry(repo, str(dest), base="base", include=["runs/experiment-1/"], yes=True)
+    assert (dest / "runs/experiment-1/out.json").exists() and not (dest / "runs/experiment-2").exists()
+    assert not (dest / "runs/experiment-1/.env").exists() and not (dest / "runs/top.json").exists()
+    assert done["paths"] == ["runs/experiment-1/"] and done["skipped"]["key"] == ["runs/experiment-1/.env"]
+    listed = run(repo, "ignored", "--json", "--base", "base", "--include", "runs/*.json")
+    assert [e["path"] for e in json.loads(listed.stdout)] == paths("runs/*.json")
+
+
+def test_pull_from_another_host_narrows_the_listing_on_that_host(repo, tmp_path, monkeypatch):
+    ignored_files(repo)
+    write(repo, ".gitignore", ".venv/\nruns/\n.env\n*.duckdb\n__pycache__/\ntarget/\n")
+    calls = []
+    real = subprocess.run
+
+    def fake(argv, **kw):
+        if argv[0] not in {"ssh", "rsync"}:
+            return real(argv, **kw)
+        calls.append(argv)
+        listing = [{"path": "runs/a/", "kind": "carry", "bytes": 4099, "files": 2},
+                   {"path": "target/", "kind": "carry", "bytes": 9, "files": 1, "keys": ["target/private.pem"]},
+                   {"path": ".venv/", "kind": "carry", "bytes": 9, "files": 1}]
+        return subprocess.CompletedProcess(argv, 0, json.dumps(listing), "")
+
+    monkeypatch.setattr(handoff.subprocess, "run", fake)
+    plan = handoff.pull(repo, "oldbox:~/work/repo", base="base", include=["runs/a/", "target", "it's*"])
+    assert calls[0][-1].endswith("ignored --json --include runs/a/ --include target --include 'it'\"'\"'s*'")
+    # A rebuildable path is taken only under the name that was asked for, and a path the other
+    # host adds to what was asked for is dropped.
+    assert plan["paths"] == ["runs/a/", "target/"] and plan["exclude"] == ["target/private.pem"]
+    assert plan["skipped"]["rebuild"] == [] and ".venv/" not in plan["paths"]
+
+
+def test_show_prints_one_json_document_when_asked(repo):
+    path = handoff.write_note(repo, base="base")
+    write(repo, path.relative_to(repo).as_posix(), path.read_text() + "key sk-ant-" + "a" * 30 + "\n")
+    shown = json.loads(run(repo, "show", "--json", "--base", "base").stdout)
+    assert shown["path"] == ".planning/handoffs/feature.md" and shown["note"].startswith("---\n")
+    assert handoff.REMOVED in shown["note"] and "sk-ant-" not in shown["note"]
+    assert "handoff/secret" in {f["check"] for f in shown["findings"]}
+    path.unlink()
+    missing = json.loads(run(repo, "show", "--json", "--base", "base").stdout)
+    assert missing["note"] is None and missing["findings"] == [] and missing["other_notes"] == []
+
+
+def test_the_leaving_skill_checks_the_filled_note_before_it_is_committed_or_pushed():
+    skill = (ROOT / "skills/dev-handoff/SKILL.md").read_text()
+    filled, checked = skill.index("2. **Write the note.**"), skill.index("python3 <tool> check")
+    assert filled < checked < skill.index("git push -u origin")
+    assert checked < skill.index("Commit the note")
+
+
+def test_an_ignored_link_is_copied_as_a_link_and_never_followed(repo, tmp_path):
+    write(repo, ".gitignore", "data\nruns/\n")
+    outside = tmp_path / "dataset"
+    write(outside, "big.bin", "x" * 4096)
+    (repo / "data").symlink_to(outside)
+    write(repo, "runs/out.json", "{}\n")
+    (repo / "runs/latest").symlink_to(outside)
+    (repo / "runs/gone").symlink_to(tmp_path / "nowhere")
+    commit(repo)
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    done = handoff.carry(repo, str(dest), base="base", all_ages=True, yes=True)
+    assert done["copied"] is True and (dest / "runs/out.json").exists()
+    for name in ("data", "runs/latest", "runs/gone"):
+        assert (dest / name).is_symlink() and os.readlink(dest / name) == os.readlink(repo / name)
+    # A second run finds them in place and leaves them.
+    assert handoff.carry(repo, str(dest), base="base", all_ages=True, yes=True)["files"] == 0
