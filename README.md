@@ -49,7 +49,16 @@ prompt. The reasoning is on the site:
   hand-written check, and what tells a new finding from one that was already there:
   [Project rules and GND](https://vasiloglou.github.io/dev-tools/rules.html).
 
-A project picks the workflow that fits it. Both use the component index.
+- **Hand-offs.** Unfinished work moves to another assistant, another account or another
+  machine with what the session knew. `dev-handoff` writes a note for the branch (goal,
+  what was verified, next step, decisions, your instructions, jobs and data outside git),
+  a check says what would be lost (uncommitted files, unpushed commits, empty sections, a
+  pasted key), and the files git ignores are copied to the other checkout. `dev-takeover`
+  lists the hand-offs, checks the machine, verifies the note against the code and
+  continues from its next step. The note informs; it approves nothing.
+
+A project picks the workflow that fits it. Both use the component index, and the hand-off
+skills work with either.
 
 ## How a project takes it
 
@@ -135,8 +144,8 @@ the phase workflow follows the first sync with
 setup command: it needs the planning folder with a `PROJECT.md`, which the project's own
 scaffold step writes (its `references/project.md` names it).
 
-The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool
-and the review helper run on 3.9.
+The sync command, the GSD converter and the component index need Python 3.11 or newer; the phase state tool,
+the review helper and the hand-off script run on 3.9.
 
 ## Or install it as a Claude Code plugin
 
@@ -153,7 +162,7 @@ claude plugin install dvt-phase@dvt
 
 `dvt-phase` holds the phase workflow, its helper agents and the component index;
 `dvt-milestone` holds the milestone workflow, `review-pr` and the component index. Both
-hold `handle-issue`. Their
+hold `handle-issue`, `dev-handoff` and `dev-takeover`. Their
 skills and agents are named after the plugin: `/dvt-phase:process-phase`,
 `dvt-phase:phase-implementer`, `/dvt-milestone:review-pr`. `--scope project` records the
 plugin in the project's `.claude/settings.json`, so every teammate gets it.
@@ -221,6 +230,7 @@ a release is due.
 | `skills/milestone/` | The milestone workflow: `start-milestone`, `process-milestone`, `process-phase`, and `review-pr` for a pull request. `process-phase/scripts/review_tool.py` writes a review brief, runs the reviewer in the other tool in the background, and reports which files a finished review covers; for a PR, which `review-pr` asks it for, it reviews the diff at its head and posts the result only with the owner's approval. |
 | `skills/components/` | The component index: the skill (consult, update, build, review) and `scripts/components_index.py`, which generates, checks and searches it, drafts entries for unclaimed files, checks a change before a PR, lists leads for a review, and writes the index as facts. `scripts/rules_check.py` is optional and a trial: it checks a project's own rules about its components (layers, and rules it writes) with GND, and reports only what a change added. |
 | `skills/handle-issue/` | How an agent handles a GitHub issue in either workflow: reproduces and classes it, checks the component index, and routes it to a test-first fix in its own pull request, an amendment to the plan, or a reply. It drafts every comment, label, close and new issue and posts only with the owner's approval. |
+| `skills/dev-handoff/`, `skills/dev-takeover/` | Moving unfinished work on a branch to another assistant, account, developer or machine, in either workflow. `dev-handoff/scripts/handoff.py` writes and checks the branch's note, lists and copies the files git ignores between checkouts, lists the hand-offs a machine can take over, and reports whether a checkout and its machine are ready to continue. It commits, pushes and deletes nothing. |
 | `skills/adopt-devtools/` | How an agent moves an existing project from its own process skills to these, without losing the project's rules. Read from this checkout; never copied into a project. |
 | `skills/move-from-gsd/` | How an agent moves a project planned with GSD to the phase workflow, keeping its phases, requirements, decisions and history. Read from this checkout; never copied into a project. |
 | `devtools/sync.py` | The sync command: `apply`, `check`, and for an existing project `survey` and `compare`. |

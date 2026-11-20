@@ -55,12 +55,15 @@ PROJECT_RULES = ".devtools/project.md"
 PLUGINS = {
     "dvt-phase": {
         "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ "
-                       "contract (process-phase, phase-tests), its helper agents, the component index, and GitHub issue handling (handle-issue).",
+                       "contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), "
+                       "and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
         "keywords": ["workflow", "planning", "tdd", "phases", "components"],
         "skills": {"process-phase": "skills/phase/process-phase",
                    "phase-tests": "skills/phase/phase-tests",
                    "components": "skills/components",
-                   "handle-issue": "skills/handle-issue"},
+                   "handle-issue": "skills/handle-issue",
+                   "dev-handoff": "skills/dev-handoff",
+                   "dev-takeover": "skills/dev-takeover"},
         "files": {"skills/process-phase/pytest/phase_selection.py": "skills/phase/pytest/phase_selection.py"},
         "agents": "agents",
         # A plugin's agents are named after the plugin.
@@ -70,14 +73,17 @@ PLUGINS = {
     "dvt-milestone": {
         "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase "
                        "(start-milestone, process-milestone, process-phase), independent PR reviews "
-                       "(review-pr), the component index, and GitHub issue handling (handle-issue).",
+                       "(review-pr), the component index, GitHub issue handling (handle-issue), "
+                       "and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
         "keywords": ["workflow", "planning", "milestones", "review", "components"],
         "skills": {"start-milestone": "skills/milestone/start-milestone",
                    "process-milestone": "skills/milestone/process-milestone",
                    "process-phase": "skills/milestone/process-phase",
                    "review-pr": "skills/milestone/review-pr",
                    "components": "skills/components",
-                   "handle-issue": "skills/handle-issue"},
+                   "handle-issue": "skills/handle-issue",
+                   "dev-handoff": "skills/dev-handoff",
+                   "dev-takeover": "skills/dev-takeover"},
         "files": {},
         "agents": None,
         "rewrites": [],
@@ -101,12 +107,13 @@ REWRITES = [
     (r"`(\w+)\.settings\.json`(\s+)beside the script", r"`.devtools/\1.settings.json`\2in the project"),
     (r"(?:\.claude/skills/[\w-]+/)?(?<![\w.}-])scripts/(\w+)\.settings\.json", r".devtools/\1.settings.json"),
     (r"skills/phase/pytest/phase_selection\.py", "${CLAUDE_PLUGIN_ROOT}/skills/process-phase/pytest/phase_selection.py"),
-    (r"\.claude/skills/(process-phase|phase-tests|components|start-milestone|process-milestone|review-pr|handle-issue)\b",
+    (r"\.claude/skills/(process-phase|phase-tests|components|start-milestone|process-milestone|review-pr|handle-issue|dev-handoff|dev-takeover)\b",
      r"${CLAUDE_PLUGIN_ROOT}/skills/\1"),
     (r"(?<![\w/.}-])scripts/components_index\.py",
      "${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py"),
     (r"\.\./process-phase/scripts/review_tool\.py", "${CLAUDE_PLUGIN_ROOT}/skills/process-phase/scripts/review_tool.py"),
     (r"\.\./process-phase/references/", "${CLAUDE_PLUGIN_ROOT}/skills/process-phase/references/"),
+    (r"\.\./dev-handoff/references/", "${CLAUDE_PLUGIN_ROOT}/skills/dev-handoff/references/"),
 ]
 MODES: dict[Path, int] = {}  # each built file's mode, from its source
 TOKEN = re.compile(r"\{\{devtools:([a-z_]+)\}\}")

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Takeover"
+  short_description: "Take over work another assistant or machine started"
+  default_prompt: "Use $dev-takeover to take over work that was handed off."

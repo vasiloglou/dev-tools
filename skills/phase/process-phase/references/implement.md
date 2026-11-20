@@ -191,4 +191,5 @@ Commit when the focused tests are green and the task is in scope: `git add <task
 - Record material deviations briefly. One that changes a LOCKED CX, a thesis or a test needs a human gate. DISCRETION choices get a one-line rationale.
 - Per plan, write `NN-MM-SUMMARY.md` (`templates/SUMMARY.md`): commits, focused tests/results, material deviations and unresolved failures. Do not create per-round evidence packets. Commit `docs(NN-MM): summary`.
 - To pause, fill `.continue-here.md` (include the coder session id and its pool) and commit `wip(NN): pause at NN-MM-T<k>`.
+- When the phase continues with another assistant, on another machine or in a later session, also write the branch's hand-off note with the `dev-handoff` skill, where the project has it: a coder session id does not resolve elsewhere, so the note carries the running jobs, the spend so far and the user's instructions for this phase.
 - To leave: required acceptance/focused results are current and green, `check --testlock NN` clean, then `advance --to implemented`. Verify reuses these results and performs the one final full regression run; no fresh verifier is mandatory.
