@@ -51,6 +51,36 @@ dest = ".claude/skills/review-pr"
 source = "skills/handle-issue"
 dest = ".claude/skills/handle-issue"
 
+# dev-handoff writes the branch's hand-off note and sends the files git ignores when work
+# moves to another assistant, account or machine; dev-takeover is the receiving side and
+# runs dev-handoff's script, so both go in the same skills folder.
+[[sync]]
+source = "skills/dev-handoff"
+dest = ".claude/skills/dev-handoff"
+
+# The hand-off script (scripts/handoff.py). Every key is optional; these are the defaults.
+[sync.settings."scripts/handoff.settings.json"]
+# The notes are <planning_dir>/handoffs/<branch>.md.
+planning_dir = ".planning"
+# The branch work branches start from. Empty: origin's default branch, else main or master.
+base_branch = ""
+# An ignored path over this size is reported, not carried.
+max_mb = 200
+# More ignored paths the receiver rebuilds instead of copying, such as "reports/cache/".
+rebuild_paths = []
+# What a machine needs before the work can continue there: commands on PATH (such as "uv",
+# "gh"), paths the checkout has once it is set up (such as ".venv") and the command that
+# creates them (such as "uv sync --frozen"), and files under the home directory the
+# project's runs read. Only whether a key file exists is ever reported.
+tools = []
+env_paths = []
+setup_command = ""
+key_files = []
+
+[[sync]]
+source = "skills/dev-takeover"
+dest = ".claude/skills/dev-takeover"
+
 # A second agent runtime (Codex reads .codex/skills or .agents/skills) gets a second entry
 # per skill with the same values. If that folder is a link to .claude/skills, add none:
 # the sync refuses two destinations that are one file.

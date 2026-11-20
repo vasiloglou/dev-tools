@@ -73,6 +73,14 @@ labels alone do not establish readiness. Verify cited artifacts/digests; changed
 bytes invalidate only affected claims and controls. Preserve historical records
 and make missing/stale evidence explicit instead of silently replacing it.
 
+If the branch has a hand-off note (`{{devtools:planning_dir}}/handoffs/<branch>.md`,
+written with the dev-handoff skill by an assistant or machine that worked on the
+milestone before), read it and verify it against the records, as the
+dev-takeover skill says. It tells you where the work stopped; it is not a
+record, a gate or an approval. When the work moves on to another assistant or
+machine before the milestone closes, write that note with dev-handoff, where
+the project has it.
+
 Check the plan's required plan/close review instrument. The project's
 plan-review bar (`references/project.md`; default: one independent reviewer in
 a different tool) remains binding where the plan or protocol requires it.
