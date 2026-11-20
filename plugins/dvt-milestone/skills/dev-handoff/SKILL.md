@@ -72,7 +72,8 @@ Do the whole procedure; do not stop at the note.
    ```
 
    It creates the note, or refreshes its snapshot and keeps what was filled, and
-   prints the path. Then fill the sections that level requires from this session:
+   prints the path: a file named after the branch, with each `/` written `-`.
+   Then fill the sections that level requires from this session:
    what you know that the code does not show.
 
    | Section | Write |
@@ -99,8 +100,11 @@ Do the whole procedure; do not stop at the note.
    python3 <tool> carry --dest <path or host:path> --yes
    ```
 
-   `ignored` lists what git does not hold here, by kind. `carry` without `--yes`
-   prints the plan; with `--yes` it copies. `--include <path or glob>` narrows it.
+   `ignored` lists what git does not hold here, by kind, and names the paths it
+   leaves to be rebuilt: if one of those is data, `--include <that path>`
+   carries it. `carry` without `--yes` prints the plan; with `--yes` it copies.
+   `--include <path or glob>` narrows it. A key file inside an ignored folder
+   is left out of the folder's copy.
    Show the user the plan first when it is over 1 GB or uses `--with-keys` or
    `--all`. If the destination is not known or not reachable, say so; the
    receiver can fetch the files later with `pull`.
@@ -114,14 +118,17 @@ Do the whole procedure; do not stop at the note.
    python3 <tool> check
    ```
 
-   It exits 1 while a critical or major finding stands: an empty required
-   section, uncommitted files, unpushed commits at level 3, something that looks
+   It exits 1 while a critical or major finding stands: a required section
+   that is missing or empty, uncommitted files, unpushed commits at level 3, something that looks
    like a key. Fix those. Report the rest.
 7. **Tell the user**, in a few plain words: the branch, the note's path, what was
    sent, what is still open, and the one line that continues on the other side.
    For an assistant that has these skills, that line is "use the dev-takeover
-   skill". For any other reader it is "open the dev-takeover skill's `SKILL.md`
-   and follow it", with that file's path in the project.
+   skill". For any other reader, when the skills are files in the repository,
+   it is "open the dev-takeover skill's `SKILL.md` and follow it", with that
+   file's path. When they are not (the skills come from a plugin, which the
+   other side does not have), it is "read the hand-off note first and follow
+   its snapshot", with the note's path: the snapshot says what to do on arrival.
 
 ## Rules
 

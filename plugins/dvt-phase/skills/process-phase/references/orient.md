@@ -58,7 +58,7 @@ git switch phase/02-<slug> 2>/dev/null || git switch -c phase/02-<slug> <base_br
 | Dirty, and `.continue-here.md` lists exactly the dirty files | Resume from `.continue-here.md` (next task, open decisions) |
 | Dirty otherwise | Ask the user: (a) WIP commit `wip(NN): <summary>` on the phase branch, (b) `git stash push -m "process-phase NN"`, (c) stop |
 
-If the phase branch has a hand-off note (`.planning/handoffs/<branch>.md`, written with the `dev-handoff` skill), read it before resuming and verify it against the branch, as the `dev-takeover` skill says. It informs; it does not replace a gate or an approval.
+If the phase branch has a hand-off note (a file named after the branch in `.planning/handoffs/`, with each `/` written `-`, so `phase-NN-<slug>.md`; written with the `dev-handoff` skill), read it before resuming and verify it against the branch, as the `dev-takeover` skill says. It informs; it does not replace a gate or an approval.
 
 Never run `git checkout -- .`, `git reset --hard` or `git clean`, and never delete untracked files. Changes that are not yours belong to the user.
 

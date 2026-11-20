@@ -6,13 +6,17 @@ branch at any time; nothing in it depends on a particular workflow.
 | Part | Where |
 |---|---|
 | Script (stdlib only, Python 3.9 and git) | `scripts/handoff.py`: `write`, `check`, `ignored`, `carry` for leaving; `list`, `takeover`, `show`, `pull`, `doctor` for arriving |
-| Note, one per branch, committed on the work branch | `<planning>/handoffs/<branch>.md`; `<planning>` is `.planning` unless the settings name another folder |
+| Note, one per branch, committed on the work branch | a file named after the branch in `<planning>/handoffs/`, with each `/` of the branch name written `-` (`phase/03-cache` is `phase-03-cache.md`); `write` and `show` print the path. `<planning>` is `.planning` unless the settings name another folder |
 | Settings | `handoff.settings.json` beside the script |
 
 The script commits, pushes and deletes nothing. `carry` and `pull` copy only with
 `--yes`, only ignored files, and only between existing checkouts. Every command
 takes `--json`, and `--base <branch>` where the base matters. `check` exits 1
-while a critical or major finding stands; every other command exits 0.
+while a critical or major finding stands, and `write` exits 1 when the file in
+the note's place is not a note (it is left as it is); every other command
+exits 0. A note that lost its snapshot markers is rebuilt around the sections
+it still has. `show`, `list` and `takeover` never print what looks like a key
+in a note: it is replaced with `[removed: looks like a key]`.
 
 ## How much to hand over
 
@@ -62,7 +66,7 @@ Two cases that look like level 1 and are not:
 |---|---|---|
 | `handoff/secret` | critical | the note contains what looks like a key or token |
 | `handoff/missing` | major | the branch has no note |
-| `handoff/unfilled` | major | a section the level requires is still empty |
+| `handoff/unfilled` | major | a section the level requires is missing, blank or still the placeholder |
 | `handoff/dirty` | major at level 3, else minor | uncommitted files |
 | `handoff/no-upstream`, `handoff/unpushed` | major at level 3, else info | the branch, or some of its commits, is not pushed |
 | `handoff/ignored` | minor at level 3, else info | ignored paths this branch changed are not in git |
@@ -90,13 +94,20 @@ python3 <tool> carry --dest ../app-second --yes          # another checkout, sam
 | `old` | unchanged since the branch started | only with `--all` |
 | `large` | over `max_mb` (200 MB unless the settings say otherwise) | only with a higher `--max-mb` |
 | `key` | looks like a credential file (`.env`, `.keys`, `*.pem`, names with secret, token or credential) | only with `--with-keys`, and only to the user's own machine |
-| `rebuild` | environments, caches, build output, other worktrees, and the project's `rebuild_paths` | never; the receiver rebuilds them |
+| `rebuild` | environments, caches, build output, other worktrees, and the project's `rebuild_paths` | only when `--include` names the path exactly; the receiver rebuilds the rest |
 
 - `--include <path or glob>` (repeatable) narrows the copy to what the next step
   needs.
 - The destination must already be a checkout: clone it, or add the worktree,
-  first.
-- A newer file at the destination is kept; nothing is deleted there.
+  first. For another host the script asks over ssh before it plans a copy.
+- A newer file at the destination is kept; nothing is deleted there. A file
+  that a link at the destination would put outside that checkout is refused
+  and named.
+- A key file inside an ignored folder is left out of the folder's copy, and
+  `ignored` says how many such paths a folder holds. `--with-keys` sends them.
+- `ignored` names the paths it treats as rebuildable. If one of them is data
+  (a results folder called `target/` or `dist/`), `--include <that path>`
+  carries it.
 - The note's snapshot lists the `carry`, `large` and `key` paths, so the receiver
   sees what exists on the old machine even when it was not sent. `check` reports
   them until they are sent or "Outside git" says they are not needed.
@@ -104,7 +115,8 @@ python3 <tool> carry --dest ../app-second --yes          # another checkout, sam
   run by the receiver. For another host it sends this script over ssh to list
   the files there, so the old machine needs python3 and git and no copy of the
   script. What that host lists is held to this checkout's rules: a path that
-  leaves the checkout is dropped, and a key file stays a key file.
+  leaves the checkout or names the checkout itself is dropped, a path this
+  checkout does not ignore is refused, and a key file stays a key file.
 - Files outside the repository (datasets and models elsewhere on disk, another
   host's run directory) are not found by the script. List them under "Outside
   git".
@@ -148,6 +160,13 @@ PATH, and what the project's settings name: tools, the environment the checkout
 needs, and key files. It reports only whether a key file exists and never reads
 one.
 
+`takeover` says ready when the checkout holds the commit the note was written
+at, no ignored path the note lists is missing, the note has a next step, and
+nothing it marks `[MISSING]` is left: a tool or an environment path the settings
+name, and the git remote unless the note is for the same machine (level 1 or
+2). The base branch, the assistants on PATH and key files are reported as not
+needed to continue.
+
 What does not come with the clone:
 
 | Item | Where it lives | Action |
@@ -168,11 +187,11 @@ with the sync sets them in its `.devtools.toml`, in the settings block of the
 
 | Key | Default | Meaning |
 |---|---|---|
-| `planning_dir` | `".planning"` | the notes are `<planning_dir>/handoffs/<branch>.md`; the phase workflow's state is read from here too |
+| `planning_dir` | `".planning"` | the notes are in `<planning_dir>/handoffs/`; the phase workflow's state is read from here too. Keep it the same as the workflow's planning folder |
 | `base_branch` | `""` | the branch work branches start from. Empty: the `base_branch` in the phase workflow's `STATE.md`, else the default branch of `origin`, else `main` or `master` |
 | `max_mb` | `200` | an ignored path over this size is reported as `large`, not carried |
 | `rebuild_paths` | `[]` | more ignored paths the receiver rebuilds instead of copying (a path, or a folder ending in `/`) |
-| `tools` | `[]` | commands `doctor` wants on PATH, such as `"uv"` or `"gh"` |
+| `tools` | `[]` | commands `doctor` wants on PATH, such as `"uv"` or `"gh"`. A missing one makes `takeover` report not ready |
 | `env_paths` | `[]` | paths the checkout has once it is set up, such as `".venv"`; a worktree may find them in the main checkout. A missing one makes `takeover` report not ready |
 | `setup_command` | `""` | the command that creates them, such as `"uv sync --frozen"`; `doctor` prints it as the fix |
 | `key_files` | `[]` | files under the home directory the project's runs read; `doctor` reports only whether each exists |

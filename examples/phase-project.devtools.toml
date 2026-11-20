@@ -105,7 +105,8 @@ dest = ".claude/skills/dev-handoff"
 
 # The hand-off script (scripts/handoff.py). Every key is optional; these are the defaults.
 [sync.settings."scripts/handoff.settings.json"]
-# The notes are <planning_dir>/handoffs/<branch>.md.
+# The notes are in <planning_dir>/handoffs/, one per branch. Keep this the same as the
+# workflow's planning folder.
 planning_dir = ".planning"
 # The branch work branches start from. Empty: the base_branch in .planning/STATE.md, else origin's
 # default branch, else main or master.

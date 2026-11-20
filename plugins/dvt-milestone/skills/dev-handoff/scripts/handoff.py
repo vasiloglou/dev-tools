@@ -3,7 +3,7 @@
 (dev-handoff and dev-takeover skills).
 
 Git carries the code; it does not carry what the current session knows. ``write`` puts that into
-``<planning>/handoffs/<branch>.md``: a snapshot of the checkout that every run regenerates (branch,
+``<planning>/handoffs/``, one file per branch: a snapshot of the checkout that every run regenerates (branch,
 head, commits, uncommitted files, stashes, ignored files, phase status) and sections the one who is
 leaving fills (goal, done, next step, decisions, standing instructions, what lives outside git).
 
@@ -20,7 +20,8 @@ leaving fills (goal, done, next step, decisions, standing instructions, what liv
 Common options: --base REF, --repo DIR, --json, --max-mb N.
 Stdlib only; runs on the system python3 (3.9) with git. Nothing is committed, pushed or deleted,
 and no key is read or printed. ``carry`` and ``pull`` are dry runs until ``--yes``.
-Exit codes: 0; ``check`` exits 1 while a critical or major finding stands; 2 usage error.
+Exit codes: 0; ``check`` exits 1 while a critical or major finding stands, and ``write`` when the
+file in the note's place is not a note; 2 usage error.
 """
 
 from __future__ import annotations
@@ -63,7 +64,7 @@ SETTINGS_FILE = (None if SCRIPT is None
                  else checkout_root() / ".devtools" / "handoff.settings.json" if PLUGIN
                  else SCRIPT.with_suffix(".settings.json"))
 DEFAULT_SETTINGS = {
-    # The notes are <planning_dir>/handoffs/<branch>.md; a phase's state is read from here too.
+    # The notes are in <planning_dir>/handoffs/, one per branch; a phase's state is read from here too.
     "planning_dir": ".planning",
     # The branch work branches start from. Empty: the base_branch in <planning_dir>/STATE.md,
     # else the default branch of origin, else main or master.
@@ -213,14 +214,18 @@ def default_base(root: Path) -> str:
     return next((name for name in ("main", "master") if base_ref(root, name)), "main")
 
 
-def snapshot(root: Path, base: str | None = None) -> dict:
-    """What git and the planning folder say about the branch right now."""
+def snapshot(root: Path, base: str | None = None, *, ignored: list[dict] | None = None) -> dict:
+    """What git and the planning folder say about the branch right now. ``ignored`` is an
+    inventory already taken, so that one command sizes the ignored files once."""
     base = base or default_base(root)
     ref = base_ref(root, base)
     upstream = _git(root, "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
     unpushed = _git(root, "rev-list", "--count", "@{u}..HEAD") if upstream else ""
     status = _git(root, "status", "--porcelain", "--untracked-files=all")
     state = _state(root)
+    if ignored is None:
+        ignored = [e for e in ignored_inventory(root, since=branch_start(root, base))
+                   if e["kind"] not in {"rebuild", "old"}]
     return {
         "branch": current_branch(root),
         "base": base,
@@ -233,25 +238,38 @@ def snapshot(root: Path, base: str | None = None) -> dict:
         "dirty": [line.split(None, 1)[1] for line in status.splitlines() if " " in line.strip()],
         "stashes": len(_git(root, "stash", "list").splitlines()),
         "state": {key: state[key] for key in STATE_KEYS if key in state},
-        "ignored": [e for e in ignored_inventory(root, since=branch_start(root, base))
-                    if e["kind"] not in {"rebuild", "old"}],
+        "ignored": ignored,
         "paused_phases": _paused(root),
         "instructions": [name for name in INSTRUCTION_FILES if (root / name).is_file()],
     }
 
 
-def _size(path: Path) -> tuple[int, int, float]:
-    """(bytes, files, newest mtime) under a file or directory; symlinks are not followed."""
+def _size(root: Path, rel: str) -> tuple[int, int, float, list[str]]:
+    """(bytes, files, newest mtime, key paths inside) for an ignored file or folder; links are not
+    followed. What looks like a key file or a folder of them inside a folder is listed, with a
+    folder ending in /, and left out of the counts: it is not carried with the folder."""
+    path = root / rel
     if not path.is_dir() or path.is_symlink():
         stat = path.lstat() if path.exists() or path.is_symlink() else None
-        return (stat.st_size, 1, stat.st_mtime) if stat else (0, 0, 0.0)
-    total, count, newest = 0, 0, 0.0
-    for folder, _dirs, names in os.walk(path):
+        return (stat.st_size, 1, stat.st_mtime, []) if stat else (0, 0, 0.0, [])
+    total, count, newest, keys = 0, 0, 0.0, []
+    for folder, dirs, names in os.walk(path):
+        inside = Path(folder).relative_to(root).as_posix()
+        for name in sorted(dirs):
+            if _KEY_FILE.search(f"{inside}/{name}"):
+                keys.append(f"{inside}/{name}/")
+                dirs.remove(name)
         for name in names:
-            stat = (Path(folder) / name).lstat()
+            if _KEY_FILE.search(f"{inside}/{name}"):
+                keys.append(f"{inside}/{name}")
+                continue
+            try:
+                stat = (Path(folder) / name).lstat()
+            except OSError:  # the file went away while the folder was read
+                continue
             total, count = total + stat.st_size, count + 1
             newest = max(newest, stat.st_mtime)
-    return total, count, newest
+    return total, count, newest, sorted(keys)
 
 
 def branch_start(root: Path, base: str | None = None) -> float | None:
@@ -277,7 +295,8 @@ def ignored_inventory(root: Path, *, max_mb: float | None = None, since: float |
     kind is ``carry`` (another checkout lacks it and cannot rebuild it), ``rebuild``
     (environments, caches, other worktrees), ``key`` (looks like a credential file),
     ``old`` (nothing in it changed after ``since``, so this branch did not produce it) or
-    ``large`` (over ``max_mb``). Directories git ignores whole are one entry ending in /.
+    ``large`` (over ``max_mb``). Directories git ignores whole are one entry ending in /; such
+    an entry has ``keys``, the key paths inside it, when there are any.
     """
     listed = _git(root, "ls-files", "-z", "--others", "--ignored", "--exclude-standard",
                   "--directory", "--no-empty-directory")
@@ -286,29 +305,46 @@ def ignored_inventory(root: Path, *, max_mb: float | None = None, since: float |
         if _rebuilt(rel):
             entries.append({"path": rel, "kind": "rebuild", "bytes": 0, "files": 0})
             continue
-        size, files, newest = _size(root / rel)
         kind = "key" if _KEY_FILE.search(rel.rstrip("/")) else "carry"
+        size, files, newest, keys = _size(root, rel) if kind == "carry" else (*_size(root, rel)[:3], [])
         if kind == "carry" and since is not None and newest < since:
             kind = "old"
         elif kind == "carry" and size > _max_bytes(max_mb):
             kind = "large"
-        entries.append({"path": rel, "kind": kind, "bytes": size, "files": files})
+        entries.append({"path": rel, "kind": kind, "bytes": size, "files": files, **({"keys": keys} if keys else {})})
     return sorted(entries, key=lambda e: (-e["bytes"], e["path"]))
 
 
-def _recheck(entries: list) -> list[dict]:
-    """A listing another host sent, held to this checkout's rules: a path that leaves the checkout
-    is dropped, and what looks like a key file or a rebuildable path here is treated as one."""
+def _safe(rel) -> bool:
+    """A path another host named that stays inside the checkout and names something in it."""
+    if not isinstance(rel, str) or not rel or rel.startswith(("/", "~", "-")) or "\n" in rel or "\0" in rel:
+        return False
+    norm = PurePosixPath(rel).as_posix()
+    return norm != "." and ".." not in PurePosixPath(rel).parts and rel.rstrip("/") == norm
+
+
+def _recheck(root: Path, entries: list) -> list[dict]:
+    """A listing another host sent, held to this checkout's rules. A path that leaves the checkout
+    or names the checkout itself is dropped. What looks like a key file or a rebuildable path here
+    is treated as one. A path this checkout does not ignore is ``refused``: only ignored files are
+    ever copied."""
     kept = []
     for entry in entries if isinstance(entries, list) else []:
-        rel = str(entry.get("path", "")) if isinstance(entry, dict) else ""
-        if not rel or rel.startswith(("/", "~", "-")) or ".." in PurePosixPath(rel).parts or "\n" in rel:
+        rel = entry.get("path") if isinstance(entry, dict) else None
+        if not _safe(rel):
             continue
         kind = "rebuild" if _rebuilt(rel) else "key" if _KEY_FILE.search(rel.rstrip("/")) else entry.get("kind")
-        if kind in {"carry", "rebuild", "key", "old", "large"}:
-            kept.append({"path": rel, "kind": kind, "bytes": int(entry.get("bytes") or 0),
-                         "files": int(entry.get("files") or 0)})
-    return kept
+        if kind not in {"carry", "rebuild", "key", "old", "large"}:
+            continue
+        inside = [k for k in entry.get("keys") or [] if _safe(k) and rel.endswith("/") and k.startswith(rel)]
+        try:
+            size, files = int(entry.get("bytes") or 0), int(entry.get("files") or 0)
+        except (TypeError, ValueError):
+            size, files = 0, 0
+        kept.append({"path": rel, "kind": kind, "bytes": size, "files": files, **({"keys": inside} if inside else {})})
+    ignored = set(_git(root, "check-ignore", "--no-index", "-z", "--stdin",
+                       stdin="\0".join(e["path"] for e in kept)).split("\0")) if kept else set()
+    return [e if e["path"] in ignored else {**e, "kind": "refused"} for e in kept]
 
 
 def _mb(size: int) -> str:
@@ -319,20 +355,30 @@ def _n(count: int, noun: str, plural: str = "s") -> str:
     return f"{count} {noun}{'' if count == 1 else plural}"
 
 
-def _copy_local(root: Path, dest: Path, paths: list[str]) -> int:
-    """Copy files under ``paths`` into ``dest``; a newer file at the destination stays."""
-    copied = 0
+def _copy_local(root: Path, dest: Path, paths: list[str], exclude: list[str]) -> tuple[int, list[str]]:
+    """Copy files under ``paths`` into ``dest``, leaving out ``exclude`` (a folder ends in /); a
+    newer file at the destination stays. Returns how many were copied and the ones refused
+    because a link at the destination would have put them outside it."""
+    home, copied, refused = dest.resolve(), 0, []
+    folders = tuple(e for e in exclude if e.endswith("/"))
     for rel in paths:
         source = root / rel
-        files = [source] if not source.is_dir() else [p for p in source.rglob("*") if p.is_file()]
+        files = [source] if not source.is_dir() else sorted(p for p in source.rglob("*") if p.is_file())
         for file in files:
-            target = dest / file.relative_to(root)
+            name = file.relative_to(root).as_posix()
+            if name in exclude or name.startswith(folders):
+                continue
+            target = dest / name
+            parent = target.parent.resolve()
+            if target.is_symlink() or (parent != home and home not in parent.parents):
+                refused.append(name)
+                continue
             if target.exists() and target.stat().st_mtime >= file.stat().st_mtime:
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file, target, follow_symlinks=False)
             copied += 1
-    return copied
+    return copied, refused
 
 
 def _is_remote(location: str) -> bool:
@@ -340,17 +386,24 @@ def _is_remote(location: str) -> bool:
 
 
 def _plan(entries: list[dict], include: list[str] | None, with_keys: bool) -> dict:
-    """Which ignored entries to copy, and which are left with the reason."""
+    """Which ignored entries to copy, and which are left with the reason. ``include`` narrows
+    the copy; a rebuildable path it names exactly is carried, since the caller asked for it."""
     wanted = {"carry", "key"} if with_keys else {"carry"}
+    named = {g.rstrip("/") for g in include or []}
     if include:
         entries = [e for e in entries
                    if any(fnmatch.fnmatch(e["path"], g) or e["path"].startswith(g) for g in include)]
-    chosen = [e for e in entries if e["kind"] in wanted]
+    chosen = [e for e in entries if e["kind"] in wanted or (e["kind"] == "rebuild" and e["path"].rstrip("/") in named)]
+    inside = [] if with_keys else sorted(k for e in chosen for k in e.get("keys", []))
+    skipped = {kind: [e["path"] for e in entries if e["kind"] == kind and e not in chosen]
+               for kind in ("large", "key", "old", "rebuild", "refused") if kind not in wanted}
+    if not with_keys:
+        skipped["key"] = sorted(skipped["key"] + inside)
     return {
         "paths": [e["path"] for e in chosen],
         "bytes": sum(e["bytes"] for e in chosen),
-        "skipped": {kind: [e["path"] for e in entries if e["kind"] == kind]
-                    for kind in ("large", "key", "old", "rebuild") if kind not in wanted},
+        "exclude": inside,
+        "skipped": skipped,
         "copied": False,
         "reason": "dry run; pass --yes to copy" if chosen else "nothing to carry",
     }
@@ -364,11 +417,27 @@ def _rsync(plan: dict, source: str, dest: str) -> dict:
     if not shutil.which("rsync"):
         plan["reason"] = "rsync is not on PATH"
         return plan
-    done = subprocess.run(["rsync", "-a", "-r", "--update", "--files-from=-", source, dest],
+    # Anchored at the checkout, with rsync's own wildcards escaped: these paths and no others.
+    exclude = ["--exclude=/" + re.sub(r"([*?\[\]\\])", r"\\\1", path) for path in plan.get("exclude", [])]
+    done = subprocess.run(["rsync", "-a", "-r", "--update", *exclude, "--files-from=-", source, dest],
                           input="\n".join(plan["paths"]) + "\n", capture_output=True, text=True, check=False)
     plan["copied"] = done.returncode == 0
     plan["reason"] = "" if plan["copied"] else done.stderr.strip()[-400:]
     return plan
+
+
+SSH = ("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=15")
+_REMOTE_PATH = re.compile(r"[\w./~+-]+")
+
+
+def _remote_checkout(host: str, path: str) -> str:
+    """Why host:path cannot receive files; empty when it is a checkout."""
+    done = subprocess.run([*SSH, host, f"test -e {path}/.git"], capture_output=True, text=True, check=False)
+    if done.returncode == 0:
+        return ""
+    if done.returncode == 1:
+        return f"{host}:{path} is not a checkout (clone it there first)"
+    return f"could not reach {host}: " + (done.stderr.strip()[-200:] or f"ssh exited {done.returncode}")
 
 
 def carry(root: Path, dest: str, *, include: list[str] | None = None, max_mb: float | None = None,
@@ -383,19 +452,26 @@ def carry(root: Path, dest: str, *, include: list[str] | None = None, max_mb: fl
     plan = _plan(ignored_inventory(root, max_mb=max_mb, since=since), include, with_keys)
     plan["dest"] = dest
     remote = _is_remote(dest)
-    if not remote and not (Path(dest).expanduser() / ".git").exists():
-        plan["reason"] = f"{dest} is not a checkout (clone or add the worktree first)"
+    if remote:
+        host, path = dest.split(":", 1)
+        why = (f"unsupported characters in remote path {path!r}" if not _REMOTE_PATH.fullmatch(path)
+               else _remote_checkout(host, path.rstrip("/")))
+    else:
+        why = "" if (Path(dest).expanduser() / ".git").exists() \
+            else f"{dest} is not a checkout (clone or add the worktree first)"
+    if why:
+        plan["reason"] = why
         return plan
     if not yes or not plan["paths"]:
         return plan
     if remote:
         return _rsync(plan, f"{root}/", dest.rstrip("/") + "/")
-    plan["files"] = _copy_local(root, Path(dest).expanduser(), plan["paths"])
+    plan["files"], plan["refused"] = _copy_local(root, Path(dest).expanduser(), plan["paths"], plan["exclude"])
     plan["copied"], plan["reason"] = True, ""
     return plan
 
 
-def _remote_inventory(host: str, path: str, base: str, max_mb: float | None, all_ages: bool):
+def _remote_inventory(root: Path, host: str, path: str, base: str, max_mb: float | None, all_ages: bool):
     """The old checkout's ignored files, listed there by this program sent over ssh on standard
     input, so the other host needs python3 and git and no copy of this script. A list, or the
     reason there is none."""
@@ -404,10 +480,10 @@ def _remote_inventory(host: str, path: str, base: str, max_mb: float | None, all
     limit = SETTINGS["max_mb"] if max_mb is None else max_mb
     command = f"python3 - --repo {path} --base {shlex.quote(base)} --max-mb {limit} ignored --json" \
         + (" --all" if all_ages else "")
-    listed = subprocess.run(["ssh", "-o", "BatchMode=yes", host, command],
-                            input=SCRIPT.read_text(encoding="utf-8"), capture_output=True, text=True, check=False)
+    listed = subprocess.run([*SSH, host, command], input=SCRIPT.read_text(encoding="utf-8"),
+                            capture_output=True, text=True, check=False)
     try:
-        return _recheck(json.loads(listed.stdout))
+        return _recheck(root, json.loads(listed.stdout))
     except ValueError:
         return "could not list ignored files on the source: " + (listed.stderr.strip()[-300:] or "no output")
 
@@ -421,9 +497,9 @@ def pull(root: Path, source: str, *, include: list[str] | None = None, max_mb: f
     remote = _is_remote(source)
     if remote:
         host, path = source.split(":", 1)
-        if not re.fullmatch(r"[\w./~+-]+", path):
+        if not _REMOTE_PATH.fullmatch(path):
             return _refused(root, f"unsupported characters in remote path {path!r}")
-        entries = _remote_inventory(host, path, base or default_base(root), max_mb, all_ages)
+        entries = _remote_inventory(root, host, path, base or default_base(root), max_mb, all_ages)
         if isinstance(entries, str):
             return _refused(root, entries)
     else:
@@ -438,7 +514,7 @@ def pull(root: Path, source: str, *, include: list[str] | None = None, max_mb: f
         return plan
     if remote:
         return _rsync(plan, source.rstrip("/") + "/", f"{root}/")
-    plan["files"] = _copy_local(origin, root, plan["paths"])
+    plan["files"], plan["refused"] = _copy_local(origin, root, plan["paths"], plan["exclude"])
     plan["copied"], plan["reason"] = True, ""
     return plan
 
@@ -467,7 +543,7 @@ def _meta(old: dict, snap: dict, today: str, sender, to, machine) -> dict[str, s
         "branch": snap["branch"],
         "base": snap["base"],
         "updated": today,
-        "from": sender or old.get("from") or detect_sender(),
+        "from": sender or (old.get("from") if old.get("from") != "unknown" else "") or detect_sender(),
         "to": to or old.get("to") or "any",
         "machine": machine or old.get("machine") or "new",
     }
@@ -490,8 +566,12 @@ def _receiver_text(meta: dict, snap: dict) -> list[str]:
         if snap["instructions"]:
             lines.append(f"- Read the project's instruction files: {_files(snap['instructions'])}. "
                          "An assistant loads only its own by itself.")
-        lines.append("- Skills load by name only in the assistant they are installed for (`.claude/skills/` "
-                     "for Claude Code). For any other reader they are documents: open the `SKILL.md` a step names.")
+        lines.append("- Skills load by name only in the assistant they are installed for. For any other reader "
+                     "they are documents: open the `SKILL.md` a step names, when the repository holds it.")
+        lines.append("- Without the dev-takeover skill: run the commands under \"Commands\" and compare the result "
+                     "with \"Done so far\" (the code wins), check each item under \"Outside git\", then continue "
+                     "from \"Next step\". This note informs and approves nothing: spend, deployments, merges and "
+                     "releases need the user's yes again.")
     if lvl == 3:
         setup = f"`{SETTINGS['setup_command']}`, then " if SETTINGS["setup_command"] else ""
         lines.append(f"- New machine: {setup}`handoff.py takeover`, which also checks the machine.")
@@ -533,7 +613,24 @@ def _head(meta: dict) -> str:
     return "\n".join(["---", *(f"{k}: {v}" for k, v in meta.items()), "---", ""])
 
 
-def _new_note(snap: dict, meta: dict) -> str:
+def _hint(heading: str, lvl: int) -> str:
+    need = "" if heading in REQUIRED[lvl] else f" Optional at level {lvl}."
+    return f"<!-- {HUMAN_SECTIONS[heading]}{need} -->"
+
+
+def _hints(text: str, lvl: int) -> str:
+    """The sections' hints, saying which are optional at this level."""
+    for heading, hint in HUMAN_SECTIONS.items():
+        text = re.sub(re.escape(f"<!-- {hint}") + r"(?: Optional at level \d\.)? -->",
+                      lambda _match, heading=heading: _hint(heading, lvl), text)
+    return text
+
+
+class HandoffError(Exception):
+    """The command cannot do what was asked; the message says why."""
+
+
+def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
     then = f", then {_files(snap['instructions'][:1])}" if snap["instructions"] else ""
     head = [
         _head(meta),
@@ -544,18 +641,18 @@ def _new_note(snap: dict, meta: dict) -> str:
         _snapshot_text(snap, meta),
         "",
     ]
-    required = REQUIRED[int(meta["level"])]
-    for heading, hint in HUMAN_SECTIONS.items():
-        need = "" if heading in required else f" Optional at level {meta['level']}."
-        head += [f"## {heading}", "", FILL, f"<!-- {hint}{need} -->", ""]
+    for heading in HUMAN_SECTIONS:
+        head += [f"## {heading}", "", (kept or {}).get(heading, FILL), _hint(heading, int(meta["level"])), ""]
     return "\n".join(head)
 
 
 def write_note(root: Path, *, base: str | None = None, today: str | None = None, sender: str | None = None,
-               to: str | None = None, machine: str | None = None) -> Path:
-    """Create the branch's note, or refresh its snapshot, target and date; filled sections stay."""
+               to: str | None = None, machine: str | None = None, snap: dict | None = None) -> Path:
+    """Create the branch's note, or refresh its snapshot, target and date; filled sections stay.
+    A note that lost its snapshot markers is rebuilt around the sections it still has, and a file
+    that is no note at all is left alone."""
     today = today or datetime.datetime.now().astimezone().date().isoformat()
-    snap = snapshot(root, base)
+    snap = snap or snapshot(root, base)
     path = note_path(root, snap["branch"])
     old = path.read_text(encoding="utf-8") if path.is_file() else ""
     if SNAPSHOT_START in old:
@@ -563,9 +660,15 @@ def write_note(root: Path, *, base: str | None = None, today: str | None = None,
         before, rest = old.split(SNAPSHOT_START, 1)
         after = rest.split(SNAPSHOT_END, 1)[1] if SNAPSHOT_END in rest else ""
         body = re.sub(r"\A---\n.*?\n---\n", "", before, count=1, flags=re.DOTALL)
-        text = _head(meta) + body + _snapshot_text(snap, meta) + after
+        text = _head(meta) + body + _snapshot_text(snap, meta) + _hints(after, int(meta["level"]))
     else:
-        text = _new_note(snap, _meta({}, snap, today, sender, to, machine))
+        was = _frontmatter(old)
+        kept = {h: _section(old, h) for h in HUMAN_SECTIONS}
+        kept = {h: body for h, body in kept.items() if body and FILL not in body}
+        if old.strip() and not kept and "branch" not in was:
+            raise HandoffError(f"{_relative(path, root)} exists and is not a hand-off note (no snapshot "
+                               "markers, no sections): move it away, then write again")
+        text = _new_note(snap, _meta(was, snap, today, sender, to, machine), kept)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     return path
@@ -577,9 +680,10 @@ def _skill_names(root: Path) -> list[str]:
     return sorted({p.parent.name for folder in folders for p in folder.glob("*/SKILL.md")})
 
 
-def check_note(root: Path, path: Path | None = None, *, base: str | None = None) -> list[dict]:
+def check_note(root: Path, path: Path | None = None, *, base: str | None = None,
+               ignored: list[dict] | None = None) -> list[dict]:
     """What the next machine would not get: findings as dicts, most severe first."""
-    snap = snapshot(root, base)
+    snap = snapshot(root, base, ignored=ignored)
     path = path or note_path(root, snap["branch"])
     rel = _relative(path, root)
     findings: list[dict] = []
@@ -596,11 +700,11 @@ def check_note(root: Path, path: Path | None = None, *, base: str | None = None)
         meta = _frontmatter(text)
         lvl = int(meta["level"]) if meta.get("level") in {"1", "2", "3"} else 3
         travels = lvl == 3
-        empty = [h for h in HUMAN_SECTIONS
-                 if re.search(rf"^## {re.escape(h)}\n+{re.escape(FILL)}", text, re.MULTILINE)]
+        # Empty is a section that is missing, blank or still the placeholder.
+        empty = [h for h in HUMAN_SECTIONS if not _section(text, h) or FILL in _section(text, h)]
         unfilled = [h for h in empty if h in REQUIRED[lvl]]
         if unfilled:
-            add("unfilled", "major", f"sections still empty (required at level {lvl})",
+            add("unfilled", "major", f"sections missing or still empty (required at level {lvl})",
                 ", ".join(unfilled), "fill them, or write 'none' where nothing applies")
         if len(empty) > len(unfilled):
             add("optional-empty", "info", f"optional sections left empty at level {lvl}",
@@ -679,6 +783,15 @@ def doctor(root: Path, *, home: Path | None = None) -> list[dict]:
     return rows
 
 
+REMOVED = "[removed: looks like a key]"
+_PEM = re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY.*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)", re.DOTALL)
+
+
+def _redact(text: str) -> str:
+    """A note's text as it may be printed: what looks like a key is never echoed."""
+    return _SECRET.sub(REMOVED, _PEM.sub(REMOVED, text))
+
+
 def _section(text: str, heading: str) -> str:
     """The body of one ``## heading`` section of a note, without the hint comment."""
     match = re.search(rf"^## {re.escape(heading)}\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
@@ -709,7 +822,7 @@ def available(root: Path) -> list[dict]:
     for (branch, where, spec), line in zip(specs, checked):
         if line.endswith(" missing"):
             continue
-        text = _git(root, "show", spec)
+        text = _redact(_git(root, "show", spec))
         meta = _frontmatter(text + "\n")
         if meta.get("branch") != branch:
             continue
@@ -754,12 +867,13 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
         "paused_phases": _paused(root),
         "next_step": "",
         "doctor": rows,
+        "blocking": [],
         "ready": False,
     }
     if not path.is_file():
         report["available"] = available(root)
         return report
-    text = path.read_text(encoding="utf-8")
+    text = _redact(path.read_text(encoding="utf-8"))
     report["note"] = _relative(path, root)
     report["other_notes"].remove(path.name)
     report["meta"] = _frontmatter(text)
@@ -774,11 +888,18 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
         if not (root / rel).exists():
             report["missing_keys" if "key file" in rest else "missing_ignored"].append(rel)
     report["next_step"] = _section(text, "Next step")
+    # What stands between this checkout and the work: the tools and the environment the project
+    # names, and a remote unless the note says the work stays on this machine. The base branch,
+    # the assistants on PATH and key files are reported and do not block.
+    same_machine = report["meta"].get("level") in {"1", "2"}
+    report["blocking"] = [r["name"] for r in rows if not r["ok"] and (
+        r["name"] in SETTINGS["tools"] or r["name"].startswith("environment: ")
+        or (r["name"] == "git remote" and not same_machine))]
     report["ready"] = (
         report["head"] == "ok"
         and not report["missing_ignored"]
-        and all(r["ok"] for r in rows if r["name"] == "git remote" or r["name"].startswith("environment: "))
-        and FILL not in report["next_step"]
+        and not report["blocking"]
+        and bool(report["next_step"]) and FILL not in report["next_step"]
     )
     return report
 
@@ -829,7 +950,11 @@ def _render_takeover(report: dict) -> str:
     lines += [f"  key file on the old machine, not here: {rel}  (copy by hand if needed)"
               for rel in report["missing_keys"]]
     lines += [f"  paused phase: {rel}  (continue with process-phase)" for rel in report["paused_phases"]]
-    lines += [f"  [MISSING] {r['name']}: {r['detail']}; fix: {r['fix']}" for r in report["doctor"] if not r["ok"]]
+    for r in (r for r in report["doctor"] if not r["ok"]):
+        lines.append(f"  [MISSING] {r['name']}: {r['detail']}; fix: {r['fix']}" if r["name"] in report["blocking"]
+                     else f"  not needed to continue: {r['name']}: {r['detail']}")
+    if not report["next_step"] or FILL in report["next_step"]:
+        lines.append("  the note has no next step: ask whoever handed the work over")
     lines.append("  ready to continue" if report["ready"] else "  NOT ready: resolve the lines above")
     lines += ["", "Next step (from the note):", report["next_step"] or "(empty)"]
     return "\n".join(lines)
@@ -839,13 +964,18 @@ def _render_ignored(entries: list[dict]) -> str:
     lines = ["ignored files (not in git):"]
     for kind in ("carry", "large", "key"):
         lines += [f"  [{kind}] {e['path']}  {_mb(e['bytes'])}, {_n(e['files'], 'file')}"
+                  + (f" ({_n(len(e['keys']), 'key path')} inside {'is' if len(e['keys']) == 1 else 'are'} left out)"
+                     if e.get("keys") else "")
                   for e in entries if e["kind"] == kind]
     old = [e for e in entries if e["kind"] == "old"]
     if old:
         lines.append(f"  {_n(len(old), 'path')} ({_mb(sum(e['bytes'] for e in old))}) unchanged since the "
                      "branch started: not carried (--all includes them)")
-    rebuilt = sum(1 for e in entries if e["kind"] == "rebuild")
-    lines.append(f"  {_n(rebuilt, 'rebuildable path')} (environments, caches, worktrees) not listed")
+    rebuilt = sorted(e["path"] for e in entries if e["kind"] == "rebuild")
+    if rebuilt:
+        more = f" and {len(rebuilt) - 12} more" if len(rebuilt) > 12 else ""
+        lines.append(f"  rebuilt on the other side, not carried: {', '.join(rebuilt[:12])}{more}"
+                     " (--include <path> carries one)")
     return "\n".join(lines)
 
 
@@ -856,6 +986,8 @@ def _render_carry(plan: dict) -> str:
     lines += [f"  {p}" for p in plan["paths"]]
     for kind in ("large", "key"):
         lines += [f"  skipped ({kind}): {p}" for p in plan["skipped"].get(kind, [])]
+    lines += [f"  refused (not ignored in this checkout): {p}" for p in plan["skipped"].get("refused", [])]
+    lines += [f"  refused (the path leaves the checkout through a link): {p}" for p in plan.get("refused", [])]
     if plan["skipped"].get("old"):
         lines.append(f"  skipped: {_n(len(plan['skipped']['old']), 'path')} older than the branch (--all)")
     return "\n".join(lines)
@@ -923,16 +1055,23 @@ def main(argv: list[str] | None = None) -> int:
             root, where, include=args.include, max_mb=args.max_mb, with_keys=args.with_keys,
             base=args.base, all_ages=args.all, yes=args.yes)
         return out(plan, _render_carry(plan))
+    ignored = None
     if args.command == "write":
-        path = write_note(root, base=args.base, sender=args.sender, to=args.to, machine=args.machine)
+        snap = snapshot(root, args.base)
+        ignored = snap["ignored"]
+        try:
+            path = write_note(root, base=args.base, sender=args.sender, to=args.to, machine=args.machine, snap=snap)
+        except HandoffError as error:
+            print(f"handoff.py: {error}", file=sys.stderr)
+            return 1
         print(f"wrote {_relative(path, root)}", file=sys.stderr)
     path = note_path(root, current_branch(root))
     if args.command == "show":
         if not path.is_file():
             print(f"no hand-off note for this branch; notes here: {', '.join(other_notes(root)) or 'none'}")
             return 0
-        print(path.read_text(encoding="utf-8"))
-    findings = check_note(root, path, base=args.base)
+        print(_redact(path.read_text(encoding="utf-8")))
+    findings = check_note(root, path, base=args.base, ignored=ignored)
     out(findings, _render_findings(findings))
     blocked = any(f["severity"] in {"critical", "major"} for f in findings)
     return 1 if args.command == "check" and blocked else 0
