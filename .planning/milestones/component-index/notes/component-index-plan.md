@@ -18,8 +18,8 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   - *Result:* `VERDICT: CHANGES_REQUESTED`, with 8 findings: 3 blocking, 2 hardening and
     3 completeness. All 8 were reproduced and repaired in the working tree, marked
     `(r1 Fn)` at each site.
-  - **The repaired bytes carry no review opinion.** The ledger rows stay `open` until the
-    repairs are committed.
+  - **The repaired bytes carry no review opinion.** The repairs were committed at
+    `ada0d1a`, and the ledger rows are `fixed` at that commit.
 - **Review budget, declared before round 2.** At most two more rounds over these
   artifacts (r2, r3). The stop rule of `review-convergence.md` ends the loop earlier, and
   a round whose findings are mostly completeness ends it too.
@@ -27,6 +27,16 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   | Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
   |---|---|---|---|---|---|---|
   | r1 | 1 (Codex) | 8 | 0 / 8 (first round) | 3 / 8 | blocking | CHANGES_REQUESTED |
+  | r2 | 1 (Codex) | 3 | 1 / 3 (F3 attacks a2) | 1 / 3 | blocking | CHANGES_REQUESTED |
+
+  After r2 the stop rule does not fire: 1/3 is not above one half, and the count fell
+  from 8 to 3. Round 3 is the last the budget allows.
+- **Plan review, round 2 (r2).** `notes/reviews/plan-r2`, run 2026-11-21 over the r1
+  repairs and a2 (brief SHA-256
+  `fc912dc8da465b01c6895b59f577fb595ea2ed7bfddb892062761b5f89078b1e`). `VERDICT:
+  CHANGES_REQUESTED`, with 3 findings: 1 blocking (a phase 2 test that cannot give its
+  exits), 1 hardening (a path holding a backtick is never checked) and 1 completeness
+  (section 8 said `auto=false`). All 3 were reproduced and repaired, marked `(r2 Fn)`.
 - **Amendment a2, 2026-11-21, before round 2.** The owner invoked
   `process-milestone component-index auto`, which delegates the plan, spec and close
   rulings of this milestone (`auto=true`). Before round 2, `git check-ignore` showed the
@@ -53,7 +63,7 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   documentation that describes dev-tools' own use names the index.
 - C5. `handoff.takeover` returns `ready: false` when any ignored path the note was written
   with, other than a key file, is absent, including one after the 25th. A missing key file
-  is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T7 of
+  is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T9 of
   `notes/phase-1-spec.md` exit as that spec lists, and the pull request says
   `Fixes #28`.
 - C6. A close record, after the close review.
@@ -377,7 +387,10 @@ repairs, and the close record (C6).
 ## 8. Execution, approval and review protocol
 
 - **Workflow.** `process-milestone component-index`, phase by phase with `process-phase`.
-  `auto=false`, so each spec stops at its owner gate.
+  The owner invoked it with `auto` on 2026-11-21 (a2), so the plan, spec and close rulings
+  are delegated approvals (auto=true), recorded as such, and the walk does not stop at
+  them. The owner actions below are not delegated (r2 F3: the earlier wording said
+  `auto=false`, and that each spec stops at its owner gate).
 - **Branches.** One topic branch and one pull request per phase,
   `claude/component-index-phase-N`, cut from main after the previous phase merges. The
   plan and the milestone's planning files go in with phase 1's pull request, unless the

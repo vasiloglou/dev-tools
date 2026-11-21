@@ -18,7 +18,9 @@ phase 1 is merged, and this spec's owner gate rules D1 to D3.** No code has been
   through `process-phase` and has no owner gate yet.
 - **Review rounds.** `reviews/plan-r1` (Codex, 2026-11-21) read the bytes with the
   SHA-256 listed in its `BRIEF.md`. Its F3, F4 and F5 were repaired here, marked
-  `(r1 F3)` to `(r1 F5)`. **The repaired bytes carry no review opinion.**
+  `(r1 F3)` to `(r1 F5)`. `reviews/plan-r2` (Codex, 2026-11-21) read the repaired bytes;
+  its F1 was repaired here, marked `(r2 F1)`. **The bytes repaired after round 2 carry no
+  review opinion.**
 
 ## 3. Obligations (step 0 harvest)
 
@@ -151,7 +153,7 @@ settings are at `scripts/components_index.settings.json`). The shared setup adds
 | T2 | Setting true: `--check --strict` | exits 1; prints `no component: tools/report.py` |
 | T2b | Setting true, with an entry whose `modules:` is `tools/report.py`: `write`, then `--check --strict` | both exit 0 |
 | T3 | Setting true: `draft` | exits 0; prints a stub with id `tools.report` and the module's docstring summary. On main the stub is not printed |
-| T4 | Setting true, with `tools/new.py` untracked: `changed --base main` | exits 1; prints `fail: no component: tools/new.py (new file; …)`. With the setting false it exits 0 and prints no such line |
+| T4 | Run once with the setting true and once with it false. Each run: `write`, then commit everything on `main` (the fixture makes no commit). Then add `tools/new.py`, untracked, and run `write` again so that no generated page is stale. Then `changed --base main` | true: exits 1; prints `fail: no component: tools/new.py (new file; …)`. false: exits 0 and prints no such line (r2 F1: the earlier wording ran `changed` with no commit, which exits 1 on `no branch or commit named main`, and without the second `write`, which exits 1 on `stale or missing: docs/components/modules/tools.md` whatever the setting) |
 | T5 | Setting true: `review` | exits 0; "Modules with no component (1)" lists `tools/report.py` |
 | T6 | Setting true: `stats` | prints `coverage: 1/2 src/widget, tools modules …` and lists `tools/report.py` |
 | T7 | Setting `"yes"`: `stats` | exits non-zero; prints `count_extra_dirs must be true or false` |

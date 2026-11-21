@@ -22,7 +22,9 @@ gate rules D1 and D2.** No code has been written, and no review has run over the
 - **Written with.** `start-milestone` and `handle-issue`, from dvt-milestone 0.1.3.
 - **Review rounds.** `reviews/plan-r1` (Codex, 2026-11-21) read the bytes with SHA-256
   as listed in its `BRIEF.md`. Its F1 and F2 were repaired here, marked `(r1 F1)` and
-  `(r1 F2)`. **The repaired bytes carry no review opinion.**
+  `(r1 F2)`. `reviews/plan-r2` (Codex, 2026-11-21) read the repaired bytes; its F2 was
+  repaired here, marked `(r2 F2)`. **The bytes repaired after round 2 carry no review
+  opinion.**
 
 **Reproduced on main `c9648dd`.** The reproduction ran in a scratch folder, through the
 module's own `write_note` and `takeover`:
@@ -58,7 +60,7 @@ lines of the snapshot only (`re.findall(r"^- \`([^\`]+)\` \(([^)]*)\)", listed, 
 
 | Rule | Bound here to |
 |---|---|
-| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T6 are in `tests/test_handoff.py`; T1, T3 and T6 fail on main |
+| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T9 are in `tests/test_handoff.py`; T1, T3, T6, T7, T8 and T9 fail on main (r2: the earlier wording counted T1 to T6) |
 | The plugins are rebuilt, and released under a new version | `release_plugins.py bump` to 0.1.4, then G3. The owner tags after the merge |
 | A wording change says what prompted it | Issue 28 prompts the sentence in `references/handoff.md` and in `docs/handoff.html` |
 | Shared skills stay general | Any project's note can list more than 25 ignored paths. Nothing in the fix names dev-tools |
@@ -106,7 +108,11 @@ source lines.
   spelled as `snap["ignored"]` spells `kind`. These are the three kinds the snapshot
   already prints (its `tail` map in `_snapshot_text`). Nothing changes with 25 paths or fewer (O4).
 - **`takeover`.** Build the list to check from:
-  - the bullet lines, as today;
+  - the bullet lines. Today's pattern, ``^- `([^`]+)` \(([^)]*)\)``, skips a bullet
+    whose path holds a backtick, and the writer does not escape one, so such a path is
+    never checked even in a note of 25 paths or fewer. The pattern becomes
+    ``^- `(.+)` \(([^)]*)\)$``, one bullet per line: the path runs to the last
+    `` ` ( `` of the line, since the text in parentheses after it never holds `)` (r2 F2);
   - plus the items of an `ignored-rest` line, when there is one.
   A missing item whose `kind` is `"key"` goes to `missing_keys`, and any other to
   `missing_ignored`. This matches the bullet rule, under which a bullet whose text
@@ -158,12 +164,14 @@ new helper makes `n` ignored folders of falling size, as the reproduction does.
 | T6 | As T3, through the command line: `handoff.py takeover` | the text output holds `ignored paths the note did not list: 1`, and the exit is as for any other not-ready report |
 | T7 | An `ignored-rest` line holding `not json` | treated as absent: `unlisted_ignored == 1` and `ready is False` |
 | T8 | The note says `- and 1 smaller path`, its `ignored-rest` line is `[]`, and the path is absent (r1 F2) | treated as absent: `unlisted_ignored == 1` and `ready is False` |
+| T9 | 2 ignored folders, one named ``out`1/`` (a backtick in the name); the note is written; the project is cloned with only the other folder copied (r2 F2) | `missing_ignored` holds ``out`1/`` and `ready is False`. On main: `[]` and `True` |
 
 Branch walk:
 
 - `_snapshot_text`: cut (T1) and not cut (T5).
 - `takeover`'s list: bullets only (T2 and T5), bullets plus the rest (T1), an unreadable
   rest (T7), and a readable rest of the wrong length (T8).
+- The bullet pattern: a plain path (T1, T2) and a path holding a backtick (T9).
 - A missing item's kind: key (T4) and other (T1).
 - Older notes: cut with no rest line (T3, T6), and not cut (T2).
 
