@@ -1,0 +1,10 @@
+{
+  "package_dir": "devtools",
+  "import_prefix": "devtools",
+  "extra_source_dirs": [
+    "skills"
+  ],
+  "count_extra_dirs": true,
+  "docs_dir": ".devtools/components",
+  "script_path": "plugins/dvt-milestone/skills/components/scripts/components_index.py"
+}
