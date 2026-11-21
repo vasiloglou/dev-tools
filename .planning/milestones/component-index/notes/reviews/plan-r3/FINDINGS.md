@@ -15,4 +15,4 @@ If the review returned no findings, replace the table with the line: No findings
 
 | Id | Finding | Reproduced | Class | Disposition | Repaired at | Notes |
 |---|---|---|---|---|---|---|
-| F1 | The r2 bullet pattern skips a path holding a newline, which `ls-files -z` allows, so an uncut note still reads as ready | yes | hardening | fixed | REPAIRED_AT | Reproduced: on a snapshot holding the bullet for `out\n1/`, the pattern finds only the other path; the unread line starts with the bullet's opening. Self-inflicted: it attacks the r2 F2 repair. Repaired as a test row, since the stop rule fired: an unreadable bullet line adds 1 to `unlisted_ignored`; new test T10, phase 1 |
+| F1 | The r2 bullet pattern skips a path holding a newline, which `ls-files -z` allows, so an uncut note still reads as ready | yes | hardening | fixed | b57d122 | Reproduced: on a snapshot holding the bullet for `out\n1/`, the pattern finds only the other path; the unread line starts with the bullet's opening. Self-inflicted: it attacks the r2 F2 repair. Repaired as a test row, since the stop rule fired: an unreadable bullet line adds 1 to `unlisted_ignored`; new test T10, phase 1 |
