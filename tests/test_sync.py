@@ -589,3 +589,32 @@ def test_both_examples_deliver_handle_issue_and_it_passes_the_skill_check(tmp_pa
     phase_tool = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(phase_tool)
     assert phase_tool.check_skill(project, skill) == []
+
+
+@pytest.mark.parametrize("example", ["phase-project.devtools.toml", "milestone-project.devtools.toml"])
+def test_both_examples_deliver_the_handoff_skills_with_the_script_they_share(tmp_path, example):
+    # dev-handoff and dev-takeover work in either workflow. dev-takeover runs dev-handoff's script
+    # and cites its reference, so the example delivers both into one folder; both meet the phase
+    # tool's skill rules, and the settings the example writes are ones the script knows.
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples" / example).read_text())
+    assert run("apply", "--project", project) == 0
+    skills = project / ".claude/skills"
+    spec = importlib.util.spec_from_file_location("phase_tool", sync.SOURCE_ROOT / "skills/phase/process-phase/scripts/phase_tool.py")
+    phase_tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(phase_tool)
+    for name in ("dev-handoff", "dev-takeover"):
+        assert phase_tool.check_skill(project, skills / name) == []
+        text = (skills / name / "SKILL.md").read_text()
+        assert ".claude/skills/dev-handoff/scripts/handoff.py" in text
+    cited = set(re.findall(r"\.\./dev-handoff/[\w./-]+[\w]", (skills / "dev-takeover/SKILL.md").read_text()))
+    assert cited == {"../dev-handoff/references/handoff.md"}
+    assert (skills / "dev-takeover" / "../dev-handoff/references/handoff.md").is_file()
+    script = skills / "dev-handoff/scripts/handoff.py"
+    assert json.loads(script.with_suffix(".settings.json").read_text())["planning_dir"] == ".planning"
+    import subprocess
+    import sys
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+    done = subprocess.run([sys.executable, str(script), "doctor"], cwd=project, capture_output=True, text=True)
+    assert done.returncode == 0 and "handoff doctor:" in done.stdout, done.stderr

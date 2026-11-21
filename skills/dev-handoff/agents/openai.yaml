@@ -1,0 +1,4 @@
+interface:
+  display_name: "Dev Handoff"
+  short_description: "Hand a branch to another assistant, account or machine"
+  default_prompt: "Use $dev-handoff to hand this branch over."
