@@ -1,0 +1,539 @@
+diff --git a/devtools/PLUGIN_VERSION b/devtools/PLUGIN_VERSION
+index 845639e..9faa1b7 100644
+--- a/devtools/PLUGIN_VERSION
++++ b/devtools/PLUGIN_VERSION
+@@ -1 +1 @@
+-0.1.4
++0.1.5
+diff --git a/docs/adopt.html b/docs/adopt.html
+index 9e32ca6..d898fcb 100644
+--- a/docs/adopt.html
++++ b/docs/adopt.html
+@@ -267,7 +267,7 @@ replace  .claude/skills/process-phase/references/verify.md: 5 line(s) only the p
+      46: ## Shelf rules
+      48: - Time `shelf scan` on the 10,000-file fixture before approving.
+      49: - A changed column order needs a line in `CHANGELOG.md`.</pre></div>
+-      <p class="caption">One value could not be read from the project, and nothing runs until it is decided. Then the list: most rows are cut here. In <code>verify.md</code>, two lines are older wording; the heading and the two rules under it exist nowhere else.</p>
++      <p class="caption">One value could not be read from the project, and nothing runs until it is decided. Then the list: most rows are cut here. In <code>verify.md</code>, two lines are older wording; the heading and the two rules under it exist nowhere else. Captured on 5 November 2026, with the scripts of that day. From plugin 0.1.5 the survey also writes <code>count_extra_dirs = "TODO"</code> (default false), so the <code>grep</code> prints a second line and the first <code>compare</code> names both settings.</p>
+     </div>
+   </div>
+ 
+diff --git a/examples/phase-project.devtools.toml b/examples/phase-project.devtools.toml
+index 7c26e31..fb3d235 100644
+--- a/examples/phase-project.devtools.toml
++++ b/examples/phase-project.devtools.toml
+@@ -86,6 +86,7 @@ dest = "scripts/components_index.py"
+ package_dir = "src/myapp"
+ import_prefix = "myapp"
+ extra_source_dirs = []
++# count_extra_dirs = true   # count the extra folders' modules too (plugin 0.1.5 or newer)
+ docs_dir = "docs/components"
+ script_path = "scripts/components_index.py"
+ # verb_list = "shared"   # for a large catalog: list only the verbs two or more entries use
+diff --git a/plugins/dvt-milestone/.claude-plugin/plugin.json b/plugins/dvt-milestone/.claude-plugin/plugin.json
+index dfb4f46..35b6aa4 100644
+--- a/plugins/dvt-milestone/.claude-plugin/plugin.json
++++ b/plugins/dvt-milestone/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-milestone",
+-  "version": "0.1.4",
++  "version": "0.1.5",
+   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-milestone/skills/components/SKILL.md b/plugins/dvt-milestone/skills/components/SKILL.md
+index 8db0da0..689ebfe 100644
+--- a/plugins/dvt-milestone/skills/components/SKILL.md
++++ b/plugins/dvt-milestone/skills/components/SKILL.md
+@@ -22,7 +22,10 @@ does; this skill is how you use and maintain it. The entry format is defined in
+ 
+ Paths below assume the default settings (`docs_dir` = `docs/components`, script at
+ `scripts/`). A project changes them in `.devtools/components_index.settings.json` in the project
+-(`package_dir`, `import_prefix`, `extra_source_dirs`, `docs_dir`, `script_path`, `verb_list`).
++(`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `docs_dir`,
++`script_path`, `verb_list`). `count_extra_dirs` (true or false, default false; from plugin
++0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a project
++whose code sits in more than one folder.
+ 
+ | File | What it is | Edit? |
+ |---|---|---|
+diff --git a/plugins/dvt-milestone/skills/components/references/build.md b/plugins/dvt-milestone/skills/components/references/build.md
+index 2b309a8..d9c6ea1 100644
+--- a/plugins/dvt-milestone/skills/components/references/build.md
++++ b/plugins/dvt-milestone/skills/components/references/build.md
+@@ -13,6 +13,9 @@ them is separate work.
+ 1. Check the settings in `.devtools/components_index.settings.json` in the project:
+    `package_dir` is the folder that holds the package (for example `src/<package>`), and
+    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
++   When those folders hold code that should have components too, set `count_extra_dirs`
++   to true: coverage, `--check --strict`, `draft`, `changed` and `review` then count their
++   modules like the package's (plugin 0.1.5 or newer).
+    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`
+    is published as a site or scanned by documentation tests, put the index outside it or
+    exclude it from the site. For a package of more than about 100 modules set
+diff --git a/plugins/dvt-milestone/skills/components/scripts/components_index.py b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+index 4b5f896..47d9cbc 100644
+--- a/plugins/dvt-milestone/skills/components/scripts/components_index.py
++++ b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
+     'package_dir': 'src',
+     'import_prefix': '',
+     'extra_source_dirs': [],
++    # Whether coverage, --check --strict, draft, changed and review count the modules of extra_source_dirs too.
++    'count_extra_dirs': False,
+     'docs_dir': 'docs/components',
+     'script_path': 'scripts/components_index.py',
+     # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
+@@ -84,6 +86,8 @@ def load_settings(path: Path) -> dict:
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+         raise SystemExit(f'{path}: verb_list must be all, shared or none')
++    if not isinstance(settings['count_extra_dirs'], bool):
++        raise SystemExit(f'{path}: count_extra_dirs must be true or false')
+     return settings
+ 
+ 
+@@ -233,8 +237,22 @@ def sources(root: Path, directory: str):
+             yield path
+ 
+ 
+-def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++def counted_modules(root: Path) -> list[str]:
++    """The repo-relative paths every module must have a component for: the package's, and
++    with count_extra_dirs those of the extra source folders after them. Each path once."""
+     paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
++    if SETTINGS['count_extra_dirs']:
++        for directory in EXTRA_DIRS:
++            paths.extend(p.relative_to(root).as_posix() for p in sources(root, directory))
++    return list(dict.fromkeys(paths))
++
++
++def counted_dirs() -> str:
++    return ', '.join(dict.fromkeys((PACKAGE_DIR, *EXTRA_DIRS))) if SETTINGS['count_extra_dirs'] else PACKAGE_DIR
++
++
++def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++    paths = counted_modules(root)
+     return [p for p in paths if not any(covers(e, p) for e in entries)], len(paths)
+ 
+ 
+@@ -895,7 +913,7 @@ def coverage_line(root: Path, entries: list[dict]) -> str:
+     unassigned, total = coverage(root, entries)
+     _, versions = recorded_external(root)
+     external = ', '.join(f'{k} {v}' for k, v in versions.items()) or 'none'
+-    return f'coverage: {total - len(unassigned)}/{total} {PACKAGE_DIR} modules assigned to components; external: {external}'
++    return f'coverage: {total - len(unassigned)}/{total} {counted_dirs()} modules assigned to components; external: {external}'
+ 
+ 
+ def generated_paths(root: Path) -> set[str]:
+@@ -1021,9 +1039,12 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool =
+     taken = {e['id'] for e in entries}
+     for path in unassigned:
+         tree = parse(root / path)
+-        parts = [p for p in Path(path).relative_to(PACKAGE_DIR).with_suffix('').parts if p != '__init__']
++        folder = PACKAGE_DIR if path.startswith(PACKAGE_DIR + '/') else next(
++            d.strip('/') for d in EXTRA_DIRS if path.startswith(d.strip('/') + '/'))
++        parts = [p for p in Path(path).relative_to(folder).with_suffix('').parts if p != '__init__']
+         words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
+-        area = words[0] if len(words) > 1 else PACKAGE.lower()
++        top = PACKAGE if folder == PACKAGE_DIR else folder.rsplit('/', 1)[-1]
++        area = words[0] if len(words) > 1 else re.sub(r'[^a-z0-9_]', '_', top.lower()).strip('_') or 'x'
+         name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
+         ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
+         while ident in taken:
+@@ -1088,7 +1109,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
+     files, fails = build_index(root)
+     fails = list(fails)
+     fails.extend(f'stale or missing: {name} (run `python3 {LABEL} write`)' for name in stale_files(root, files))
+-    package = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
++    package = set(counted_modules(root))
+     for path in sorted(status):
+         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
+             fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
+@@ -1442,7 +1463,8 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
+         groups.append(('No subsystem entries', [([], 'the main paths through the system are not described')]))
+     groups.append(('Modules with no docstring (the search cannot describe them)',
+                    [(owners[p], p) for p in undocumented]))
+-    groups.append(('Modules with no component', [([], p) for p in package if not owners[p]]))
++    groups.append(('Modules with no component', [([], p) for p in counted_modules(root)
++                                                 if not any(covers(e, p) for e in components)]))
+ 
+     def wanted(ids):
+         return not areas or any(i.startswith(area) for i in ids for area in areas)
+@@ -1485,7 +1507,7 @@ def show(root: Path, name: str) -> list[str]:
+     def owned(paths):
+         return ', '.join(f'{p} ({", ".join(owners.get(p, [])) or "no component"})' for p in sorted(paths))
+ 
+-    for path in [p for p in package if covers(entry, p)]:
++    for path in [p for p in counted_modules(root) if covers(entry, p)]:
+         text = (root / path).read_text(encoding='utf-8', errors='replace')
+         tree = parse(root / path)
+         private = [n.name for n in tree.body
+diff --git a/plugins/dvt-phase/.claude-plugin/plugin.json b/plugins/dvt-phase/.claude-plugin/plugin.json
+index ec3d186..6e4c4c5 100644
+--- a/plugins/dvt-phase/.claude-plugin/plugin.json
++++ b/plugins/dvt-phase/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-phase",
+-  "version": "0.1.4",
++  "version": "0.1.5",
+   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-phase/skills/components/SKILL.md b/plugins/dvt-phase/skills/components/SKILL.md
+index 1442ba5..98697e7 100644
+--- a/plugins/dvt-phase/skills/components/SKILL.md
++++ b/plugins/dvt-phase/skills/components/SKILL.md
+@@ -22,7 +22,10 @@ does; this skill is how you use and maintain it. The entry format is defined in
+ 
+ Paths below assume the default settings (`docs_dir` = `docs/components`, script at
+ `scripts/`). A project changes them in `.devtools/components_index.settings.json` in the project
+-(`package_dir`, `import_prefix`, `extra_source_dirs`, `docs_dir`, `script_path`, `verb_list`).
++(`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `docs_dir`,
++`script_path`, `verb_list`). `count_extra_dirs` (true or false, default false; from plugin
++0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a project
++whose code sits in more than one folder.
+ 
+ | File | What it is | Edit? |
+ |---|---|---|
+diff --git a/plugins/dvt-phase/skills/components/references/build.md b/plugins/dvt-phase/skills/components/references/build.md
+index 2b309a8..d9c6ea1 100644
+--- a/plugins/dvt-phase/skills/components/references/build.md
++++ b/plugins/dvt-phase/skills/components/references/build.md
+@@ -13,6 +13,9 @@ them is separate work.
+ 1. Check the settings in `.devtools/components_index.settings.json` in the project:
+    `package_dir` is the folder that holds the package (for example `src/<package>`), and
+    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
++   When those folders hold code that should have components too, set `count_extra_dirs`
++   to true: coverage, `--check --strict`, `draft`, `changed` and `review` then count their
++   modules like the package's (plugin 0.1.5 or newer).
+    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`
+    is published as a site or scanned by documentation tests, put the index outside it or
+    exclude it from the site. For a package of more than about 100 modules set
+diff --git a/plugins/dvt-phase/skills/components/scripts/components_index.py b/plugins/dvt-phase/skills/components/scripts/components_index.py
+index 4b5f896..47d9cbc 100644
+--- a/plugins/dvt-phase/skills/components/scripts/components_index.py
++++ b/plugins/dvt-phase/skills/components/scripts/components_index.py
+@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
+     'package_dir': 'src',
+     'import_prefix': '',
+     'extra_source_dirs': [],
++    # Whether coverage, --check --strict, draft, changed and review count the modules of extra_source_dirs too.
++    'count_extra_dirs': False,
+     'docs_dir': 'docs/components',
+     'script_path': 'scripts/components_index.py',
+     # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
+@@ -84,6 +86,8 @@ def load_settings(path: Path) -> dict:
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+         raise SystemExit(f'{path}: verb_list must be all, shared or none')
++    if not isinstance(settings['count_extra_dirs'], bool):
++        raise SystemExit(f'{path}: count_extra_dirs must be true or false')
+     return settings
+ 
+ 
+@@ -233,8 +237,22 @@ def sources(root: Path, directory: str):
+             yield path
+ 
+ 
+-def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++def counted_modules(root: Path) -> list[str]:
++    """The repo-relative paths every module must have a component for: the package's, and
++    with count_extra_dirs those of the extra source folders after them. Each path once."""
+     paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
++    if SETTINGS['count_extra_dirs']:
++        for directory in EXTRA_DIRS:
++            paths.extend(p.relative_to(root).as_posix() for p in sources(root, directory))
++    return list(dict.fromkeys(paths))
++
++
++def counted_dirs() -> str:
++    return ', '.join(dict.fromkeys((PACKAGE_DIR, *EXTRA_DIRS))) if SETTINGS['count_extra_dirs'] else PACKAGE_DIR
++
++
++def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++    paths = counted_modules(root)
+     return [p for p in paths if not any(covers(e, p) for e in entries)], len(paths)
+ 
+ 
+@@ -895,7 +913,7 @@ def coverage_line(root: Path, entries: list[dict]) -> str:
+     unassigned, total = coverage(root, entries)
+     _, versions = recorded_external(root)
+     external = ', '.join(f'{k} {v}' for k, v in versions.items()) or 'none'
+-    return f'coverage: {total - len(unassigned)}/{total} {PACKAGE_DIR} modules assigned to components; external: {external}'
++    return f'coverage: {total - len(unassigned)}/{total} {counted_dirs()} modules assigned to components; external: {external}'
+ 
+ 
+ def generated_paths(root: Path) -> set[str]:
+@@ -1021,9 +1039,12 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool =
+     taken = {e['id'] for e in entries}
+     for path in unassigned:
+         tree = parse(root / path)
+-        parts = [p for p in Path(path).relative_to(PACKAGE_DIR).with_suffix('').parts if p != '__init__']
++        folder = PACKAGE_DIR if path.startswith(PACKAGE_DIR + '/') else next(
++            d.strip('/') for d in EXTRA_DIRS if path.startswith(d.strip('/') + '/'))
++        parts = [p for p in Path(path).relative_to(folder).with_suffix('').parts if p != '__init__']
+         words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
+-        area = words[0] if len(words) > 1 else PACKAGE.lower()
++        top = PACKAGE if folder == PACKAGE_DIR else folder.rsplit('/', 1)[-1]
++        area = words[0] if len(words) > 1 else re.sub(r'[^a-z0-9_]', '_', top.lower()).strip('_') or 'x'
+         name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
+         ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
+         while ident in taken:
+@@ -1088,7 +1109,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
+     files, fails = build_index(root)
+     fails = list(fails)
+     fails.extend(f'stale or missing: {name} (run `python3 {LABEL} write`)' for name in stale_files(root, files))
+-    package = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
++    package = set(counted_modules(root))
+     for path in sorted(status):
+         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
+             fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
+@@ -1442,7 +1463,8 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
+         groups.append(('No subsystem entries', [([], 'the main paths through the system are not described')]))
+     groups.append(('Modules with no docstring (the search cannot describe them)',
+                    [(owners[p], p) for p in undocumented]))
+-    groups.append(('Modules with no component', [([], p) for p in package if not owners[p]]))
++    groups.append(('Modules with no component', [([], p) for p in counted_modules(root)
++                                                 if not any(covers(e, p) for e in components)]))
+ 
+     def wanted(ids):
+         return not areas or any(i.startswith(area) for i in ids for area in areas)
+@@ -1485,7 +1507,7 @@ def show(root: Path, name: str) -> list[str]:
+     def owned(paths):
+         return ', '.join(f'{p} ({", ".join(owners.get(p, [])) or "no component"})' for p in sorted(paths))
+ 
+-    for path in [p for p in package if covers(entry, p)]:
++    for path in [p for p in counted_modules(root) if covers(entry, p)]:
+         text = (root / path).read_text(encoding='utf-8', errors='replace')
+         tree = parse(root / path)
+         private = [n.name for n in tree.body
+diff --git a/skills/components/SKILL.md b/skills/components/SKILL.md
+index 41aa29a..4f6c231 100644
+--- a/skills/components/SKILL.md
++++ b/skills/components/SKILL.md
+@@ -20,7 +20,10 @@ does; this skill is how you use and maintain it. The entry format is defined in
+ 
+ Paths below assume the default settings (`docs_dir` = `docs/components`, script at
+ `scripts/`). A project changes them in `components_index.settings.json` beside the script
+-(`package_dir`, `import_prefix`, `extra_source_dirs`, `docs_dir`, `script_path`, `verb_list`).
++(`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `docs_dir`,
++`script_path`, `verb_list`). `count_extra_dirs` (true or false, default false; from plugin
++0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a project
++whose code sits in more than one folder.
+ 
+ | File | What it is | Edit? |
+ |---|---|---|
+diff --git a/skills/components/references/build.md b/skills/components/references/build.md
+index a3730ce..8e4f5d6 100644
+--- a/skills/components/references/build.md
++++ b/skills/components/references/build.md
+@@ -13,6 +13,9 @@ them is separate work.
+ 1. Check the settings in `components_index.settings.json` beside the script:
+    `package_dir` is the folder that holds the package (for example `src/<package>`), and
+    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
++   When those folders hold code that should have components too, set `count_extra_dirs`
++   to true: coverage, `--check --strict`, `draft`, `changed` and `review` then count their
++   modules like the package's (plugin 0.1.5 or newer).
+    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`
+    is published as a site or scanned by documentation tests, put the index outside it or
+    exclude it from the site. For a package of more than about 100 modules set
+diff --git a/skills/components/scripts/components_index.py b/skills/components/scripts/components_index.py
+index 4b5f896..47d9cbc 100644
+--- a/skills/components/scripts/components_index.py
++++ b/skills/components/scripts/components_index.py
+@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
+     'package_dir': 'src',
+     'import_prefix': '',
+     'extra_source_dirs': [],
++    # Whether coverage, --check --strict, draft, changed and review count the modules of extra_source_dirs too.
++    'count_extra_dirs': False,
+     'docs_dir': 'docs/components',
+     'script_path': 'scripts/components_index.py',
+     # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
+@@ -84,6 +86,8 @@ def load_settings(path: Path) -> dict:
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+         raise SystemExit(f'{path}: verb_list must be all, shared or none')
++    if not isinstance(settings['count_extra_dirs'], bool):
++        raise SystemExit(f'{path}: count_extra_dirs must be true or false')
+     return settings
+ 
+ 
+@@ -233,8 +237,22 @@ def sources(root: Path, directory: str):
+             yield path
+ 
+ 
+-def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++def counted_modules(root: Path) -> list[str]:
++    """The repo-relative paths every module must have a component for: the package's, and
++    with count_extra_dirs those of the extra source folders after them. Each path once."""
+     paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
++    if SETTINGS['count_extra_dirs']:
++        for directory in EXTRA_DIRS:
++            paths.extend(p.relative_to(root).as_posix() for p in sources(root, directory))
++    return list(dict.fromkeys(paths))
++
++
++def counted_dirs() -> str:
++    return ', '.join(dict.fromkeys((PACKAGE_DIR, *EXTRA_DIRS))) if SETTINGS['count_extra_dirs'] else PACKAGE_DIR
++
++
++def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
++    paths = counted_modules(root)
+     return [p for p in paths if not any(covers(e, p) for e in entries)], len(paths)
+ 
+ 
+@@ -895,7 +913,7 @@ def coverage_line(root: Path, entries: list[dict]) -> str:
+     unassigned, total = coverage(root, entries)
+     _, versions = recorded_external(root)
+     external = ', '.join(f'{k} {v}' for k, v in versions.items()) or 'none'
+-    return f'coverage: {total - len(unassigned)}/{total} {PACKAGE_DIR} modules assigned to components; external: {external}'
++    return f'coverage: {total - len(unassigned)}/{total} {counted_dirs()} modules assigned to components; external: {external}'
+ 
+ 
+ def generated_paths(root: Path) -> set[str]:
+@@ -1021,9 +1039,12 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool =
+     taken = {e['id'] for e in entries}
+     for path in unassigned:
+         tree = parse(root / path)
+-        parts = [p for p in Path(path).relative_to(PACKAGE_DIR).with_suffix('').parts if p != '__init__']
++        folder = PACKAGE_DIR if path.startswith(PACKAGE_DIR + '/') else next(
++            d.strip('/') for d in EXTRA_DIRS if path.startswith(d.strip('/') + '/'))
++        parts = [p for p in Path(path).relative_to(folder).with_suffix('').parts if p != '__init__']
+         words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
+-        area = words[0] if len(words) > 1 else PACKAGE.lower()
++        top = PACKAGE if folder == PACKAGE_DIR else folder.rsplit('/', 1)[-1]
++        area = words[0] if len(words) > 1 else re.sub(r'[^a-z0-9_]', '_', top.lower()).strip('_') or 'x'
+         name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
+         ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
+         while ident in taken:
+@@ -1088,7 +1109,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
+     files, fails = build_index(root)
+     fails = list(fails)
+     fails.extend(f'stale or missing: {name} (run `python3 {LABEL} write`)' for name in stale_files(root, files))
+-    package = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
++    package = set(counted_modules(root))
+     for path in sorted(status):
+         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
+             fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
+@@ -1442,7 +1463,8 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
+         groups.append(('No subsystem entries', [([], 'the main paths through the system are not described')]))
+     groups.append(('Modules with no docstring (the search cannot describe them)',
+                    [(owners[p], p) for p in undocumented]))
+-    groups.append(('Modules with no component', [([], p) for p in package if not owners[p]]))
++    groups.append(('Modules with no component', [([], p) for p in counted_modules(root)
++                                                 if not any(covers(e, p) for e in components)]))
+ 
+     def wanted(ids):
+         return not areas or any(i.startswith(area) for i in ids for area in areas)
+@@ -1485,7 +1507,7 @@ def show(root: Path, name: str) -> list[str]:
+     def owned(paths):
+         return ', '.join(f'{p} ({", ".join(owners.get(p, [])) or "no component"})' for p in sorted(paths))
+ 
+-    for path in [p for p in package if covers(entry, p)]:
++    for path in [p for p in counted_modules(root) if covers(entry, p)]:
+         text = (root / path).read_text(encoding='utf-8', errors='replace')
+         tree = parse(root / path)
+         private = [n.name for n in tree.body
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index a6703d8..0de4191 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -668,6 +668,94 @@ def test_changed_warns_about_a_new_caller_of_a_retired_component(project):
+     assert tool(project, "changed", "--base", "main", "--strict", script=INDEX)[0] == 1
+ 
+ 
++def extra_tools(project, count=None):
++    """An extra source folder, tools/, with one module, and the package itself covered."""
++    (project / "tools").mkdir()
++    (project / "tools/report.py").write_text('"""Print a size report."""\n\n\ndef report(rows):\n    """Print rows."""\n')
++    settings = project / "scripts/components_index.settings.json"
++    values = dict(json.loads(settings.read_text()), extra_source_dirs=["tools"])
++    if count is not None:
++        values["count_extra_dirs"] = count
++    settings.write_text(json.dumps(values))
++    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"))
++
++
++def test_extra_folders_are_not_counted_unless_the_setting_says_so(project):
++    extra_tools(project)
++    assert tool(project, "--check", "--strict", script=INDEX)[0] == 0
++    code, out = tool(project, "stats", script=INDEX)
++    assert code == 0 and "coverage: 1/1 src/widget modules assigned" in out and "tools/report.py" not in out
++
++
++@pytest.fixture
++def counted(project):
++    extra_tools(project, count=True)
++    return project
++
++
++def test_strict_check_names_a_module_of_a_counted_extra_folder(counted):
++    code, out = tool(counted, "--check", "--strict", script=INDEX)
++    assert code == 1 and "no component: tools/report.py" in out
++    catalog(counted, entry("tools.report", "Print a size report", "tools/report.py"))
++    assert tool(counted, "--check", "--strict", script=INDEX)[0] == 0
++
++
++def test_draft_stubs_a_module_of_a_counted_extra_folder(counted):
++    code, out = tool(counted, "draft", script=INDEX)
++    assert code == 0, out
++    assert "### tools.report" in out and "- does: TODO Print a size report." in out and "- modules: tools/report.py" in out
++
++
++@pytest.mark.parametrize("count", [True, False])
++def test_changed_names_a_new_module_of_an_extra_folder_only_when_counted(project, count):
++    extra_tools(project, count=count)
++    if count:
++        catalog(project, entry("tools.report", "Print a size report", "tools/report.py"))
++    commit(project)
++    (project / "tools/new.py").write_text('"""New."""\n')
++    assert tool(project, "write", script=INDEX)[0] == 0
++    code, out = tool(project, "changed", "--base", "main", script=INDEX)
++    if count:
++        assert code == 1 and "fail: no component: tools/new.py (new file;" in out
++    else:
++        assert code == 0 and "no component" not in out, out
++
++
++def test_review_and_stats_name_a_module_of_a_counted_extra_folder(counted):
++    code, out = tool(counted, "review", script=INDEX)
++    assert code == 0 and "## Modules with no component (1)\ntools/report.py" in out
++    code, out = tool(counted, "stats", script=INDEX)
++    assert code == 0 and "coverage: 1/2 src/widget, tools modules assigned" in out and "tools/report.py" in out
++
++
++def test_count_extra_dirs_must_be_a_boolean(project):
++    extra_tools(project)
++    settings = project / "scripts/components_index.settings.json"
++    settings.write_text(json.dumps(dict(json.loads(settings.read_text()), count_extra_dirs="yes")))
++    code, out = tool(project, "stats", script=INDEX)
++    assert code != 0 and "count_extra_dirs must be true or false" in out
++
++
++def test_the_baseline_can_hold_a_module_of_a_counted_extra_folder(counted):
++    assert tool(counted, "stats", "--write-baseline", script=INDEX)[0] == 0
++    assert "tools/report.py" in (counted / "docs/components/unassigned-baseline.txt").read_text().split()
++    assert tool(counted, "--check", "--strict", script=INDEX)[0] == 0
++
++
++def test_show_prints_a_module_of_a_counted_extra_folder(counted):
++    catalog(counted, entry("tools.report", "Print a size report", "tools/report.py"))
++    code, out = tool(counted, "show", "tools.report", script=INDEX)
++    assert code == 0 and "## tools/report.py (" in out and "report(rows)" in out
++
++
++def test_unassigned_modules_keep_the_order_of_their_paths(project):
++    for name in ("src/widget/a.py", "src/widget/a/z.py"):
++        (project / name).parent.mkdir(parents=True, exist_ok=True)
++        (project / name).write_text('"""M."""\n')
++    out = tool(project, "stats", script=INDEX)[1]
++    assert out.index("src/widget/a/z.py") < out.index("src/widget/a.py\n")
++
++
+ def facts(project, *args):
+     code, out = tool(project, "facts", *args, script=INDEX)
+     assert code == 0, out
