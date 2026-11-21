@@ -124,8 +124,9 @@ _KEY_FILE = re.compile(
     re.IGNORECASE,
 )
 _SECRET = re.compile(
-    r"sk-ant-[\w-]{20,}|sk-[A-Za-z0-9]{32,}|hf_[A-Za-z0-9]{30,}|gh[pousr]_[A-Za-z0-9]{30,}"
-    r"|github_pat_\w{30,}|rpa_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY"
+    r"sk-(?:ant|proj|svcacct|admin)-[\w-]{20,}|sk-[A-Za-z0-9]{32,}|hf_[A-Za-z0-9]{30,}"
+    r"|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_\w{30,}|rpa_[A-Za-z0-9]{30,}|AIza[\w-]{35}|AKIA[0-9A-Z]{16}"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY"
 )
 ASSISTANTS = ("claude", "codex", "gemini")
 RECEIVERS = (*ASSISTANTS, "human", "any")
@@ -313,6 +314,12 @@ def _entry(root: Path, rel: str, *, max_mb: float | None, since: float | None, a
 _GLOB = re.compile(r"[*?\[]")
 
 
+def _above(rel: str) -> list[str]:
+    """The path and every folder above it, outermost first: a/b/c gives a, a/b, a/b/c."""
+    parts = rel.rstrip("/").split("/")
+    return ["/".join(parts[:end]) for end in range(1, len(parts) + 1)]
+
+
 def _named(rel: str, names: list[str]) -> bool:
     """A name or glob of ``--include`` selects this path: it, a folder above it, or a match."""
     bare = rel.rstrip("/")
@@ -326,7 +333,8 @@ def _narrow(root: Path, rel: str, include: list[str]) -> list[str]:
 
     A name matches whole, so ``runs`` is not ``runs-private``. A glob is fnmatch's, where ``*``
     also crosses ``/``; it selects a matching folder whole, else the matching files, and does not
-    reach into a path left to be rebuilt."""
+    reach into a path left to be rebuilt. Neither reaches through a link: a link can be named,
+    what lies behind it cannot."""
     names = [g.rstrip("/") for g in include if g.rstrip("/")]
     if _named(rel, names):
         return [rel]
@@ -335,7 +343,8 @@ def _narrow(root: Path, rel: str, include: list[str]) -> list[str]:
     found = set()
     for name in names:
         inside = root / name
-        if name.startswith(rel) and _safe(name) and os.path.lexists(inside):
+        if name.startswith(rel) and _safe(name) and os.path.lexists(inside) \
+                and not any((root / above).is_symlink() for above in _above(name)[:-1]):
             found.add(name + "/" if inside.is_dir() and not inside.is_symlink() else name)
     globs = [g for g in names if _GLOB.search(g)]
     for folder, dirs, files in os.walk(root / rel) if globs and not _rebuilt(rel) else ():
@@ -414,24 +423,33 @@ def _n(count: int, noun: str, plural: str = "s") -> str:
     return f"{count} {noun}{'' if count == 1 else plural}"
 
 
+def _in_the_way(dest: Path, name: str) -> bool:
+    """Something in the checkout at ``dest`` keeps a file from being written at ``name`` and
+    nowhere else: a link or a file where a folder belongs, or a link or a folder where the file
+    goes."""
+    *folders, _ = _above(name)
+    return (dest / name).is_symlink() or (dest / name).is_dir() or any(
+        (dest / f).is_symlink() or (os.path.lexists(dest / f) and not (dest / f).is_dir()) for f in folders)
+
+
 def _copy_local(root: Path, dest: Path, paths: list[str], exclude: list[str]) -> tuple[int, list[str]]:
-    """Copy files under ``paths`` into ``dest``, leaving out ``exclude`` (a folder ends in /); a
+    """Copy files under ``paths`` into ``dest``, leaving out ``exclude`` and what lies under it; a
     newer file at the destination stays. A link is copied as a link, never followed, and only
     where nothing is in its place. Returns how many were copied and the ones refused because a
-    link at the destination would have put them outside it."""
-    home, copied, refused = dest.resolve(), 0, []
-    folders = tuple(e for e in exclude if e.endswith("/"))
+    link or another kind of file at the destination was in the way: a file is written at its own
+    name or not at all."""
+    copied, refused, left = 0, [], {e.rstrip("/") for e in exclude}
     for rel in paths:
         source = root / rel
         files = [source] if source.is_symlink() or not source.is_dir() \
             else sorted(p for p in source.rglob("*") if p.is_symlink() or p.is_file())
         for file in files:
             name = file.relative_to(root).as_posix()
-            if name in exclude or name.startswith(folders):
-                continue
             target = dest / name
-            parent = target.parent.resolve()
-            if target.is_symlink() or (parent != home and home not in parent.parents):
+            if left.intersection(_above(name)) or (file.is_symlink() and target.is_symlink()
+                                                   and os.readlink(file) == os.readlink(target)):
+                continue
+            if _in_the_way(dest, name):
                 refused.append(name)
                 continue
             if target.exists() and (file.is_symlink() or target.stat().st_mtime >= file.lstat().st_mtime):
@@ -451,29 +469,43 @@ def _tracked(root: Path) -> list[str]:
     return _git(root, "ls-files", "-z").split("\0")
 
 
+def _clash(source: Path, tracked: str) -> str | None:
+    """What a copy from ``source`` would put in the place of a path the receiving checkout tracks:
+    the path itself when ``source`` has it, or the file or link ``source`` has above it. None when
+    ``source`` has nothing there."""
+    for here in _above(tracked):
+        if not os.path.lexists(source / here):
+            return None
+        if (source / here).is_symlink() or not (source / here).is_dir():
+            return here
+    return tracked
+
+
 def _plan(entries: list[dict], with_keys: bool, tracked=(), source: Path | None = None) -> dict:
     """Which ignored entries to copy, and which are left with the reason.
 
-    ``tracked`` is what the receiving checkout tracks. Such a file is never copied over, whatever
-    the sending checkout ignores: it is left out and named under ``skipped["tracked"]``. ``source``
-    is the sending checkout when it is on this machine, so that only files it has are named."""
+    ``tracked`` is what the receiving checkout tracks. A copy never replaces such a file, whatever
+    the sending checkout ignores. An entry at or under a tracked path is left out whole (a copy
+    would put a folder where the tracked file or link is); inside a chosen folder, what would
+    replace a tracked path is left out. Both are named under ``skipped["tracked"]``. ``source`` is
+    the sending checkout when it is on this machine, so that only what it has is named."""
     wanted = {"carry", "key"} if with_keys else {"carry"}
-    chosen = [e for e in entries if e["kind"] in wanted]
-    folders = tuple(e["path"] for e in chosen if e["path"].endswith("/"))
-    files = {e["path"] for e in chosen} - set(folders)
-    held = sorted(t for t in set(tracked) if t and (t in files or t.startswith(folders))
-                  and (source is None or os.path.lexists(source / t)))
-    chosen = [e for e in chosen if e["path"] not in held]
-    inside = [] if with_keys else sorted(k for e in chosen for k in e.get("keys", []))
+    chosen, tracked = [e for e in entries if e["kind"] in wanted], {t for t in tracked if t}
+    blocked = {e["path"]: t for e in chosen for t in _above(e["path"]) if t in tracked}
+    under = tuple(e["path"].rstrip("/") + "/" for e in chosen if e["path"] not in blocked)
+    inside = {_clash(source, t) if source else t for t in tracked if under and t.startswith(under)} - {None}
+    held = sorted(set(blocked.values()) | inside)
+    chosen = [e for e in chosen if e["path"] not in blocked and e["path"].rstrip("/") not in inside]
+    keys = [] if with_keys else sorted(k for e in chosen for k in e.get("keys", []))
     skipped = {kind: [e["path"] for e in entries if e["kind"] == kind]
                for kind in ("large", "key", "old", "rebuild", "refused") if kind not in wanted}
     if not with_keys:
-        skipped["key"] = sorted(skipped["key"] + inside)
+        skipped["key"] = sorted(skipped["key"] + keys)
     skipped["tracked"] = held
     return {
         "paths": [e["path"] for e in chosen],
         "bytes": sum(e["bytes"] for e in chosen),
-        "exclude": sorted(inside + held),
+        "exclude": sorted(keys + held),
         "skipped": skipped,
         "copied": False,
         "reason": "dry run; pass --yes to copy" if chosen else "nothing to carry",
@@ -489,9 +521,11 @@ def _rsync(plan: dict, source: str, dest: str) -> dict:
         plan["reason"] = "rsync is not on PATH"
         return plan
     # Anchored at the checkout, with rsync's own wildcards escaped: these paths and no others.
+    # The names go NUL-separated, so that one with a newline in it stays one name.
     exclude = ["--exclude=/" + re.sub(r"([*?\[\]\\])", r"\\\1", path) for path in plan.get("exclude", [])]
-    done = subprocess.run(["rsync", "-a", "-r", "--update", *exclude, "--files-from=-", source, dest],
-                          input="\n".join(plan["paths"]) + "\n", capture_output=True, text=True, check=False)
+    done = subprocess.run(["rsync", "-a", "-r", "--update", *exclude, "--from0", "--files-from=-", source, dest],
+                          input="".join(path + "\0" for path in plan["paths"]), capture_output=True, text=True,
+                          check=False)
     plan["copied"] = done.returncode == 0
     plan["reason"] = "" if plan["copied"] else done.stderr.strip()[-400:]
     return plan
@@ -1066,9 +1100,10 @@ def _render_carry(plan: dict) -> str:
     for kind in ("large", "key"):
         lines += [f"  skipped ({kind}): {p}" for p in plan["skipped"].get(kind, [])]
     lines += [f"  refused (not ignored in this checkout): {p}" for p in plan["skipped"].get("refused", [])]
-    lines += [f"  left alone (git tracks it in the receiving checkout): {p}"
+    lines += [f"  left alone (it would replace what git tracks in the receiving checkout): {p}"
               for p in plan["skipped"].get("tracked", [])]
-    lines += [f"  refused (the path leaves the checkout through a link): {p}" for p in plan.get("refused", [])]
+    lines += [f"  refused (a link or another kind of file is in the way in the receiving checkout): {p}"
+              for p in plan.get("refused", [])]
     if plan["skipped"].get("old"):
         lines.append(f"  skipped: {_n(len(plan['skipped']['old']), 'path')} older than the branch (--all)")
     return "\n".join(lines)

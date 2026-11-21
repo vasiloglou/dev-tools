@@ -305,7 +305,8 @@ def test_pull_from_another_host_sends_the_program_and_copies_with_rsync(repo, tm
     assert program == SCRIPT.read_text()
     done = handoff.pull(dest, "oldbox:~/work/repo", base="base", yes=True)
     rsync, files = calls[-1]
-    assert rsync[0] == "rsync" and rsync[-2:] == ["oldbox:~/work/repo/", f"{dest}/"] and files == "runs/\n"
+    assert rsync[0] == "rsync" and rsync[-2:] == ["oldbox:~/work/repo/", f"{dest}/"]
+    assert "--from0" in rsync and files == "runs/\0"
     assert done["copied"] is True
     refused = handoff.pull(dest, "oldbox:~/work; rm -rf x", base="base")
     assert "unsupported characters" in refused["reason"]
@@ -547,7 +548,8 @@ def test_a_copy_never_leaves_the_receiving_checkout_through_a_link(repo, tmp_pat
     assert list(outside.iterdir()) == [outside / "victim.txt"]
     assert (outside / "victim.txt").read_text() == "mine\n"
     assert sorted(done["refused"]) == ["data.duckdb", "runs/a/big.bin", "runs/a/out.json"]
-    assert "refused (the path leaves the checkout through a link): data.duckdb" in handoff._render_carry(done)
+    said = handoff._render_carry(done)
+    assert "refused (a link or another kind of file is in the way in the receiving checkout): data.duckdb" in said
 
 
 def test_a_listing_from_another_host_cannot_name_the_checkout_or_a_tracked_path(repo):
@@ -759,7 +761,8 @@ def test_a_copy_leaves_alone_a_file_the_receiving_checkout_tracks(repo, tmp_path
     done = handoff.carry(repo, str(dest), base="base", yes=True)
     assert done["copied"] is True and (dest / "runs/out.json").exists()
     assert git(dest, "status", "--short") == "" and (dest / "report.json").read_text() == "tracked here\n"
-    assert "left alone (git tracks it in the receiving checkout): report.json" in handoff._render_carry(done)
+    said = handoff._render_carry(done)
+    assert "left alone (it would replace what git tracks in the receiving checkout): report.json" in said
     (dest / "runs/out.json").unlink()
     pulled = handoff.pull(dest, str(repo), base="base", yes=True)
     assert pulled["skipped"]["tracked"] == ["report.json", "runs/kept.txt"] and (dest / "runs/out.json").exists()
@@ -884,3 +887,81 @@ def test_an_ignored_link_is_copied_as_a_link_and_never_followed(repo, tmp_path):
         assert (dest / name).is_symlink() and os.readlink(dest / name) == os.readlink(repo / name)
     # A second run finds them in place and leaves them.
     assert handoff.carry(repo, str(dest), base="base", all_ages=True, yes=True)["files"] == 0
+
+
+@pytest.mark.parametrize("fake", ["sk-proj-" + "aB3_-" * 13, "sk-svcacct-" + "a" * 40,
+                                  "AIza" + "Sy" + "aB3_-x" * 5 + "abc"])
+def test_a_key_in_another_providers_form_is_seen_in_a_note_too(repo, fake):
+    path = handoff.write_note(repo, base="base", sender="claude", to="codex", machine="same")
+    fill(path, handoff.HUMAN_SECTIONS, f"export KEY={fake} and run")
+    commit(repo)
+    assert by_check(repo, path).get("handoff/secret") == "critical"
+    for command in ("show", "list", "takeover"):
+        assert fake not in run(repo, command, "--base", "base").stdout, command
+
+
+def test_a_file_name_with_a_newline_in_it_is_one_name_to_rsync(repo, tmp_path):
+    if not shutil.which("rsync"):
+        pytest.skip("rsync is not installed")
+    write(repo, ".gitignore", ".env\nout*\n")
+    write(repo, ".env", "KEY=do-not-copy\n")
+    write(repo, "output\n.env", "data\n")
+    commit(repo)
+    dest = tmp_path / "plain"
+    dest.mkdir()
+    plan = handoff._plan(handoff.ignored_inventory(repo), False)
+    assert plan["paths"] == ["output\n.env"] and plan["skipped"]["key"] == [".env"]
+    done = handoff._rsync(plan, f"{repo}/", f"{dest}/")
+    assert done["copied"] is True and [p.name for p in dest.iterdir()] == ["output\n.env"]
+
+
+def test_a_copy_writes_only_at_the_name_it_copies(repo, tmp_path):
+    # In the receiving checkout a link, a folder or a file stands where the copy would go, and
+    # behind each is a file git tracks there.
+    write(repo, ".gitignore", "runs\nout\nlogs\n")
+    commit(repo)
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    (dest / "runs").symlink_to("src")
+    write(dest, "src/out.txt", "tracked here\n")
+    write(dest, "out/report/report", "tracked here\n")
+    write(dest, "logs", "tracked here\n")
+    git(dest, "add", "-f", "src/out.txt", "out/report/report", "logs")
+    git(dest, "commit", "-q", "-m", "track them")
+    for name in ("src/out.txt", "out/report/report", "out/report", "logs"):
+        os.utime(dest / name, (1_000_000_000, 1_000_000_000))
+    write(repo, "runs/out.txt", "from the old checkout\n")
+    write(repo, "out/report", "from the old checkout\n")
+    write(repo, "out/other.json", "{}\n")
+    write(repo, "logs/a.log", "from the old checkout\n")
+    for include in (None, ["runs/out.txt", "out/report", "logs/a.log"]):
+        done = handoff.carry(repo, str(dest), base="base", include=include, yes=True)
+        assert git(dest, "status", "--short") == "", include
+        assert (dest / "src/out.txt").read_text() == "tracked here\n" and (dest / "logs").is_file()
+        assert done["refused"] == ["runs/out.txt"] and done["skipped"]["tracked"] == ["logs", "out/report"]
+    assert (dest / "out/other.json").exists()
+    said = handoff._render_carry(done)
+    assert "refused (a link or another kind of file is in the way in the receiving checkout): runs/out.txt" in said
+    assert "left alone (it would replace what git tracks in the receiving checkout): out/report" in said
+    # Another host's rsync would replace a link or a file with the folder: the plan leaves it out.
+    listing = [{"path": "runs/a/", "kind": "carry", "bytes": 1, "files": 1}]
+    plan = handoff._plan(listing, False, ["runs", "src/app/core.py"])
+    assert plan["paths"] == [] and plan["skipped"]["tracked"] == ["runs"]
+
+
+def test_include_does_not_reach_through_an_ignored_link(repo, tmp_path):
+    write(repo, ".gitignore", "runs/\n")
+    outside = tmp_path / "dataset"
+    write(outside, "output.json", "{}\n")
+    write(outside, "deep/x.json", "{}\n")
+    write(repo, "runs/out.json", "{}\n")
+    (repo / "runs/latest").symlink_to(outside)
+    commit(repo)
+    dest = tmp_path / "other"
+    git(tmp_path, "clone", "-q", str(repo), str(dest))
+    for name in ("runs/latest/output.json", "runs/latest/deep/", "runs/latest/*.json", "runs/latest/deep/x.json"):
+        done = handoff.carry(repo, str(dest), base="base", all_ages=True, include=[name], yes=True)
+        assert done["paths"] == [] and not (dest / "runs").exists(), name
+    # The link itself can be named, and is copied as a link.
+    handoff.carry(repo, str(dest), base="base", all_ages=True, include=["runs/latest"], yes=True)
+    assert (dest / "runs/latest").is_symlink() and list((dest / "runs").iterdir()) == [dest / "runs/latest"]

@@ -104,16 +104,23 @@ python3 <tool> carry --dest ../app-second --yes          # another checkout, sam
   ignored folder (`runs/experiment-1/`). A glob is matched the way Python's
   `fnmatch` does, so `*` also crosses `/`: `runs/*.json` selects every JSON
   file under `runs/`. A glob selects a matching folder whole, else the
-  matching files, and does not reach into a `rebuild` path. Whatever is
-  selected keeps its kind: a key file named by its own path is still `key`.
-- A file the receiving checkout tracks is never copied over, even when the
-  sending checkout ignores it. The plan names it as left alone. For another
-  host the script asks that checkout over ssh what it tracks.
+  matching files, and does not reach into a `rebuild` path. Neither reaches
+  through a link: an ignored link can be named and is copied as a link, what
+  lies behind it cannot. Whatever is selected keeps its kind: a key file named
+  by its own path is still `key`.
+- A copy never replaces what the receiving checkout tracks, even when the
+  sending checkout ignores it: not a tracked file of the same name, and not a
+  tracked file or link standing where a folder of the copy would go, or inside
+  a folder standing where a file would go. The plan names what it left alone.
+  For another host the script asks that checkout over ssh what it tracks.
 - The destination must already be a checkout: clone it, or add the worktree,
   first. For another host the script asks over ssh before it plans a copy.
-- A newer file at the destination is kept; nothing is deleted there. A file
-  that a link at the destination would put outside that checkout is refused
-  and named.
+- A newer file at the destination is kept; nothing is deleted there. A copy
+  on this machine writes a file at its own name or not at all: where a link or
+  another kind of file is in the way in the receiving checkout (a link where a
+  folder belongs, a folder where the file goes), the file is refused and
+  named. To another host the copy is rsync's, which puts a folder in the place
+  of an untracked link or file of the same name.
 - A key file inside an ignored folder is left out of the folder's copy, and
   `ignored` says how many such paths a folder holds. `--with-keys` sends them.
   This holds for a `rebuild` folder that `--include` names, too.
