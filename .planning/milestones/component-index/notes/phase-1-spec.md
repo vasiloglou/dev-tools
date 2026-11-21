@@ -23,8 +23,9 @@ gate rules D1 and D2.** No code has been written, and no review has run over the
 - **Review rounds.** `reviews/plan-r1` (Codex, 2026-11-21) read the bytes with SHA-256
   as listed in its `BRIEF.md`. Its F1 and F2 were repaired here, marked `(r1 F1)` and
   `(r1 F2)`. `reviews/plan-r2` (Codex, 2026-11-21) read the repaired bytes; its F2 was
-  repaired here, marked `(r2 F2)`. **The bytes repaired after round 2 carry no review
-  opinion.**
+  repaired here, marked `(r2 F2)`. `reviews/plan-r3` read those; its F1 was repaired
+  here, marked `(r3 F1)`, and T10 is its test. **The bytes repaired after round 3 carry no
+  review opinion**: the round budget is spent, and the phase diff review reads them.
 
 **Reproduced on main `c9648dd`.** The reproduction ran in a scratch folder, through the
 module's own `write_note` and `takeover`:
@@ -60,7 +61,7 @@ lines of the snapshot only (`re.findall(r"^- \`([^\`]+)\` \(([^)]*)\)", listed, 
 
 | Rule | Bound here to |
 |---|---|
-| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T9 are in `tests/test_handoff.py`; T1, T3, T6, T7, T8 and T9 fail on main (r2: the earlier wording counted T1 to T6) |
+| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T10 are in `tests/test_handoff.py`; T1, T3, T6, T7, T8, T9 and T10 fail on main (r2, r3: the earlier wording counted T1 to T6) |
 | The plugins are rebuilt, and released under a new version | `release_plugins.py bump` to 0.1.4, then G3. The owner tags after the merge |
 | A wording change says what prompted it | Issue 28 prompts the sentence in `references/handoff.md` and in `docs/handoff.html` |
 | Shared skills stay general | Any project's note can list more than 25 ignored paths. Nothing in the fix names dev-tools |
@@ -113,6 +114,11 @@ source lines.
     never checked even in a note of 25 paths or fewer. The pattern becomes
     ``^- `(.+)` \(([^)]*)\)$``, one bullet per line: the path runs to the last
     `` ` ( `` of the line, since the text in parentheses after it never holds `)` (r2 F2);
+  - a line under the ignored-files heading that starts with ``- ` `` and does not match
+    that pattern cannot be read. It happens when a path holds a newline, which
+    `ls-files -z` allows and the writer prints as it is. Each such line adds 1 to
+    `unlisted_ignored` (below), so the note is not ready until the path is checked by hand
+    (r3 F1: the r2 pattern skipped such a path, and the note read as ready);
   - plus the items of an `ignored-rest` line, when there is one.
   A missing item whose `kind` is `"key"` goes to `missing_keys`, and any other to
   `missing_ignored`. This matches the bullet rule, under which a bullet whose text
@@ -123,7 +129,8 @@ source lines.
     "Older notes", so a damaged or short line can never make the result ready.
 - **Older notes.** When the snapshot has a `- and N smaller path(s)` line and no readable
   `ignored-rest` line, set `report["unlisted_ignored"] = N`. Otherwise it is `0`, and the
-  key is always present. `ready` also requires `unlisted_ignored == 0`.
+  key is always present. Each bullet line that cannot be read adds 1 to it (r3 F1).
+  `ready` also requires `unlisted_ignored == 0`.
 - **Rendering.** When `unlisted_ignored` is above 0, the text report prints one line
   after the `missing ignored path:` lines, in their style:
 
@@ -165,13 +172,15 @@ new helper makes `n` ignored folders of falling size, as the reproduction does.
 | T7 | An `ignored-rest` line holding `not json` | treated as absent: `unlisted_ignored == 1` and `ready is False` |
 | T8 | The note says `- and 1 smaller path`, its `ignored-rest` line is `[]`, and the path is absent (r1 F2) | treated as absent: `unlisted_ignored == 1` and `ready is False` |
 | T9 | 2 ignored folders, one named ``out`1/`` (a backtick in the name); the note is written; the project is cloned with only the other folder copied (r2 F2) | `missing_ignored` holds ``out`1/`` and `ready is False`. On main: `[]` and `True` |
+| T10 | As T9, the folder named `out\n1/` (a newline in the name) (r3 F1) | `unlisted_ignored == 1` and `ready is False`. On main: no key, and `True` |
 
 Branch walk:
 
 - `_snapshot_text`: cut (T1) and not cut (T5).
 - `takeover`'s list: bullets only (T2 and T5), bullets plus the rest (T1), an unreadable
   rest (T7), and a readable rest of the wrong length (T8).
-- The bullet pattern: a plain path (T1, T2) and a path holding a backtick (T9).
+- The bullet pattern: a plain path (T1, T2), a path holding a backtick (T9), and a
+  line it cannot read (T10).
 - A missing item's kind: key (T4) and other (T1).
 - Older notes: cut with no rest line (T3, T6), and not cut (T2).
 

@@ -29,21 +29,31 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   | r1 | 1 (Codex) | 8 | 0 / 8 (first round) | 3 / 8 | blocking | CHANGES_REQUESTED |
   | r2 | 1 (Codex) | 3 | 1 / 3 (F3 attacks a2) | 1 / 3 | blocking | CHANGES_REQUESTED |
 
-  After r2 the stop rule does not fire: 1/3 is not above one half, and the count fell
-  from 8 to 3. Round 3 is the last the budget allows.
+  | r3 | 1 (Codex) | 1 | 1 / 1 (F1 attacks the r2 F2 repair) | 0 / 1 | hardening | CHANGES_REQUESTED |
+
+  After r2 the stop rule did not fire: 1/3 is not above one half, and the count fell
+  from 8 to 3. After r3 it fires (1/1 is above one half), and the budget is spent. The
+  next instrument is the code: r3 F1 is repaired as a test row (phase 1 spec, T10), and
+  phase 1's diff review reads it.
 - **Plan review, round 2 (r2).** `notes/reviews/plan-r2`, run 2026-11-21 over the r1
   repairs and a2 (brief SHA-256
   `fc912dc8da465b01c6895b59f577fb595ea2ed7bfddb892062761b5f89078b1e`). `VERDICT:
   CHANGES_REQUESTED`, with 3 findings: 1 blocking (a phase 2 test that cannot give its
   exits), 1 hardening (a path holding a backtick is never checked) and 1 completeness
   (section 8 said `auto=false`). All 3 were reproduced and repaired, marked `(r2 Fn)`.
+- **Plan review, round 3 (r3).** `notes/reviews/plan-r3` (brief SHA-256
+  `92d7eadd722d588543504414dddc6401e5c215361d880cb0d5ed70cad48449f2`). `VERDICT:
+  CHANGES_REQUESTED`, with 1 hardening finding: a path holding a newline is still
+  skipped by the r2 bullet pattern. It was reproduced and repaired, marked `(r3 F1)`.
 - **Amendment a2, 2026-11-21, before round 2.** The owner invoked
   `process-milestone component-index auto`, which delegates the plan, spec and close
   rulings of this milestone (`auto=true`). Before round 2, `git check-ignore` showed the
   milestone's `notes/` folder ignored by `.gitignore` line 7, so none of this plan could be
   committed. Phase 1 now also anchors that line (section 3, artifact homes; section 4,
   phase 1 deliverables).
-- **No ruling yet.** No owner or delegated ruling is recorded.
+- **Plan gate: delegated approval (auto=true), 2026-11-21.** Recorded in `001-plan.md`,
+  which binds these bytes by SHA-256. D1 to D5 are ruled as proposed (section 10). The
+  r3 F1 repair is unreviewed (above).
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 
@@ -63,7 +73,7 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   documentation that describes dev-tools' own use names the index.
 - C5. `handoff.takeover` returns `ready: false` when any ignored path the note was written
   with, other than a key file, is absent, including one after the 25th. A missing key file
-  is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T9 of
+  is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T10 of
   `notes/phase-1-spec.md` exit as that spec lists, and the pull request says
   `Fixes #28`.
 - C6. A close record, after the close review.
@@ -439,7 +449,7 @@ abbreviated (r1 F7). In a search row, `<words>` is the query of one case of
 
 ## 10. Owner decisions and open questions
 
-### Decisions for the plan gate (all open)
+### Decisions for the plan gate (ruled 2026-11-21, delegated approval (auto=true): each as proposed)
 
 | # | Question | Readings and their cost | Proposed |
 |---|---|---|---|
