@@ -21,6 +21,9 @@ note did not list is missing.
 - **Execution:** `process-milestone component-index auto`, from 2026-11-21. Merges, release
   tags and anything posted to GitHub still need the owner each time.
 - **Branches:** phase 1 is vasiloglou/dev-tools#29 (`claude/component-index-phase-1`).
-  Phase 2 is stacked on it, on `claude/component-index-phase-2` (plan amendment a3).
+  Phase 2 is vasiloglou/dev-tools#30, stacked on it (plan amendment a3). Phase 3 is
+  stacked on phase 2, on `claude/component-index-phase-3`.
+- **Index:** [`.devtools/components/`](../../../.devtools/components/COMPONENTS.md), built in
+  phase 3.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md),
-  [003-phase-2.md](003-phase-2.md).
+  [003-phase-2.md](003-phase-2.md), [004-phase-3.md](004-phase-3.md).

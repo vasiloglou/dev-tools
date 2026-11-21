@@ -1,0 +1,123 @@
+{
+  "base": "f25d3a5",
+  "claims": [
+    "Each entry's does, verbs, modules and tests are true of the code it names: no entry claims a command, option or behaviour the module does not have.",
+    "The three subsystems name every place where one of the 12 scripts runs or loads another, and their notes state each such run-time load truly.",
+    "Every entry not marked checked: partial was read in full.",
+    "REVIEW.md's suggestions and its 'Not confirmed' list are true of the code at f25d3a5.",
+    "Each query in search-cases.md is a fair newcomer's query, not one tuned to the entry's wording, and its expected component is the right one.",
+    "The settings file, run through plugins/dvt-milestone/skills/components/scripts/components_index.py from the repository root, counts exactly the 12 shipped modules and nothing under plugins/, tests/ or .claude/."
+  ],
+  "created": "2026-11-21T22:25:26.501823+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r1/diff.patch",
+      "sha256": "719d569fb1f6d13e25518adb41da362e42714f296a89615c253b3161c6498762"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "dd45618a5709776abdb969dd52ad06ea7e1d348e6693982c39727a0009b2d97d"
+    },
+    {
+      "path": ".devtools/components/REVIEW.md",
+      "sha256": "507255a5ecfb25380cd6a6c2626baf285c47ebfffa7b04b73e71184882593c09"
+    },
+    {
+      "path": ".devtools/components/graph.md",
+      "sha256": "3d3df2e0ad8132479eee1a84bff3f96280856e5fd9a61f8477914c64591a49b5"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "a37b3a8d191d88feb586df3d33450981e6db68e2b6970cba9b5d5548aab1b9db"
+    },
+    {
+      "path": ".devtools/components/modules/skills.md",
+      "sha256": "da944750555d7f475ad63363950f00d9645eb75cdc92ec09f3c8f195b1a48f0f"
+    },
+    {
+      "path": ".devtools/components/search-cases.md",
+      "sha256": "876fab2dc57cca4dca143346783934556b2caadaf0b3d4415aa1caab616a5453"
+    },
+    {
+      "path": ".devtools/components_index.settings.json",
+      "sha256": "56717af02b363be6354f9fc760ea2a8e56151821c33bfa58342296d1adad6893"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-3-spec.md",
+      "sha256": "bd9470e3f60b6792333b501cd009e5af265bfecf2d93ae5adc86c7f18d3a5cf9"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "3cc5eb4924e69fb5584fd2613a0246718a27b5b3dd9e58f34afebabb97b886a9"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "1232e277b0b9b116325956b0084027963491aa02065d441392698eb5013d1e10"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "f01ae0b3865c4f5028a2075b988a3a84ec4665436d2120a7df97a1c82562fb32"
+    },
+    {
+      "path": "devtools/build_plugins.py",
+      "sha256": "a98b0d93ef4df6286c4c72d74986464d2f80c4b9c7d4b80eb09fc3e0b04ca674"
+    },
+    {
+      "path": "devtools/release_plugins.py",
+      "sha256": "eedc3a907803df084a8941aa9bf0a511c3679156cf904ebfa8cc693037e1be59"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "1637af6f38ec3472e42da7ea3207445ba7b0fd25a0e3e73bba46b140e8da06f6"
+    },
+    {
+      "path": "devtools/from_gsd.py",
+      "sha256": "7865f45e952703de6d59793e016714a417e35056a6ba4ef8f14f2ea15dcf209a"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "3b76af42ff825159ae80a445fbd69a11ae13c935e93793aa79888e6dd5ce4d14"
+    },
+    {
+      "path": "skills/components/scripts/rules_check.py",
+      "sha256": "69dd596107826bdf3fc551db810097ae8e292e61c257977cef6b5cde8dbb772b"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "dbab0519e8689154579ec06bc0894125d08b5244ea738d547b66947537d16a6a"
+    },
+    {
+      "path": "skills/milestone/process-phase/scripts/review_tool.py",
+      "sha256": "12dc9800f55dc9f409dadf8466b39591c6b58f2210195478cb4ce39e985a38ff"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/phase_tool.py",
+      "sha256": "08dadf9fc68e96320f9c3bdaf6ae3483ed330a8d8608bf2c321232f4bf73be8e"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/coder_pool.py",
+      "sha256": "f657307c1e0f1f5c377aa3fcdd69e85daf7be81de91689ecc503c17e9ceb7b1d"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/codex_gate.py",
+      "sha256": "66f9cfeae96b82e6a4b3a757da94278c95a08dba2d8b2ccadcbc1524bae3e698"
+    },
+    {
+      "path": "skills/phase/pytest/phase_selection.py",
+      "sha256": "0d8f6ebf67e585ed573975d4e6fe31760592fa64f357091e589504bcc8dc9227"
+    }
+  ],
+  "head": "2e48abfc3e4b2ac6ececa30e7b0165d48ee98906",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this index do what notes/phase-3-spec.md requires of it, and where does an entry say something the code does not do, or leave out something a searcher would need? Where can the claims below be shown false?",
+  "subject": "phase",
+  "version": 1
+}
