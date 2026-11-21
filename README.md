@@ -239,6 +239,7 @@ a release is due.
 | `devtools/from_gsd.py` | Reads a GSD planning folder (`survey`) and rewrites it in the phase workflow's format (`convert`). |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
 | `tests/` | Tests for the sync command, the GSD converter, the plugin build and release, and the scripts a project runs after a sync or from a plugin. |
+| `.planning/`, `.devtools/project.md`, `AGENTS.md` | dev-tools' own use of the milestone workflow, which it is developed with: its milestones and their records, its rules for the skills, and the words the work uses. Not part of what a project takes. |
 
 ## Tests
 
