@@ -239,7 +239,49 @@ review_tool.py status notes/reviews</pre>
   </div>
 </div></section>
 
-<section><div class="wrap narrow">
+<section id="own-use"><div class="wrap">
+  <div class="section-head">
+    <h2>dev-tools runs on this workflow</h2>
+    <p>Since 2026-11-21 the repository that holds these skills is also a project that uses them. No milestone has run there yet, so this page shows no record of its own. The first milestone will leave the first ones.</p>
+  </div>
+  <div class="two">
+    <div class="prose">
+      <h3>What runs, and what the project keeps</h3>
+      <p>It takes the workflow as any project would: the <code>dvt-milestone</code> plugin, turned on in <code>.claude/settings.json</code>. Codex installs the same plugin.</p>
+      <p><strong>The released version runs, not the branch.</strong> A phase that changes a skill is still run by the released text of that skill. The changed text is tried by building the plugins and starting a session on the built copy.</p>
+      <p>What the project added is small, and all of it is in the repository:</p>
+      <div class="table-scroll"><table>
+        <tr><th>Path</th><th>What</th></tr>
+        <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.planning/PROJECT.md"><code>.planning/PROJECT.md</code></a></td><td>The one-page statement of the project. The milestone skills read it first.</td></tr>
+        <tr><td><code>.planning/milestones/</code></td><td>One folder per milestone: its plan, its phase specs, its review rounds and its numbered records. Empty until the first milestone is planned.</td></tr>
+        <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/project.md"><code>.devtools/project.md</code></a></td><td>The project's own rules for the skills.</td></tr>
+        <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/AGENTS.md"><code>AGENTS.md</code></a></td><td>The words the work uses (milestone, phase, spec, owner gate, record, review round) and the project's names. <code>CLAUDE.md</code> points to it, so both tools read one file.</td></tr>
+      </table></div>
+    </div>
+    <div>
+      <h3>A rules file to read</h3>
+      <p>With a plugin, a project keeps its own rules in <code>.devtools/project.md</code> (<a href="adopt.html">Add it to your project</a> says why). dev-tools' file is a complete one. It states:</p>
+      <ul>
+        <li>which workflow runs, and where the planning folder is;</li>
+        <li>which work takes which lane;</li>
+        <li>the gate commands: all tests, one test file, and whether the plugins match the skills;</li>
+        <li>how a review is run, and where its rounds are kept;</li>
+        <li>seven design rules, each with what it prevents and what a spec must name to answer it;</li>
+        <li>what needs the owner each time, whatever was delegated: a merge into <code>main</code>, a release tag, anything posted to GitHub.</li>
+      </ul>
+      <div class="callout">
+        <p><strong>Fast lane.</strong> A fix, a wording change, a page of this site, a contributor's pull request: branch, test, pull request. No milestone and no record.</p>
+      </div>
+      <div class="callout">
+        <p><strong>Evidence lane, as a milestone.</strong> A new skill, script or subcommand; a change to a format a project's files depend on; a change to what a gate refuses.</p>
+      </div>
+      <p>A milestone is named for what it delivers, not for a plugin version. A plugin version is a release, and one milestone can ship in several.</p>
+      <p>A contributor needs none of this. <a href="contribute.html">How a change gets in</a> is the whole process for a pull request.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="band"><div class="wrap narrow">
   <h2>Phase workflow or milestone workflow?</h2>
   <p>They answer different needs, and a project picks one. Both come from the same place and are installed the same way.</p>
   <div class="table-scroll"><table>

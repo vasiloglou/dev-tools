@@ -26,6 +26,17 @@ Nobody else can approve or merge.
    if there is one. One purpose per pull request.
 5. **Review.** You may be asked for changes before it is merged.
 
+## dev-tools is developed with dev-tools
+
+The maintainer's own larger work on this repository runs under the milestone workflow it
+ships: each milestone has a plan, phase specs and numbered records in
+`.planning/milestones/`. The project's rules for the skills are in `.devtools/project.md`,
+and `AGENTS.md` lists the words the work uses (milestone, phase, spec, owner gate, record,
+review round), which an agent working here reads first.
+
+A contribution needs none of it. A fix is a pull request, as above; if a change is large
+enough to need a plan, the issue is where that is agreed.
+
 ## What makes a change easy to accept
 
 The skill text is the product: changing a sentence changes how an agent behaves in every
