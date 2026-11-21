@@ -242,3 +242,66 @@ on prose. The argument for prose: the format change is one line, written only wh
 list is cut. Its whole grammar is the JSON item above, and T1, T3, T5 and T7 are that
 corpus, written first in step 3. If the owner prefers, those four fixtures are written
 before the gate, and the gate rules on them.
+
+## Implementation findings (recorded as found, 2026-11-21)
+
+- **IF1. T2's "on main" column.** T2 fails on main too, with `KeyError: 'unlisted_ignored'`,
+  because it asserts the new key. It is not a regression test of the defect; T1 is.
+- **IF2. T5 compared with main's bytes.** A one-off script loaded main's `handoff.py` (from a
+  throwaway worktree at `c9648dd`) and this branch's, and wrote a note with each over the
+  same repository: identical snapshots at 2 and 25 paths; at 26, only the `ignored-rest`
+  line differs. T5 itself pins the bullets by a literal, so it keeps holding after the
+  merge, when main is this code.
+- **IF3. The plugin version.** `release_plugins.py status` before the bump: `version in the
+  tree: 0.1.3`, `released: 0.1.2`. 0.1.3 was never tagged, but plugin installs of 0.1.3 exist
+  (this machine runs one), so the bump to 0.1.4 stands, as the plan says.
+- **IF4. The first phase brief named unrelated files.** `review_tool.py brief --subject
+  phase` reads every untracked file. The PR 26 rounds in `.planning/reviews/` and the
+  `review.log` files were named (42 files). That run was stopped before it reported and set
+  aside outside the tree. The files are now excluded locally in `.git/info/exclude`, not in
+  `.gitignore`, since the PR 26 rounds are out of scope (plan section 7). The brief was
+  written again with 15 files.
+- **IF5. Phase review r1 (Codex): 2 blocking findings, both reproduced.**
+  - F1: a path holding a newline can print a line that reads as a whole bullet
+    (``out0` (0.0 MB, 1 file)`` + newline + `1/`), so its continuation was ignored and the
+    note read as ready.
+  - F2: an `ignored-rest` item whose `kind` is a list or an object raised `TypeError`.
+
+  Repairs (correction to the design in section 6, `takeover`; the earlier rule was "a line
+  ... that starts with ``- ` `` and does not match"): every line of the ignored-files
+  section must be one the snapshot writes. These are an empty line, `- none`, a bullet, the
+  `- and N` line or the rest line. Each run of other lines counts 1 in
+  `unlisted_ignored`. A `kind` must be a string before it is looked up. T10 and T7/T8
+  gained these cases, and each was observed red before the repair (`TypeError` twice;
+  `assert (0 == 1)` once).
+- **Review budget for this phase, declared before round 2:** one more round (r2). If r2
+  finds anything, its findings are reproduced, fixed with a red-first test, and the phase
+  records them without a round 3.
+- **IF6. Phase review r2 (Codex): 3 findings, all reproduced, the round budget spent.**
+  - F1 (blocking): a path holding a newline can print lines that are all valid bullets
+    (``out0` (0.0 MB, 1 file)`` + newline + ``- `out0/``), which no line rule can catch.
+  - F2 (blocking): a commit subject or a file named `Files git ignores…` moved the start of
+    the section, and ordinary notes read as not ready (`unlisted_ignored: 2`).
+  - F3 (hardening): a rest line nested 100000 deep raised `RecursionError`. At 2000, the
+    reviewer's depth, Python 3.14 decodes it, so the test uses 100000.
+
+  Two of the three attack the r1 repair. The self-inflicted ratio is 2/3, so the stop rule
+  fires, and the budget declared above allows no round 3.
+  **Amendment (o, 2026-11-21, delegated approval (auto=true)) to section 6.** Prior rules:
+  `_snapshot_text` printed every bullet as `` - `<path>` (…) ``, and `takeover` read the
+  section from the first `Files git ignores`. Now:
+  - the writer prints a path holding a control character (`\x00` to `\x1f`, `\x7f`)
+    JSON-escaped (`json.dumps(path)[1:-1]`), on one line. Its bullet ends `, written
+    escaped)`, and `takeover` decodes such a bullet's path with `json.loads`. A note with
+    no such path is written as before (IF2's comparison, rerun after this change: identical
+    at 2 and 25 paths);
+  - the section starts at the last line that begins with `Files git ignores`;
+  - `_ignored_rest` also treats a `RecursionError` as an unreadable line.
+
+  The line rule of IF5 stays, for notes from before 0.1.4. Tests, each observed red before
+  the change: `test_t10_a_path_holding_a_newline_is_written_escaped_and_checked` (3 cases:
+  `assert (2 == 2 and False)` twice and `assert (3 == 2)` once), `test_t10b_…` (an older
+  note's two-line bullet; passes before and after, it pins the IF5 rule), `test_t12_…`
+  (`assert (4 == 0)`) and the fifth case of `test_t7_t8_…` (`RecursionError`).
+  **Residual:** a note from before 0.1.4 whose ignored path holds a newline that prints as
+  valid bullets (F1's shape) can still read as ready. The 0.1.4 writer never prints one.
