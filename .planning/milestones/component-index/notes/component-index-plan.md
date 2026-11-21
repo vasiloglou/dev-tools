@@ -54,6 +54,12 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
 - **Plan gate: delegated approval (auto=true), 2026-11-21.** Recorded in `001-plan.md`,
   which binds these bytes by SHA-256. D1 to D5 are ruled as proposed (section 10). The
   r3 F1 repair is unreviewed (above).
+- **Amendment a3, 2026-11-21: delegated approval (auto=true).** Phase 1's pull request
+  (vasiloglou/dev-tools#29) is open and not merged. The owner said to go on. Phase 2
+  needs nothing phase 1 produces (section 3, phase dependencies), so its branch is cut
+  from phase 1's branch tip, and its pull request names phase 1's branch as its base
+  (section 8, "Branches"). The phases still run one at a time and release one version
+  each. Recorded in `003-phase-2.md`. The amended bytes are not reviewed.
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 
@@ -404,7 +410,11 @@ repairs, and the close record (C6).
 - **Branches.** One topic branch and one pull request per phase,
   `claude/component-index-phase-N`, cut from main after the previous phase merges. The
   plan and the milestone's planning files go in with phase 1's pull request, unless the
-  owner merges them first.
+  owner merges them first. *Amended a3, 2026-11-21:* while the previous phase's pull
+  request is open, the next branch is cut from that branch's tip and its pull request
+  names that branch as its base. Once the previous phase merges, the branch is rebased
+  onto main and the base changed to main. The prior wording, above, stands for every
+  other case.
 - **Reviews.** The review helper (`review_tool.py`), with the other tool as reviewer:
   - `--subject plan` over this plan, before the plan gate (the project's plan-review bar);
   - `--subject phase` over each phase's diff (process-phase step 4);
