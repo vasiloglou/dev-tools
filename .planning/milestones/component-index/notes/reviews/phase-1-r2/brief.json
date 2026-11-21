@@ -1,0 +1,110 @@
+{
+  "base": "1a5f14c",
+  "claims": [
+    "A note written with 25 or fewer ignored paths is byte-for-byte the note main writes.",
+    "takeover reports ready only if every ignored path the note was written with, other than a key file, exists in the checkout, wherever it sits in the list and whatever characters it holds.",
+    "A note from 0.1.3 or older whose list was cut, and any ignored-rest line that is damaged, short, long or not a list of path and kind items, gives ready false and never raises.",
+    "A missing key file, listed or after the 25th, is reported in missing_keys and does not block.",
+    "No note that main writes for a checkout with ordinary paths reads as not ready because of the new line-by-line rule.",
+    "plugins/ is rebuilt from skills/ at 0.1.4."
+  ],
+  "created": "2026-11-21T19:40:28.884332+00:00",
+  "deleted": [],
+  "dirty": true,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r2/diff.patch",
+      "sha256": "c387a3db863a527a4b5e2cc68922d6912788feec76ff91d32e783d27c3ae2736"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-1-spec.md",
+      "sha256": "bb8a2c94eb7ffddfbec76d2b6f408fb86c2bcd5dfbd7663611233547e2c11a73"
+    },
+    {
+      "path": "devtools/PLUGIN_VERSION",
+      "sha256": "8a3dad16d348c163566a456fcf650d85d7aeeda5e53d01ee1fa8dc15212915a7"
+    },
+    {
+      "path": "docs/handoff.html",
+      "sha256": "33880b4fac821bf766c802d81ef25158470d36747b192f02fa410981db24b6a7"
+    },
+    {
+      "path": "plugins/dvt-milestone/.claude-plugin/plugin.json",
+      "sha256": "492ae4c62c4fe4706eeec04e118af8c2d4ea264235122aa15443c8e4c7294599"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/references/handoff.md",
+      "sha256": "2cc54f1e8f3f1d626baeeb1c4818878cac82a079f3897f560b3fa6ce68abcb9b"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "42a7cf47e736e92b659b5865dac6a66206e22262410a5825b12759a57d9bdf30"
+    },
+    {
+      "path": "plugins/dvt-phase/.claude-plugin/plugin.json",
+      "sha256": "f3a7e2a54161de4145830a96c41ec780a6bce3fa8cd8f33c1a5f6351a62e03b1"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/references/handoff.md",
+      "sha256": "2cc54f1e8f3f1d626baeeb1c4818878cac82a079f3897f560b3fa6ce68abcb9b"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "42a7cf47e736e92b659b5865dac6a66206e22262410a5825b12759a57d9bdf30"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "81ce6d44aa595922f59d8b6d4f5151978d6538b2cd0f64ba5f06bd65c481a4b3"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "42a7cf47e736e92b659b5865dac6a66206e22262410a5825b12759a57d9bdf30"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "3238f394d3a1e235901d58df2950c4c24ad53a4f9f0ec34dbd6fb06281bcf8e4"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/BRIEF.md",
+      "sha256": "c8f50889fbda5c75a7ba7f41479bca4b4c38a5b34686c796bf45ee554364c490"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/FINDINGS.md",
+      "sha256": "b1566979148a7d8aa47d06a49cbc5e331f534a8c5b6e1b6cc0230b6a1259a341"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/brief.json",
+      "sha256": "029a22ca25be177587a4461cba525adc41730c28bb83aeeeaaa5f24b05405969"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/diff.patch",
+      "sha256": "f732528b2037cb53a3ec99be06595dbafd567ddadb6332db83c228f37d32fa76"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/review.md",
+      "sha256": "c6c5f22687c7b3f76fb95d8bc8cfa6bf37f6ca2878b98e5e36a9c1c6991150f6"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/run.json",
+      "sha256": "c9ddc86587382b2622be48174dc17c7086dc53a73f0d17e79bf6dbd168620938"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "1a5f14c534dff093063d8529eecca582f4d2ce40",
+  "left_out": [],
+  "notes": [
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/BRIEF.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/FINDINGS.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/brief.json (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/diff.patch (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/review.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-1-r1/run.json (not tracked yet, so not in the diff: read it whole)"
+  ],
+  "pr": null,
+  "question": "Does this diff do what notes/phase-1-spec.md requires of it, including its implementation findings, and where can its claims below be shown false, by an input, a note or a checkout state? Round 1 is notes/reviews/phase-1-r1.",
+  "subject": "phase",
+  "version": 1
+}

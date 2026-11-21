@@ -20,4 +20,4 @@ note did not list is missing.
   5. Close.
 - **Execution:** `process-milestone component-index auto`, from 2026-11-21. Merges, release
   tags and anything posted to GitHub still need the owner each time.
-- **Records:** [001-plan.md](001-plan.md).
+- **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md).

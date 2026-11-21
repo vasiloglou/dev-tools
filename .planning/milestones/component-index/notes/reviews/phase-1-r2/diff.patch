@@ -1,0 +1,620 @@
+diff --git a/.planning/milestones/component-index/notes/phase-1-spec.md b/.planning/milestones/component-index/notes/phase-1-spec.md
+index 4536f15..6e46aac 100644
+--- a/.planning/milestones/component-index/notes/phase-1-spec.md
++++ b/.planning/milestones/component-index/notes/phase-1-spec.md
+@@ -242,3 +242,38 @@ on prose. The argument for prose: the format change is one line, written only wh
+ list is cut. Its whole grammar is the JSON item above, and T1, T3, T5 and T7 are that
+ corpus, written first in step 3. If the owner prefers, those four fixtures are written
+ before the gate, and the gate rules on them.
++
++## Implementation findings (recorded as found, 2026-11-21)
++
++- **IF1. T2's "on main" column.** T2 fails on main too, with `KeyError: 'unlisted_ignored'`,
++  because it asserts the new key. It is not a regression test of the defect; T1 is.
++- **IF2. T5 compared with main's bytes.** A one-off script loaded main's `handoff.py` (from a
++  throwaway worktree at `c9648dd`) and this branch's, and wrote a note with each over the
++  same repository: identical snapshots at 2 and 25 paths; at 26, only the `ignored-rest`
++  line differs. T5 itself pins the bullets by a literal, so it keeps holding after the
++  merge, when main is this code.
++- **IF3. The plugin version.** `release_plugins.py status` before the bump: `version in the
++  tree: 0.1.3`, `released: 0.1.2`. 0.1.3 was never tagged, but plugin installs of 0.1.3 exist
++  (this machine runs one), so the bump to 0.1.4 stands, as the plan says.
++- **IF4. The first phase brief named unrelated files.** `review_tool.py brief --subject
++  phase` reads every untracked file. The PR 26 rounds in `.planning/reviews/` and the
++  `review.log` files were named (42 files). That run was stopped before it reported and set
++  aside outside the tree. The files are now excluded locally in `.git/info/exclude`, not in
++  `.gitignore`, since the PR 26 rounds are out of scope (plan section 7). The brief was
++  written again with 15 files.
++- **IF5. Phase review r1 (Codex): 2 blocking findings, both reproduced.**
++  - F1: a path holding a newline can print a line that reads as a whole bullet
++    (``out0` (0.0 MB, 1 file)`` + newline + `1/`), so its continuation was ignored and the
++    note read as ready.
++  - F2: an `ignored-rest` item whose `kind` is a list or an object raised `TypeError`.
++
++  Repairs (correction to the design in section 6, `takeover`; the earlier rule was "a line
++  ... that starts with ``- ` `` and does not match"): every line of the ignored-files
++  section must be one the snapshot writes. These are an empty line, `- none`, a bullet, the
++  `- and N` line or the rest line. Each run of other lines counts 1 in
++  `unlisted_ignored`. A `kind` must be a string before it is looked up. T10 and T7/T8
++  gained these cases, and each was observed red before the repair (`TypeError` twice;
++  `assert (0 == 1)` once).
++- **Review budget for this phase, declared before round 2:** one more round (r2). If r2
++  finds anything, its findings are reproduced, fixed with a red-first test, and the phase
++  records them without a round 3.
+diff --git a/devtools/PLUGIN_VERSION b/devtools/PLUGIN_VERSION
+index b1e80bb..845639e 100644
+--- a/devtools/PLUGIN_VERSION
++++ b/devtools/PLUGIN_VERSION
+@@ -1 +1 @@
+-0.1.3
++0.1.4
+diff --git a/docs/handoff.html b/docs/handoff.html
+index 3afd094..baac5a7 100644
+--- a/docs/handoff.html
++++ b/docs/handoff.html
+@@ -179,7 +179,7 @@ ignored files (not in git):
+       <span class="num">Arriving</span>
+       <h3>Which hand-off, and is this machine ready for it?</h3>
+       <p>With no branch named, the agent lists the hand-offs on local and remote branches and asks you which one to take over. It does not pick one itself.</p>
+-      <p>On the branch, one report says whether this checkout has the commit the note was written at, which ignored files the note lists that are missing here, and what the machine lacks. A project names what its machines need (tools, an environment, key files) in the script's settings. A missing tool or environment means not ready; so does a note with no next step.</p>
++      <p>On the branch, one report says whether this checkout has the commit the note was written at, which ignored files the note was written with are missing here (every one, including those after the 25th that the note does not list for a reader), and what the machine lacks. A project names what its machines need (tools, an environment, key files) in the script's settings. A missing tool or environment means not ready; so does a note with no next step.</p>
+     </div>
+     <div>
+ <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a second checkout, before anything is set up</b><em>captured</em></div>
+diff --git a/plugins/dvt-milestone/.claude-plugin/plugin.json b/plugins/dvt-milestone/.claude-plugin/plugin.json
+index 753228e..dfb4f46 100644
+--- a/plugins/dvt-milestone/.claude-plugin/plugin.json
++++ b/plugins/dvt-milestone/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-milestone",
+-  "version": "0.1.3",
++  "version": "0.1.4",
+   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-milestone/skills/dev-handoff/references/handoff.md b/plugins/dvt-milestone/skills/dev-handoff/references/handoff.md
+index ac1df6b..4d03923 100644
+--- a/plugins/dvt-milestone/skills/dev-handoff/references/handoff.md
++++ b/plugins/dvt-milestone/skills/dev-handoff/references/handoff.md
+@@ -180,11 +180,15 @@ needs, and key files. It reports only whether a key file exists and never reads
+ one.
+ 
+ `takeover` says ready when the checkout holds the commit the note was written
+-at, no ignored path the note lists is missing, the note has a next step, and
+-nothing it marks `[MISSING]` is left: a tool or an environment path the settings
+-name, and the git remote unless the note is for the same machine (level 1 or
+-2). The base branch, the assistants on PATH and key files are reported as not
+-needed to continue.
++at, no ignored path the note was written with is missing (the ones it lists, and
++those after the 25th, which it keeps in one line at the end of the snapshot), the
++note has a next step, and nothing it marks `[MISSING]` is left: a tool or an
++environment path the settings name, and the git remote unless the note is for
++the same machine (level 1 or 2). A note from before 0.1.4 that cut its list at
++25, or a listed path the report cannot read (one holding a newline), counts
++under "ignored paths the note did not list", and is not ready until those paths
++are checked by hand. The base branch, the assistants on PATH and key files are
++reported as not needed to continue.
+ 
+ What does not come with the clone:
+ 
+diff --git a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+index c3f14ba..63965be 100644
+--- a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+@@ -99,6 +99,9 @@ SETTINGS = load_settings()
+ FILL = "_TODO: fill before handing off._"
+ SNAPSHOT_START = "<!-- snapshot:start (regenerated by handoff.py write) -->"
+ SNAPSHOT_END = "<!-- snapshot:end -->"
++REST_START = "<!-- ignored-rest: "
++_BULLET = re.compile(r"- `(.+)` \(([^)]*)\)")
++_CUT = re.compile(r"^- and (\d+) smaller paths? \(", re.MULTILINE)
+ # Section heading -> what the one who is leaving writes there.
+ HUMAN_SECTIONS = {
+     "Goal": "What this branch is for and what done means (the issue, phase or request).",
+@@ -718,6 +721,10 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+               for e in snap["ignored"][:25]] or ["- none"]
+     if len(snap["ignored"]) > 25:
+         lines.append(f"- and {_n(len(snap['ignored']) - 25, 'smaller path')} (`handoff.py ignored`)")
++        # The paths after the 25th, for takeover to check: one line a reader can skip. A ">" is
++        # written as \u003e, so a path holding "-->" cannot end the comment early.
++        rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
++        lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+     return "\n".join(lines)
+ 
+@@ -958,6 +965,22 @@ def available(root: Path) -> list[dict]:
+     return sorted(notes.values(), key=lambda n: (n["updated"], n["branch"]), reverse=True)
+ 
+ 
++def _ignored_rest(listed: str, count: int) -> list[dict] | None:
++    """The paths after the 25th, from the snapshot's ignored-rest line, or None when there is no
++    such line or it cannot be trusted: not JSON, not a list of {path, kind}, or not ``count`` long."""
++    line = next((l for l in listed.splitlines() if l.startswith(REST_START) and l.endswith(" -->")), None)
++    try:
++        items = json.loads(line[len(REST_START):-len(" -->")]) if line else None
++    except ValueError:
++        return None
++    if not isinstance(items, list) or len(items) != count or not all(
++            isinstance(i, dict) and isinstance(i.get("path"), str) and isinstance(i.get("kind"), str)
++            and i["kind"] in {"carry", "large", "key"}
++            for i in items):
++        return None
++    return items
++
++
+ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     """Everything the receiving side checks before continuing, in one report.
+ 
+@@ -977,6 +1000,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         "head": "unknown",
+         "missing_ignored": [],
+         "missing_keys": [],
++        "unlisted_ignored": 0,
+         "paused_phases": _paused(root),
+         "next_step": "",
+         "doctor": rows,
+@@ -997,9 +1021,29 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         fork = _git(root, "merge-base", head.group(1), "HEAD") if known else ""
+         report["head"] = "ok" if fork.startswith(head.group(1)) else ("diverged" if known else "missing")
+     listed = snap.split("Files git ignores", 1)[-1] if "Files git ignores" in snap else ""
+-    for rel, rest in re.findall(r"^- `([^`]+)` \(([^)]*)\)", listed, re.MULTILINE):
++    paths: list[tuple[str, bool]] = []  # (path, is a key file), every one the note was written with
++    # Each run of lines that is none of the snapshot's own is one path the note printed over
++    # several lines (it held a newline), and the bullet just before such a run may be the start
++    # of that path. Neither can be checked, so each run counts as unlisted.
++    unread = False
++    for line in listed.splitlines()[1:]:
++        bullet = _BULLET.fullmatch(line) if line.startswith("- `") else None
++        known = bullet or line in {"", "- none"} or _CUT.match(line) or line.startswith(REST_START)
++        if not known and not unread:
++            report["unlisted_ignored"] += 1
++        unread = not known
++        if bullet:
++            paths.append((bullet.group(1), "key file" in bullet.group(2)))
++    cut = _CUT.search(listed)
++    if cut:
++        rest = _ignored_rest(listed, int(cut.group(1)))
++        if rest is None:
++            report["unlisted_ignored"] += int(cut.group(1))  # a note from before 0.1.4, or a damaged line
++        else:
++            paths += [(item["path"], item["kind"] == "key") for item in rest]
++    for rel, key in paths:
+         if not (root / rel).exists():
+-            report["missing_keys" if "key file" in rest else "missing_ignored"].append(rel)
++            report["missing_keys" if key else "missing_ignored"].append(rel)
+     report["next_step"] = _section(text, "Next step")
+     # What stands between this checkout and the work: the tools and the environment the project
+     # names, and a remote unless the note says the work stays on this machine. The base branch,
+@@ -1011,6 +1055,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     report["ready"] = (
+         report["head"] == "ok"
+         and not report["missing_ignored"]
++        and not report["unlisted_ignored"]
+         and not report["blocking"]
+         and bool(report["next_step"]) and FILL not in report["next_step"]
+     )
+@@ -1060,6 +1105,9 @@ def _render_takeover(report: dict) -> str:
+     ]
+     lines += [f"  missing ignored path: {rel}  (handoff.py pull --from-checkout <old checkout>)"
+               for rel in report["missing_ignored"]]
++    if report["unlisted_ignored"]:
++        lines.append(f"  ignored paths the note did not list: {report['unlisted_ignored']}  (compare with handoff.py "
++                     "ignored in the old checkout, or handoff.py pull --from-checkout <old checkout>)")
+     lines += [f"  key file on the old machine, not here: {rel}  (copy by hand if needed)"
+               for rel in report["missing_keys"]]
+     lines += [f"  paused phase: {rel}  (continue with process-phase)" for rel in report["paused_phases"]]
+diff --git a/plugins/dvt-phase/.claude-plugin/plugin.json b/plugins/dvt-phase/.claude-plugin/plugin.json
+index e7268cf..ec3d186 100644
+--- a/plugins/dvt-phase/.claude-plugin/plugin.json
++++ b/plugins/dvt-phase/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-phase",
+-  "version": "0.1.3",
++  "version": "0.1.4",
+   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-phase/skills/dev-handoff/references/handoff.md b/plugins/dvt-phase/skills/dev-handoff/references/handoff.md
+index ac1df6b..4d03923 100644
+--- a/plugins/dvt-phase/skills/dev-handoff/references/handoff.md
++++ b/plugins/dvt-phase/skills/dev-handoff/references/handoff.md
+@@ -180,11 +180,15 @@ needs, and key files. It reports only whether a key file exists and never reads
+ one.
+ 
+ `takeover` says ready when the checkout holds the commit the note was written
+-at, no ignored path the note lists is missing, the note has a next step, and
+-nothing it marks `[MISSING]` is left: a tool or an environment path the settings
+-name, and the git remote unless the note is for the same machine (level 1 or
+-2). The base branch, the assistants on PATH and key files are reported as not
+-needed to continue.
++at, no ignored path the note was written with is missing (the ones it lists, and
++those after the 25th, which it keeps in one line at the end of the snapshot), the
++note has a next step, and nothing it marks `[MISSING]` is left: a tool or an
++environment path the settings name, and the git remote unless the note is for
++the same machine (level 1 or 2). A note from before 0.1.4 that cut its list at
++25, or a listed path the report cannot read (one holding a newline), counts
++under "ignored paths the note did not list", and is not ready until those paths
++are checked by hand. The base branch, the assistants on PATH and key files are
++reported as not needed to continue.
+ 
+ What does not come with the clone:
+ 
+diff --git a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+index c3f14ba..63965be 100644
+--- a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+@@ -99,6 +99,9 @@ SETTINGS = load_settings()
+ FILL = "_TODO: fill before handing off._"
+ SNAPSHOT_START = "<!-- snapshot:start (regenerated by handoff.py write) -->"
+ SNAPSHOT_END = "<!-- snapshot:end -->"
++REST_START = "<!-- ignored-rest: "
++_BULLET = re.compile(r"- `(.+)` \(([^)]*)\)")
++_CUT = re.compile(r"^- and (\d+) smaller paths? \(", re.MULTILINE)
+ # Section heading -> what the one who is leaving writes there.
+ HUMAN_SECTIONS = {
+     "Goal": "What this branch is for and what done means (the issue, phase or request).",
+@@ -718,6 +721,10 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+               for e in snap["ignored"][:25]] or ["- none"]
+     if len(snap["ignored"]) > 25:
+         lines.append(f"- and {_n(len(snap['ignored']) - 25, 'smaller path')} (`handoff.py ignored`)")
++        # The paths after the 25th, for takeover to check: one line a reader can skip. A ">" is
++        # written as \u003e, so a path holding "-->" cannot end the comment early.
++        rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
++        lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+     return "\n".join(lines)
+ 
+@@ -958,6 +965,22 @@ def available(root: Path) -> list[dict]:
+     return sorted(notes.values(), key=lambda n: (n["updated"], n["branch"]), reverse=True)
+ 
+ 
++def _ignored_rest(listed: str, count: int) -> list[dict] | None:
++    """The paths after the 25th, from the snapshot's ignored-rest line, or None when there is no
++    such line or it cannot be trusted: not JSON, not a list of {path, kind}, or not ``count`` long."""
++    line = next((l for l in listed.splitlines() if l.startswith(REST_START) and l.endswith(" -->")), None)
++    try:
++        items = json.loads(line[len(REST_START):-len(" -->")]) if line else None
++    except ValueError:
++        return None
++    if not isinstance(items, list) or len(items) != count or not all(
++            isinstance(i, dict) and isinstance(i.get("path"), str) and isinstance(i.get("kind"), str)
++            and i["kind"] in {"carry", "large", "key"}
++            for i in items):
++        return None
++    return items
++
++
+ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     """Everything the receiving side checks before continuing, in one report.
+ 
+@@ -977,6 +1000,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         "head": "unknown",
+         "missing_ignored": [],
+         "missing_keys": [],
++        "unlisted_ignored": 0,
+         "paused_phases": _paused(root),
+         "next_step": "",
+         "doctor": rows,
+@@ -997,9 +1021,29 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         fork = _git(root, "merge-base", head.group(1), "HEAD") if known else ""
+         report["head"] = "ok" if fork.startswith(head.group(1)) else ("diverged" if known else "missing")
+     listed = snap.split("Files git ignores", 1)[-1] if "Files git ignores" in snap else ""
+-    for rel, rest in re.findall(r"^- `([^`]+)` \(([^)]*)\)", listed, re.MULTILINE):
++    paths: list[tuple[str, bool]] = []  # (path, is a key file), every one the note was written with
++    # Each run of lines that is none of the snapshot's own is one path the note printed over
++    # several lines (it held a newline), and the bullet just before such a run may be the start
++    # of that path. Neither can be checked, so each run counts as unlisted.
++    unread = False
++    for line in listed.splitlines()[1:]:
++        bullet = _BULLET.fullmatch(line) if line.startswith("- `") else None
++        known = bullet or line in {"", "- none"} or _CUT.match(line) or line.startswith(REST_START)
++        if not known and not unread:
++            report["unlisted_ignored"] += 1
++        unread = not known
++        if bullet:
++            paths.append((bullet.group(1), "key file" in bullet.group(2)))
++    cut = _CUT.search(listed)
++    if cut:
++        rest = _ignored_rest(listed, int(cut.group(1)))
++        if rest is None:
++            report["unlisted_ignored"] += int(cut.group(1))  # a note from before 0.1.4, or a damaged line
++        else:
++            paths += [(item["path"], item["kind"] == "key") for item in rest]
++    for rel, key in paths:
+         if not (root / rel).exists():
+-            report["missing_keys" if "key file" in rest else "missing_ignored"].append(rel)
++            report["missing_keys" if key else "missing_ignored"].append(rel)
+     report["next_step"] = _section(text, "Next step")
+     # What stands between this checkout and the work: the tools and the environment the project
+     # names, and a remote unless the note says the work stays on this machine. The base branch,
+@@ -1011,6 +1055,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     report["ready"] = (
+         report["head"] == "ok"
+         and not report["missing_ignored"]
++        and not report["unlisted_ignored"]
+         and not report["blocking"]
+         and bool(report["next_step"]) and FILL not in report["next_step"]
+     )
+@@ -1060,6 +1105,9 @@ def _render_takeover(report: dict) -> str:
+     ]
+     lines += [f"  missing ignored path: {rel}  (handoff.py pull --from-checkout <old checkout>)"
+               for rel in report["missing_ignored"]]
++    if report["unlisted_ignored"]:
++        lines.append(f"  ignored paths the note did not list: {report['unlisted_ignored']}  (compare with handoff.py "
++                     "ignored in the old checkout, or handoff.py pull --from-checkout <old checkout>)")
+     lines += [f"  key file on the old machine, not here: {rel}  (copy by hand if needed)"
+               for rel in report["missing_keys"]]
+     lines += [f"  paused phase: {rel}  (continue with process-phase)" for rel in report["paused_phases"]]
+diff --git a/skills/dev-handoff/references/handoff.md b/skills/dev-handoff/references/handoff.md
+index 4c4de5a..fb73eff 100644
+--- a/skills/dev-handoff/references/handoff.md
++++ b/skills/dev-handoff/references/handoff.md
+@@ -180,11 +180,15 @@ needs, and key files. It reports only whether a key file exists and never reads
+ one.
+ 
+ `takeover` says ready when the checkout holds the commit the note was written
+-at, no ignored path the note lists is missing, the note has a next step, and
+-nothing it marks `[MISSING]` is left: a tool or an environment path the settings
+-name, and the git remote unless the note is for the same machine (level 1 or
+-2). The base branch, the assistants on PATH and key files are reported as not
+-needed to continue.
++at, no ignored path the note was written with is missing (the ones it lists, and
++those after the 25th, which it keeps in one line at the end of the snapshot), the
++note has a next step, and nothing it marks `[MISSING]` is left: a tool or an
++environment path the settings name, and the git remote unless the note is for
++the same machine (level 1 or 2). A note from before 0.1.4 that cut its list at
++25, or a listed path the report cannot read (one holding a newline), counts
++under "ignored paths the note did not list", and is not ready until those paths
++are checked by hand. The base branch, the assistants on PATH and key files are
++reported as not needed to continue.
+ 
+ What does not come with the clone:
+ 
+diff --git a/skills/dev-handoff/scripts/handoff.py b/skills/dev-handoff/scripts/handoff.py
+index c3f14ba..63965be 100644
+--- a/skills/dev-handoff/scripts/handoff.py
++++ b/skills/dev-handoff/scripts/handoff.py
+@@ -99,6 +99,9 @@ SETTINGS = load_settings()
+ FILL = "_TODO: fill before handing off._"
+ SNAPSHOT_START = "<!-- snapshot:start (regenerated by handoff.py write) -->"
+ SNAPSHOT_END = "<!-- snapshot:end -->"
++REST_START = "<!-- ignored-rest: "
++_BULLET = re.compile(r"- `(.+)` \(([^)]*)\)")
++_CUT = re.compile(r"^- and (\d+) smaller paths? \(", re.MULTILINE)
+ # Section heading -> what the one who is leaving writes there.
+ HUMAN_SECTIONS = {
+     "Goal": "What this branch is for and what done means (the issue, phase or request).",
+@@ -718,6 +721,10 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+               for e in snap["ignored"][:25]] or ["- none"]
+     if len(snap["ignored"]) > 25:
+         lines.append(f"- and {_n(len(snap['ignored']) - 25, 'smaller path')} (`handoff.py ignored`)")
++        # The paths after the 25th, for takeover to check: one line a reader can skip. A ">" is
++        # written as \u003e, so a path holding "-->" cannot end the comment early.
++        rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
++        lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+     return "\n".join(lines)
+ 
+@@ -958,6 +965,22 @@ def available(root: Path) -> list[dict]:
+     return sorted(notes.values(), key=lambda n: (n["updated"], n["branch"]), reverse=True)
+ 
+ 
++def _ignored_rest(listed: str, count: int) -> list[dict] | None:
++    """The paths after the 25th, from the snapshot's ignored-rest line, or None when there is no
++    such line or it cannot be trusted: not JSON, not a list of {path, kind}, or not ``count`` long."""
++    line = next((l for l in listed.splitlines() if l.startswith(REST_START) and l.endswith(" -->")), None)
++    try:
++        items = json.loads(line[len(REST_START):-len(" -->")]) if line else None
++    except ValueError:
++        return None
++    if not isinstance(items, list) or len(items) != count or not all(
++            isinstance(i, dict) and isinstance(i.get("path"), str) and isinstance(i.get("kind"), str)
++            and i["kind"] in {"carry", "large", "key"}
++            for i in items):
++        return None
++    return items
++
++
+ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     """Everything the receiving side checks before continuing, in one report.
+ 
+@@ -977,6 +1000,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         "head": "unknown",
+         "missing_ignored": [],
+         "missing_keys": [],
++        "unlisted_ignored": 0,
+         "paused_phases": _paused(root),
+         "next_step": "",
+         "doctor": rows,
+@@ -997,9 +1021,29 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+         fork = _git(root, "merge-base", head.group(1), "HEAD") if known else ""
+         report["head"] = "ok" if fork.startswith(head.group(1)) else ("diverged" if known else "missing")
+     listed = snap.split("Files git ignores", 1)[-1] if "Files git ignores" in snap else ""
+-    for rel, rest in re.findall(r"^- `([^`]+)` \(([^)]*)\)", listed, re.MULTILINE):
++    paths: list[tuple[str, bool]] = []  # (path, is a key file), every one the note was written with
++    # Each run of lines that is none of the snapshot's own is one path the note printed over
++    # several lines (it held a newline), and the bullet just before such a run may be the start
++    # of that path. Neither can be checked, so each run counts as unlisted.
++    unread = False
++    for line in listed.splitlines()[1:]:
++        bullet = _BULLET.fullmatch(line) if line.startswith("- `") else None
++        known = bullet or line in {"", "- none"} or _CUT.match(line) or line.startswith(REST_START)
++        if not known and not unread:
++            report["unlisted_ignored"] += 1
++        unread = not known
++        if bullet:
++            paths.append((bullet.group(1), "key file" in bullet.group(2)))
++    cut = _CUT.search(listed)
++    if cut:
++        rest = _ignored_rest(listed, int(cut.group(1)))
++        if rest is None:
++            report["unlisted_ignored"] += int(cut.group(1))  # a note from before 0.1.4, or a damaged line
++        else:
++            paths += [(item["path"], item["kind"] == "key") for item in rest]
++    for rel, key in paths:
+         if not (root / rel).exists():
+-            report["missing_keys" if "key file" in rest else "missing_ignored"].append(rel)
++            report["missing_keys" if key else "missing_ignored"].append(rel)
+     report["next_step"] = _section(text, "Next step")
+     # What stands between this checkout and the work: the tools and the environment the project
+     # names, and a remote unless the note says the work stays on this machine. The base branch,
+@@ -1011,6 +1055,7 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
+     report["ready"] = (
+         report["head"] == "ok"
+         and not report["missing_ignored"]
++        and not report["unlisted_ignored"]
+         and not report["blocking"]
+         and bool(report["next_step"]) and FILL not in report["next_step"]
+     )
+@@ -1060,6 +1105,9 @@ def _render_takeover(report: dict) -> str:
+     ]
+     lines += [f"  missing ignored path: {rel}  (handoff.py pull --from-checkout <old checkout>)"
+               for rel in report["missing_ignored"]]
++    if report["unlisted_ignored"]:
++        lines.append(f"  ignored paths the note did not list: {report['unlisted_ignored']}  (compare with handoff.py "
++                     "ignored in the old checkout, or handoff.py pull --from-checkout <old checkout>)")
+     lines += [f"  key file on the old machine, not here: {rel}  (copy by hand if needed)"
+               for rel in report["missing_keys"]]
+     lines += [f"  paused phase: {rel}  (continue with process-phase)" for rel in report["paused_phases"]]
+diff --git a/tests/test_handoff.py b/tests/test_handoff.py
+index 411487d..9a0fb23 100644
+--- a/tests/test_handoff.py
++++ b/tests/test_handoff.py
+@@ -965,3 +965,135 @@ def test_include_does_not_reach_through_an_ignored_link(repo, tmp_path):
+     # The link itself can be named, and is copied as a link.
+     handoff.carry(repo, str(dest), base="base", all_ages=True, include=["runs/latest"], yes=True)
+     assert (dest / "runs/latest").is_symlink() and list((dest / "runs").iterdir()) == [dest / "runs/latest"]
++
++
++# --- every ignored path the note was written with is checked (issue 28) ---
++
++def _ignored_note(repo: Path, tmp_path: Path, names: list[str]) -> tuple[Path, Path]:
++    """Ignored paths ``names``, largest first, a filled note written and committed, and a clone
++    with none of them in it. Returns the clone and the clone's note."""
++    write(repo, ".gitignore", "out*/\nz*/\n.env.local\n")
++    for i, name in enumerate(names):
++        size = (len(names) - i) * 100
++        write(repo, name.rstrip("/") + "/f.bin" if name.endswith("/") else name, "x" * size)
++    commit(repo)
++    path = handoff.write_note(repo, base="base", sender="claude", to="codex", machine="new")
++    fill(path, handoff.HUMAN_SECTIONS, "run the total tests")
++    commit(repo)
++    dest = tmp_path / "other"
++    git(tmp_path, "clone", "-q", str(repo), str(dest))
++    return dest, dest / ".planning/handoffs/feature.md"
++
++
++def _copy(repo: Path, dest: Path, names: list[str]) -> None:
++    for name in names:
++        if name.endswith("/"):
++            shutil.copytree(repo / name, dest / name)
++        else:
++            shutil.copy2(repo / name, dest / name)
++
++
++OUT = [f"out{i:02d}/" for i in range(26)]
++
++
++def test_t1_a_missing_path_after_the_25th_makes_takeover_not_ready(repo, tmp_path):
++    dest, note = _ignored_note(repo, tmp_path, OUT)
++    assert "- and 1 smaller path" in note.read_text() and "`out25/`" not in note.read_text()
++    _copy(repo, dest, OUT[:25])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_ignored"] == ["out25/"] and report["ready"] is False
++    assert report["unlisted_ignored"] == 0
++
++
++def test_t2_with_every_path_present_takeover_is_ready(repo, tmp_path):
++    dest, _ = _ignored_note(repo, tmp_path, OUT)
++    _copy(repo, dest, OUT)
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_ignored"] == [] and report["unlisted_ignored"] == 0 and report["ready"] is True
++
++
++def _older_note(repo: Path, tmp_path: Path) -> tuple[Path, Path]:
++    """A ready takeover whose note is then given an older version's cut list, by hand."""
++    dest = handed_over(repo, tmp_path)
++    handoff.pull(dest, str(repo), base="base", yes=True)
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["ready"] is True and report["unlisted_ignored"] == 0
++    note = dest / ".planning/handoffs/feature.md"
++    note.write_text(note.read_text().replace(
++        handoff.SNAPSHOT_END, "- and 1 smaller path (`handoff.py ignored`)\n" + handoff.SNAPSHOT_END))
++    return dest, note
++
++
++def test_t3_an_older_note_with_a_cut_list_is_not_ready(repo, tmp_path):
++    dest, _ = _older_note(repo, tmp_path)
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["unlisted_ignored"] == 1 and report["ready"] is False
++
++
++def test_t4_a_missing_key_file_after_the_25th_is_reported_and_does_not_block(repo, tmp_path):
++    names = OUT[:25] + [".env.local"]
++    dest, note = _ignored_note(repo, tmp_path, names)
++    assert "`.env.local`" not in note.read_text()
++    _copy(repo, dest, OUT[:25])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_keys"] == [".env.local"] and report["missing_ignored"] == []
++    assert report["unlisted_ignored"] == 0 and report["ready"] is True
++
++
++@pytest.mark.parametrize("count", [2, 25])
++def test_t5_a_note_of_25_paths_or_fewer_has_no_rest_line(repo, tmp_path, count):
++    names = OUT[:count]
++    _, note = _ignored_note(repo, tmp_path, names)
++    text = note.read_text()
++    listed = text.split("Files git ignores", 1)[1].split(handoff.SNAPSHOT_END, 1)[0]
++    assert "ignored-rest" not in text and "smaller path" not in text
++    assert [line for line in listed.splitlines() if line.startswith("- ")] == [
++        f"- `{name}` (0.0 MB, 1 file)" for name in names]
++
++
++def test_t6_the_text_report_counts_the_paths_an_older_note_did_not_list(repo, tmp_path):
++    dest, _ = _older_note(repo, tmp_path)
++    done = run(dest, "takeover")
++    assert done.returncode == 0, done.stderr
++    assert "  ignored paths the note did not list: 1  (compare with handoff.py ignored in the old " \
++           "checkout, or handoff.py pull --from-checkout <old checkout>)" in done.stdout
++    assert "NOT ready" in done.stdout
++
++
++@pytest.mark.parametrize("rest", ["not json", "[]", '[{"path":"out25/","kind":[]}]',
++                                  '[{"path":"out25/","kind":{}}]'])  # the last two crashed (phase-1-r1 F2)
++def test_t7_t8_an_unreadable_or_short_rest_line_is_treated_as_absent(repo, tmp_path, rest):
++    dest, note = _ignored_note(repo, tmp_path, OUT)
++    text = note.read_text()
++    line = next(l for l in text.splitlines() if l.startswith("<!-- ignored-rest: "))
++    note.write_text(text.replace(line, f"<!-- ignored-rest: {rest} -->"))
++    _copy(repo, dest, OUT[:25])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["unlisted_ignored"] == 1 and report["ready"] is False
++
++
++def test_t9_a_path_holding_a_backtick_is_checked(repo, tmp_path):
++    names = ["out0/", "out`1/"]
++    dest, _ = _ignored_note(repo, tmp_path, names)
++    _copy(repo, dest, names[:1])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_ignored"] == ["out`1/"] and report["ready"] is False
++
++
++@pytest.mark.parametrize("odd", ["out\n1/", "out0` (0.0 MB, 1 file)\n1/"])  # the second forges a bullet (phase-1-r1 F1)
++def test_t10_a_bullet_that_cannot_be_read_withholds_ready(repo, tmp_path, odd):
++    names = ["out0/", odd]
++    dest, _ = _ignored_note(repo, tmp_path, names)
++    _copy(repo, dest, names[:1])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["unlisted_ignored"] == 1 and report["ready"] is False
++
++
++def test_t11_a_path_holding_a_comment_end_survives_the_rest_line(repo, tmp_path):
++    names = OUT[:25] + ["z-->/"]
++    dest, note = _ignored_note(repo, tmp_path, names)
++    line = next(l for l in note.read_text().splitlines() if l.startswith("<!-- ignored-rest: "))
++    assert "\\u003e" in line and "-->" not in line[:-len(" -->")]
++    _copy(repo, dest, OUT[:25])
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_ignored"] == ["z-->/"] and report["ready"] is False
