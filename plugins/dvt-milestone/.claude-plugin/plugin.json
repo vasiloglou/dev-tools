@@ -1,6 +1,6 @@
 {
   "name": "dvt-milestone",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
   "author": {
     "name": "vasiloglou",

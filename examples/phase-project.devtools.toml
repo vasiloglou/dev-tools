@@ -86,6 +86,7 @@ dest = "scripts/components_index.py"
 package_dir = "src/myapp"
 import_prefix = "myapp"
 extra_source_dirs = []
+# count_extra_dirs = true   # count the extra folders' modules too (plugin 0.1.5 or newer)
 docs_dir = "docs/components"
 script_path = "scripts/components_index.py"
 # verb_list = "shared"   # for a large catalog: list only the verbs two or more entries use

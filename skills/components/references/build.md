@@ -13,6 +13,9 @@ them is separate work.
 1. Check the settings in `components_index.settings.json` beside the script:
    `package_dir` is the folder that holds the package (for example `src/<package>`), and
    `extra_source_dirs` lists other folders with source worth listing (scripts, tools).
+   When those folders hold code that should have components too, set `count_extra_dirs`
+   to true: coverage, `--check --strict`, `draft`, `changed` and `review` then count their
+   modules like the package's (plugin 0.1.5 or newer).
    `docs_dir` is where the index is written (`docs/components` by default): if `docs/`
    is published as a site or scanned by documentation tests, put the index outside it or
    exclude it from the site. For a package of more than about 100 modules set

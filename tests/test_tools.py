@@ -668,6 +668,110 @@ def test_changed_warns_about_a_new_caller_of_a_retired_component(project):
     assert tool(project, "changed", "--base", "main", "--strict", script=INDEX)[0] == 1
 
 
+def extra_tools(project, count=None):
+    """An extra source folder, tools/, with one module, and the package itself covered."""
+    (project / "tools").mkdir()
+    (project / "tools/report.py").write_text('"""Print a size report."""\n\n\ndef report(rows):\n    """Print rows."""\n')
+    settings = project / "scripts/components_index.settings.json"
+    values = dict(json.loads(settings.read_text()), extra_source_dirs=["tools"])
+    if count is not None:
+        values["count_extra_dirs"] = count
+    settings.write_text(json.dumps(values))
+    catalog(project, entry("core.package", "Hold the package", "src/widget/__init__.py"))
+
+
+def test_extra_folders_are_not_counted_unless_the_setting_says_so(project):
+    extra_tools(project)
+    assert tool(project, "--check", "--strict", script=INDEX)[0] == 0
+    code, out = tool(project, "stats", script=INDEX)
+    assert code == 0 and "coverage: 1/1 src/widget modules assigned" in out and "tools/report.py" not in out
+
+
+@pytest.fixture
+def counted(project):
+    extra_tools(project, count=True)
+    return project
+
+
+def test_strict_check_names_a_module_of_a_counted_extra_folder(counted):
+    code, out = tool(counted, "--check", "--strict", script=INDEX)
+    assert code == 1 and "no component: tools/report.py" in out
+    catalog(counted, entry("tools.report", "Print a size report", "tools/report.py"))
+    assert tool(counted, "--check", "--strict", script=INDEX)[0] == 0
+
+
+def test_draft_stubs_a_module_of_a_counted_extra_folder(counted):
+    code, out = tool(counted, "draft", script=INDEX)
+    assert code == 0, out
+    assert "### tools.report" in out and "- does: TODO Print a size report." in out and "- modules: tools/report.py" in out
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_changed_names_a_new_module_of_an_extra_folder_only_when_counted(project, count):
+    extra_tools(project, count=count)
+    if count:
+        catalog(project, entry("tools.report", "Print a size report", "tools/report.py"))
+    commit(project)
+    (project / "tools/new.py").write_text('"""New."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    if count:
+        assert code == 1 and "fail: no component: tools/new.py (new file;" in out
+    else:
+        assert code == 0 and "no component" not in out, out
+
+
+def test_review_and_stats_name_a_module_of_a_counted_extra_folder(counted):
+    code, out = tool(counted, "review", script=INDEX)
+    assert code == 0 and "## Modules with no component (1)\ntools/report.py" in out
+    code, out = tool(counted, "stats", script=INDEX)
+    assert code == 0 and "coverage: 1/2 src/widget, tools modules assigned" in out and "tools/report.py" in out
+
+
+def test_count_extra_dirs_must_be_a_boolean(project):
+    extra_tools(project)
+    settings = project / "scripts/components_index.settings.json"
+    settings.write_text(json.dumps(dict(json.loads(settings.read_text()), count_extra_dirs="yes")))
+    code, out = tool(project, "stats", script=INDEX)
+    assert code != 0 and "count_extra_dirs must be true or false" in out
+
+
+def test_the_baseline_can_hold_a_module_of_a_counted_extra_folder(counted):
+    assert tool(counted, "stats", "--write-baseline", script=INDEX)[0] == 0
+    assert "tools/report.py" in (counted / "docs/components/unassigned-baseline.txt").read_text().split()
+    assert tool(counted, "--check", "--strict", script=INDEX)[0] == 0
+
+
+def test_show_prints_a_module_of_a_counted_extra_folder(counted):
+    catalog(counted, entry("tools.report", "Print a size report", "tools/report.py"))
+    code, out = tool(counted, "show", "tools.report", script=INDEX)
+    assert code == 0 and "## tools/report.py (" in out and "report(rows)" in out
+
+
+@pytest.mark.parametrize("key, value, stub", [
+    ("extra_source_dirs", ["./tools"], "### tools.report"),
+    ("package_dir", "./src/widget", "### widget.sizes"),
+])
+def test_draft_takes_a_folder_written_with_a_leading_dot(project, key, value, stub):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    extra_tools(project, count=True)
+    settings = project / "scripts/components_index.settings.json"
+    values = dict(json.loads(settings.read_text()), **{key: value})
+    if key == "package_dir":
+        values["count_extra_dirs"] = False
+    settings.write_text(json.dumps(values))
+    code, out = tool(project, "draft", script=INDEX)
+    assert code == 0 and stub in out, out
+
+
+def test_unassigned_modules_keep_the_order_of_their_paths(project):
+    for name in ("src/widget/a.py", "src/widget/a/z.py"):
+        (project / name).parent.mkdir(parents=True, exist_ok=True)
+        (project / name).write_text('"""M."""\n')
+    out = tool(project, "stats", script=INDEX)[1]
+    assert out.index("src/widget/a/z.py") < out.index("src/widget/a.py\n")
+
+
 def facts(project, *args):
     code, out = tool(project, "facts", *args, script=INDEX)
     assert code == 0, out

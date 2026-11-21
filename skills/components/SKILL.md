@@ -20,7 +20,10 @@ does; this skill is how you use and maintain it. The entry format is defined in
 
 Paths below assume the default settings (`docs_dir` = `docs/components`, script at
 `scripts/`). A project changes them in `components_index.settings.json` beside the script
-(`package_dir`, `import_prefix`, `extra_source_dirs`, `docs_dir`, `script_path`, `verb_list`).
+(`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `docs_dir`,
+`script_path`, `verb_list`). `count_extra_dirs` (true or false, default false; from plugin
+0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a project
+whose code sits in more than one folder.
 
 | File | What it is | Edit? |
 |---|---|---|
