@@ -4,4 +4,5 @@ __pycache__/
 .venv/
 
 # Working notes about the projects this was extracted from; kept local, never committed.
-notes/
+# Anchored to the root, so a milestone's notes/ under .planning/ is committed.
+/notes/
