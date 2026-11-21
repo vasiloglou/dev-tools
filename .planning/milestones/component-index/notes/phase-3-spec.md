@@ -200,3 +200,14 @@ in section 6, and G5 runs them as they stand.
   close.
 - **Unreviewed.** No review round reads this spec before the code. The phase's diff
   review (`--subject phase`) reads both.
+
+## 13. Implementation findings
+
+- **IF1 (phase-3-r1 F2), 2026-11-21.** Section 6's `subsystem.rule_check` row said
+  `rules_check.py` "runs `components_index.py facts`, and `phase_tool.py facts` for
+  `check --phase`, as subprocesses; it also loads `phase_tool.py` with `importlib` for its
+  fact types". That wording is kept above. The code (`rules_check.py`, `check_phase` and
+  `vocabulary`) does this instead: `check` and `test` run `components_index.py facts`,
+  and `test` then loads `phase_tool.py` with `importlib`; `check --phase` runs
+  `phase_tool.py facts` first, then `components_index.py facts`. The entry's `notes:`
+  says so; its `flow:` keeps the order of `check` and `test`.

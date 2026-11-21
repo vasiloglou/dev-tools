@@ -158,6 +158,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - rule check: components.rules
 - rule check flow: subsystem.rule_check
 - rules json: components.rules
+- run a named acceptance test: phase.test_selection
 - run reviewer: review.rounds
 - run tests of one phase: phase.test_selection
 - sanitize review: review.rounds
@@ -331,8 +332,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - tests: tests/test_tools.py
 
 ### phase.test_selection
-- does: A pytest plugin that runs a phase's acceptance tests only once its phase is complete, or with --phase NN (phase_selection.py)
-- verbs: select acceptance tests, acceptance tests by phase, pytest plugin, pytest phase option, deselect tests, completed phases, conftest, run tests of one phase, inserted phase
+- does: A pytest plugin that leaves out the acceptance tests of phases not yet complete, unless --phase NN or their path is named (phase_selection.py)
+- verbs: select acceptance tests, acceptance tests by phase, pytest plugin, pytest phase option, deselect tests, completed phases, conftest, run tests of one phase, run a named acceptance test, inserted phase
 - status: canonical
 - modules: skills/phase/pytest/phase_selection.py
 - uses: (none)
@@ -351,13 +352,13 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - notes: A run-time load, which the import graph cannot see: release_plugins.py loads build_plugins.py with importlib.
 
 ### subsystem.rule_check
-- does: Judge the project's component rules: rules_check.py reads the catalog and import graph from components_index.py facts, and the plans of a phase from phase_tool.py facts
+- does: Judge the project's component rules: rules_check.py reads the catalog and import graph from components_index.py facts, and the plans and fact types of the phase workflow from phase_tool.py
 - verbs: rule check flow, judge rules over facts
 - status: canonical
 - components: components.rules, components.index, phase.state
 - members_uses: (none)
 - flow: components.rules -> components.index -> phase.state
-- notes: Run-time calls, which the import graph cannot see: rules_check.py runs components_index.py facts as a subprocess, and for check --phase runs phase_tool.py facts and loads phase_tool.py with importlib for its fact types.
+- notes: Run-time calls, which the import graph cannot see. check and test run components_index.py facts as a subprocess, and test then loads phase_tool.py with importlib for its fact types; check --phase runs phase_tool.py facts first, then components_index.py facts.
 
 ### subsystem.phase_status
 - does: Order the plans of a phase: phase_tool.py asks coder_pool.py how many tracks run at once
