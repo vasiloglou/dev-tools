@@ -9,6 +9,9 @@ copied into each project that uses it.
 
 Status: prototype.
 
+dev-tools is developed with dev-tools. Since 2026-11-21, work on this repository runs
+under the milestone workflow it ships: see [Developed with itself](#developed-with-itself).
+
 ## Why
 
 A coding agent writes code faster than anyone can read it. What is left to settle is
@@ -218,6 +221,29 @@ runs on `main`. It tags `plugins-vX.Y.Z` with notes from the commits since the l
 pushes the tag and creates the GitHub release. Without `--push` or `--github` it only tags
 locally, and `--dry-run` prints the tag and notes. `release_plugins.py status` says whether
 a release is due.
+
+## Developed with itself
+
+Since 2026-11-21 this repository is a project that uses dev-tools, as well as the place
+dev-tools is kept. No milestone has run here yet; the first one will leave the first
+records.
+
+- **Which workflow.** The milestone workflow, from the released `dvt-milestone` plugin,
+  which `.claude/settings.json` turns on. The released version runs, not the branch: a
+  phase that changes a skill is still run by the released text of that skill.
+- **Where the work is kept.** Each milestone is a folder under `.planning/milestones/`,
+  with its plan, its phase specs, its review rounds and its numbered records.
+  `.planning/PROJECT.md` is the one-page statement the skills read first.
+- **Where its rules are.** [`.devtools/project.md`](.devtools/project.md): which work
+  takes a milestone and which is a plain pull request, the gate commands, how reviews are
+  run and kept, the design rules every spec answers, and what needs the owner each time.
+  It is a complete example of the file a project writes for itself when it installs a
+  plugin.
+- **What it changes for a contributor.** Nothing. A fix is a pull request, as
+  [CONTRIBUTING.md](CONTRIBUTING.md) says, with no milestone and no record.
+
+The site has the same account with the lanes side by side:
+[dev-tools runs on this workflow](https://vasiloglou.github.io/dev-tools/milestone.html#own-use).
 
 ## What is here
 
