@@ -2,16 +2,20 @@
 
 ## 1. Status
 
-Draft, 2026-11-21. **Implementable once the plan gate is recorded and this spec's owner
-gate rules D1 and D2.** No code has been written, and no review has run over these bytes.
+**owner-decided (2026-11-21), by delegated approval (auto=true).** The plan gate is
+recorded (`001-plan.md`), and D1 to D4 are ruled in section 7. The approved bytes are
+committed as `docs(phase-1): approve the phase 1 spec`, and the phase record cites their
+SHA-256. Implementation follows. (Earlier: "Draft, 2026-11-21. Implementable once the plan
+gate is recorded and this spec's owner gate rules D1 and D2.")
 
 ## 2. Provenance
 
 - **Source.** Issue 28, "dev-takeover can report ready while an ignored path the note left
   out is missing", opened 2026-11-21 by the owner. The owner asked the same day for it to
   be fixed in this milestone (o).
-- **Plan.** `notes/component-index-plan.md`, a draft: phase 1 in section 4. It is
-  unreviewed and has no plan gate.
+- **Plan.** `notes/component-index-plan.md`: phase 1 in section 4, approved by delegated
+  approval (auto=true) on 2026-11-21 at SHA-256
+  `42ac8f116b426ad9589c6f9224b99a188d34ae03e75f2a1cceac6d84bf0b460c` (`001-plan.md`).
 - **Code read.** `skills/dev-handoff/scripts/handoff.py` at main `c9648dd`:
   - `_snapshot_text`, lines 694 to 722;
   - `takeover`, lines 961 to 1018;
@@ -55,13 +59,16 @@ lines of the snapshot only (`re.findall(r"^- \`([^\`]+)\` \(([^)]*)\)", listed, 
 | O4 | A note with 25 paths or fewer is written exactly as today | Standing rule "captures are real output": `docs/handoff.html` shows a note's snapshot (lines 70 to 110) | Design, `_snapshot_text`; T5 |
 | O5 | The reference and the site say what ready now checks | Standing rule "the page that describes it" | Design, "Text" |
 | O6 | The release under a new version | Standing rule "plugins are rebuilt" | Design, "Release"; G3 |
+| O8 | `.gitignore` line 7 anchored to `/notes/`, so the planning files can be committed (a2) | Plan section 4, phase 1 deliverables; `001-plan.md`, refuted premises | Landed with the plan at `ada0d1a`, before this gate; cited in the record |
+| O9 | A bullet whose path holds a backtick or a newline is checked or withholds ready | Plan reviews r2 F2 and r3 F1 | Design, `takeover`; T9, T10 |
+| O10 | The plan's section 9 rows for phase 1 run as written | Plan section 9 | Section 8, the verification-selection ledger |
 | O7 | The issue gets a reply saying where it went, posted only with the owner's approval | `handle-issue`, step 3 and step 4 | Plan section 8, "Owner actions"; the pull request says `Fixes #28` |
 
 ## 4. The standing rules, bound to this phase
 
 | Rule | Bound here to |
 |---|---|
-| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T10 are in `tests/test_handoff.py`; T1, T3, T6, T7, T8, T9 and T10 fail on main (r2, r3: the earlier wording counted T1 to T6) |
+| A script change comes with a test | `handoff.py`: `_snapshot_text`, `takeover` and the takeover rendering. T1 to T11 are in `tests/test_handoff.py`; T1, T3, T6, T7, T8, T9, T10 and T11 fail on main (r2, r3: the earlier wording counted T1 to T6) |
 | The plugins are rebuilt, and released under a new version | `release_plugins.py bump` to 0.1.4, then G3. The owner tags after the merge |
 | A wording change says what prompted it | Issue 28 prompts the sentence in `references/handoff.md` and in `docs/handoff.html` |
 | Shared skills stay general | Any project's note can list more than 25 ignored paths. Nothing in the fix names dev-tools |
@@ -108,6 +115,9 @@ source lines.
   `separators=(",", ":")`). Each item is `{"path": <str>, "kind": "carry" | "large" | "key"}`,
   spelled as `snap["ignored"]` spells `kind`. These are the three kinds the snapshot
   already prints (its `tail` map in `_snapshot_text`). Nothing changes with 25 paths or fewer (O4).
+  Every `>` in the JSON is written as `\u003e`, which `json.loads` reads back as `>`, so a
+  path holding `-->` cannot end the comment early. The line is read with the pattern
+  `^<!-- ignored-rest: (.*) -->$`, one line (T11).
 - **`takeover`.** Build the list to check from:
   - the bullet lines. Today's pattern, ``^- `([^`]+)` \(([^)]*)\)``, skips a bullet
     whose path holds a backtick, and the writer does not escape one, so such a path is
@@ -155,6 +165,11 @@ source lines.
 |---|---|---|---|
 | D1 | How the note carries the paths after the 25th | **(A)** One comment line holding them, written only when the list is cut. The note stays readable, every path is checked, and the capture is unchanged. **(B)** List every path in the note. This is the simplest code, but a note with hundreds of ignored paths grows by hundreds of lines. **(C)** No new format: a cut list makes `takeover` not ready. Small, but a project with more than 25 ignored paths can never be ready without checking by hand | (A), with (C) as the rule for older notes |
 | D2 | Whether a missing key file after the 25th blocks | Today a missing key file is reported and does not block (`references/handoff.md`: "key files are reported as not needed to continue"). Keeping that rule is consistent. Making it block would change the rule for every note | Keep: it is reported in `missing_keys`, and it does not block |
+| D3 | The approval instrument (process-phase step 2) | Prose, with T1, T3, T5 and T7 written first (section 11); or a corpus authored before the gate | Prose |
+| D4 | Whether the review instrument runs over these spec bytes | Three plan rounds read the spec already, and the stop rule fired after r3; a fourth round over the spec is the round the stop rule forbids | Omit; the phase diff review reads the code |
+
+**Rulings, 2026-11-21, delegated approval (auto=true) (o):** D1 (A), with (C) for older
+notes; D2 keep; D3 prose, the corpus tests written red first; D4 omitted.
 
 ## 8. Tests
 
@@ -173,6 +188,7 @@ new helper makes `n` ignored folders of falling size, as the reproduction does.
 | T8 | The note says `- and 1 smaller path`, its `ignored-rest` line is `[]`, and the path is absent (r1 F2) | treated as absent: `unlisted_ignored == 1` and `ready is False` |
 | T9 | 2 ignored folders, one named ``out`1/`` (a backtick in the name); the note is written; the project is cloned with only the other folder copied (r2 F2) | `missing_ignored` holds ``out`1/`` and `ready is False`. On main: `[]` and `True` |
 | T10 | As T9, the folder named `out\n1/` (a newline in the name) (r3 F1) | `unlisted_ignored == 1` and `ready is False`. On main: no key, and `True` |
+| T11 | 26 ignored folders, the 26th named `z-->/`; the clone lacks it | the `ignored-rest` line holds `\u003e` and no `-->` before its end; `missing_ignored == ["z-->/"]` and `ready is False` |
 
 Branch walk:
 
@@ -181,6 +197,7 @@ Branch walk:
   rest (T7), and a readable rest of the wrong length (T8).
 - The bullet pattern: a plain path (T1, T2), a path holding a backtick (T9), and a
   line it cannot read (T10).
+- The rest line's escaping: a path holding `>` (T11) and none (T1).
 - A missing item's kind: key (T4) and other (T1).
 - Older notes: cut with no rest line (T3, T6), and not cut (T2).
 
@@ -191,6 +208,15 @@ Branch walk:
 - G2: `uv run --no-project --with pytest python -m pytest tests -q` has 1 failure, the R5
   case.
 - G3: `python3 devtools/build_plugins.py --check` exits 0.
+
+**Verification-selection ledger** (O10):
+
+| Obligation | Disposition | Command or evidence | Input boundary | Justification | Invalidation |
+|---|---|---|---|---|---|
+| T1 to T11, P1.1 to P1.3 | run | G1, exits 0 | `handoff.py`, `tests/test_handoff.py` | The direct tests of every changed branch | Any change to `handoff.py` or its tests |
+| Plan section 9, phase 1 row 2 | run | G2: 1 failure, `test_suggestions_and_generated_cases_with_newer_gnd` (R5) | the whole tree | The plan mandates it; `test_plugins.py` and `test_release_plugins.py` read the rebuilt `plugins/` | Any change after the run |
+| P1.4, the plugins match the skills | run | G3, exits 0 | `skills/`, `agents/`, `plugins/`, `.claude-plugin/` | The bump rebuilds `plugins/` | Any skill change after the bump |
+| The known red (R5) | inherit | `001-plan.md`, boundary: proven at `c9648dd`, `1 failed, 62 deselected` | GND's installed extras on this machine | The phase does not touch `components_index.py`, `rules_check.py` or GND | A change to GND's install or to `rules_check.py` |
 
 ## 9. Out of scope for this phase
 
