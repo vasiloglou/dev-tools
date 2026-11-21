@@ -750,18 +750,30 @@ def test_show_prints_a_module_of_a_counted_extra_folder(counted):
 
 @pytest.mark.parametrize("key, value, stub", [
     ("extra_source_dirs", ["./tools"], "### tools.report"),
+    ("extra_source_dirs", ["<absolute>"], "### tools.report"),
     ("package_dir", "./src/widget", "### widget.sizes"),
 ])
 def test_draft_takes_a_folder_written_with_a_leading_dot(project, key, value, stub):
     (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
     extra_tools(project, count=True)
     settings = project / "scripts/components_index.settings.json"
+    if value == ["<absolute>"]:
+        value = [str(project / "tools")]
     values = dict(json.loads(settings.read_text()), **{key: value})
     if key == "package_dir":
         values["count_extra_dirs"] = False
     settings.write_text(json.dumps(values))
     code, out = tool(project, "draft", script=INDEX)
     assert code == 0 and stub in out, out
+
+
+def test_draft_keeps_the_package_name_as_it_is_for_the_area(project):
+    (project / "src/widget_").mkdir()
+    (project / "src/widget_/report.py").write_text('"""Report."""\n')
+    settings = project / "scripts/components_index.settings.json"
+    settings.write_text(json.dumps(dict(json.loads(settings.read_text()), package_dir="src/widget_", import_prefix="")))
+    code, out = tool(project, "draft", script=INDEX)
+    assert code == 0 and "### widget_.report" in out, out
 
 
 def test_unassigned_modules_keep_the_order_of_their_paths(project):

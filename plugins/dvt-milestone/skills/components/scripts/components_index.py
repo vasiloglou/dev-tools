@@ -1039,12 +1039,13 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool = 
     taken = {e['id'] for e in entries}
     for path in unassigned:
         tree = parse(root / path)
-        # Compared as paths, so a folder written './tools' or 'tools/' holds 'tools/x.py'.
-        folder = next((d for d in (PACKAGE_DIR, *EXTRA_DIRS) if Path(path).is_relative_to(d)), PACKAGE_DIR)
-        parts = [p for p in Path(path).relative_to(folder).with_suffix('').parts if p != '__init__']
+        # Compared under the root, so a folder written './tools', 'tools/' or absolute holds 'tools/x.py'.
+        folder = next((d for d in (PACKAGE_DIR, *EXTRA_DIRS) if (root / path).is_relative_to(root / d)), PACKAGE_DIR)
+        parts = [p for p in (root / path).relative_to(root / folder).with_suffix('').parts if p != '__init__']
         words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
-        top = PACKAGE if folder == PACKAGE_DIR else Path(folder).name
-        area = words[0] if len(words) > 1 else re.sub(r'[^a-z0-9_]', '_', top.lower()).strip('_') or 'x'
+        top = PACKAGE.lower() if folder == PACKAGE_DIR else \
+            re.sub(r'[^a-z0-9_]', '_', Path(folder).name.lower()).strip('_') or 'x'
+        area = words[0] if len(words) > 1 else top
         name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
         ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
         while ident in taken:
