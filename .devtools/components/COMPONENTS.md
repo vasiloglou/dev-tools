@@ -152,6 +152,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - new caller of deprecated component: components.index
 - new violation since base: components.rules
 - next phase: phase.state
+- normative document ownership: phase.state
+- normative_for frontmatter: phase.state
 - outside allowlist: phase.codex_gate
 - parallel tracks: phase.coder_pool
 - parked phases: migrate.from_gsd
@@ -324,14 +326,14 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## Moving work between assistants and machines
 
 ### handoff.notes
-- does: Hand a branch to another assistant, developer or machine: write the note with a snapshot of the checkout, check what would be lost at its hand-off level, list ignored files by kind, carry or pull them, list the notes on local and origin branches; on arrival takeover and doctor say whether this checkout is ready (handoff.py)
+- does: Hand a branch to another assistant, developer or machine: write the note with a snapshot of the checkout, check what would be lost at its hand-off level, list ignored files by kind, carry or pull them, show a note and its findings, list the notes on local and origin branches; on arrival takeover and doctor say whether this checkout is ready (handoff.py)
 - verbs: hand off, handoff note, take over, takeover ready, continue on another machine, switch assistant, carry ignored files, pull ignored files, what would be lost, list handoffs, doctor, snapshot of the checkout, key files, ignored inventory, hand-off level, show note, secret in note, slash commands in note, paused phase, rsync over ssh, tracked files never replaced
 - status: canonical
 - modules: skills/dev-handoff/scripts/handoff.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_handoff.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 repair (e2b2762). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with is missing or cannot be read. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 repair (e2b2762). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, is missing or cannot be read; a missing key file is reported in missing_keys and does not block. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
 
 ## The milestone workflow
 
@@ -349,7 +351,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 
 ### phase.state
 - does: Own a phase's state in the planning folder (STATE.md, ROADMAP.md, REQUIREMENTS.md) and its planning checks: setup, init, status, roadmap, activate, advance, complete, branch, check, req-coverage, testlock, golden-diff, evidence-check, migration-check, facts (phase_tool.py)
-- verbs: phase state, phase status, next phase, roadmap, roadmap lint, init phase folder, advance phase, complete phase, activate phase, gate problems, check plans, plan order, plan scope drift, requirements coverage, test lock, golden diff, evidence check, deferred ledger, migration check, skill lint, template citations, capabilities stale, phase branch, plan facts, state md, json envelope
+- verbs: phase state, phase status, next phase, roadmap, roadmap lint, init phase folder, advance phase, complete phase, activate phase, gate problems, check plans, plan order, plan scope drift, normative document ownership, normative_for frontmatter, requirements coverage, test lock, golden diff, evidence check, deferred ledger, migration check, skill lint, template citations, capabilities stale, phase branch, plan facts, state md, json envelope
 - status: canonical
 - modules: skills/phase/process-phase/scripts/phase_tool.py
 - uses: (none)
@@ -367,7 +369,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - part_of: subsystem.phase_status
 - tests: tests/test_tools.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). show exits 0 even with an empty pool (nothing on PATH gives effective_tracks 0); bad limits warn and use 4, bad TOML exits 1. A linked worktree reads the main checkout's local file. It carries its own small TOML reader for a Python without tomllib. phase_tool.py runs show --json (subsystem.phase_status).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). show exits 0 even with an empty pool (nothing on PATH gives effective_tracks 0); bad limits warn and use 4, bad TOML exits 1. A linked worktree without a local file of its own reads the main checkout's. It carries its own small TOML reader for a Python without tomllib. phase_tool.py runs show --json (subsystem.phase_status).
 
 ### phase.codex_gate
 - does: Check a coding round's changed paths against an allowlist and its added lines against a budget (codex_gate.py)

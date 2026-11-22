@@ -187,3 +187,19 @@ One parser: the command is a positional choice and every option is accepted with
 - verbs: hand off, handoff note, takeover ready, continue on another machine, switch assistant, carry ignored files, pull ignored files, what would be lost, list handoffs, doctor, snapshot of the checkout, key files, ignored inventory, hand-off level, show note, redact keys in note, secret in note, slash commands in note, paused phase, base branch detection, rebuild paths, include glob, tracked files never replaced, ssh pull, rsync, machine check
 - notes: takeover checks and reports; it does not switch or fetch the branch. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks. A pull from another host sends this script over ssh on stdin. Only Claude Code is detected as the sender.
 ```
+
+
+## Addendum: the phase-1-r3 repair
+
+Written by the driving agent after `e2b2762`, which added three definitions (77 now, by the
+same count) and changed `takeover`, `write_note` and `check_note`:
+
+| Name | Line | What the body does |
+|---|---|---|
+| `_inside` | 992 | True when a path, as a note wrote it, is relative and has no empty, `.` or `..` part, a folder's trailing `/` aside. |
+| `_split_end` | 1000 | Splits a text at its first line that is the snapshot end marker alone, or returns None. |
+| `_exists` | 1007 | `Path.exists()`, with a lookup the file system refuses read as False. |
+
+`takeover` now ends the snapshot with `_split_end`, counts a snapshot without its ignored
+section as unlisted, refuses a bullet or rest path that `_inside` rejects, and checks with
+`_exists`; `write_note` and `check_note` find the end marker with `_split_end`.
