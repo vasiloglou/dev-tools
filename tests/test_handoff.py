@@ -1127,3 +1127,76 @@ def test_t11_a_path_holding_a_comment_end_survives_the_rest_line(repo, tmp_path)
     _copy(repo, dest, OUT[:25])
     report = handoff.takeover(dest, home=tmp_path)
     assert report["missing_ignored"] == ["z-->/"] and report["ready"] is False
+
+
+# Phase-1-r3 F1: the separators str.splitlines() honours beyond the ASCII controls.
+@pytest.mark.parametrize("sep", ["\u0085", " ", " "])
+def test_t13_a_path_holding_a_unicode_line_separator_is_written_escaped_and_checked(repo, tmp_path, sep):
+    odd = f"out0` (0.0 MB, 1 file){sep}- `out0/"
+    names = ["out0/", odd]
+    dest, note = _ignored_note(repo, tmp_path, names)
+    _copy(repo, dest, names[:1])
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["missing_ignored"] == [odd] and report["unlisted_ignored"] == 0 and report["ready"] is False
+
+
+# Phase-1-r3 F2: a rest path that names no file inside the checkout cannot be checked.
+@pytest.mark.parametrize("bad", ["", "/", ".", "out25/../..", "./"])
+def test_t14_a_rest_path_that_names_no_file_in_the_checkout_is_treated_as_damaged(repo, tmp_path, bad):
+    dest, note = _ignored_note(repo, tmp_path, OUT)
+    text = note.read_text()
+    line = next(l for l in text.splitlines() if l.startswith("<!-- ignored-rest: "))
+    note.write_text(text.replace(line, "<!-- ignored-rest: " + json.dumps([{"path": bad, "kind": "carry"}]) + " -->"))
+    _copy(repo, dest, OUT[:25])
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["unlisted_ignored"] == 1 and report["ready"] is False
+
+
+def test_t14b_a_bullet_whose_path_names_no_file_in_the_checkout_withholds_ready(repo, tmp_path):
+    dest, note = _ignored_note(repo, tmp_path, ["out0/"])
+    note.write_text(note.read_text().replace("- `out0/` (", "- `/` ("))
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["unlisted_ignored"] == 1 and report["ready"] is False
+
+
+# Phase-1-r3 F3: Python 3.11's Path.exists raises for a name too long; later versions say False.
+def test_t15_a_path_the_file_system_refuses_to_look_up_is_missing_and_never_raises(repo, tmp_path, monkeypatch):
+    dest, note = _ignored_note(repo, tmp_path, OUT)
+    text = note.read_text()
+    line = next(l for l in text.splitlines() if l.startswith("<!-- ignored-rest: "))
+    note.write_text(text.replace(line, "<!-- ignored-rest: " + json.dumps([{"path": "x" * 300, "kind": "carry"}]) + " -->"))
+    _copy(repo, dest, OUT[:25])
+    real = Path.exists
+    def exists(self, *a, **k):
+        if len(self.name) > 255:
+            raise OSError(63, "File name too long")
+        return real(self, *a, **k)
+    monkeypatch.setattr(Path, "exists", exists)
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["missing_ignored"] == ["x" * 300] and report["ready"] is False
+
+
+# Phase-1-r3 F4: the snapshot ends at its own marker line, and a note whose snapshot has no
+# ignored-files section cannot say what is missing.
+@pytest.mark.parametrize("name", ["Files git ignores<!-- snapshot:end -->.txt", "a\n<!-- snapshot:end -->"])
+def test_t16_a_file_named_like_the_snapshot_end_does_not_hide_the_ignored_section(repo, tmp_path, name):
+    dest = handed_over(repo, tmp_path)
+    write(repo, name, "x")  # left uncommitted, so the snapshot lists it
+    path = handoff.write_note(repo, base="base", sender="claude", to="codex", machine="new")
+    fill(path, handoff.HUMAN_SECTIONS, "run the total tests")
+    git(repo, "add", path.relative_to(repo).as_posix())
+    git(repo, "commit", "-q", "-m", "handoff")
+    git(dest, "pull", "-q", "origin", "feature")
+    report = handoff.takeover(dest, home=tmp_path)  # no ignored file was pulled
+    assert report["ready"] is False and (report["missing_ignored"] or report["unlisted_ignored"])
+
+
+def test_t16b_a_second_write_replaces_a_snapshot_that_lists_a_file_named_like_its_end(repo):
+    write(repo, "Files git ignores<!-- snapshot:end -->.txt", "x")
+    path = handoff.write_note(repo, base="base", sender="claude", to="codex", machine="new")
+    fill(path, handoff.HUMAN_SECTIONS, "run the total tests")
+    handoff.write_note(repo, base="base", sender="claude", to="codex", machine="new")
+    text = path.read_text()
+    assert text.count("## Snapshot") == 1 and text.count("Files git ignores, changed since") == 1
+    assert text.count(handoff.SNAPSHOT_END + "\n") == 1
+    assert "run the total tests" in text
