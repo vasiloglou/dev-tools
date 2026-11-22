@@ -3,6 +3,9 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+# A review round's raw reviewer log: large, machine-specific, and not part of the round's record.
+.planning/**/review.log
+
 # Working notes about the projects this was extracted from; kept local, never committed.
 # Anchored to the root, so a milestone's notes/ under .planning/ is committed.
 /notes/
