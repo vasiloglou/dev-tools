@@ -333,7 +333,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_handoff.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 repair (e2b2762). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, is missing or cannot be read; a missing key file is reported in missing_keys and does not block. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 repair (e2b2762). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, does not exist here, or while a line of the note's ignored list cannot be parsed; it checks existence only, never that a file can be read. A missing key file is reported in missing_keys and does not block. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
 
 ## The milestone workflow
 
