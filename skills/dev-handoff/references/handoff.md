@@ -187,7 +187,8 @@ environment path the settings name, and the git remote unless the note is for
 the same machine (level 1 or 2). A note from before 0.1.4 that cut its list at
 25, a listed path the report cannot read (one holding a line break) or one that
 names no file inside the checkout (empty, absolute, or with a `.` or `..` part),
-and a snapshot without its ignored-files section count under "ignored paths the
+a snapshot without its ignored-files section, and a rest line whose "and N smaller
+paths" line is gone count under "ignored paths the
 note did not list", and the note is not ready until those paths are checked by
 hand. The base branch, the assistants on PATH and key files are
 reported as not needed to continue.
