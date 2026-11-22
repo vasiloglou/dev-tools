@@ -714,11 +714,11 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
     if snap["state"]:
         lines.append("- STATE.md: " + ", ".join(f"{key} {value}" for key, value in snap["state"].items())
                      + " (a phase branch can be ahead of this)")
-    lines += [f"- Paused phase: `{path}`" for path in snap["paused_phases"]]
+    lines += [f"- Paused phase: `{_one_line(path)}`" for path in snap["paused_phases"]]
     lines += ["", "Commits since the base (newest first):", ""]
     lines += [f"- {c}" for c in snap["commits"]] or ["- none"]
     lines += ["", "Uncommitted files when the note was written:", ""]
-    lines += [f"- `{p}`" for p in snap["dirty"]] or ["- none"]
+    lines += [f"- `{_one_line(p)}`" for p in snap["dirty"]] or ["- none"]
     lines += ["", "Files git ignores, changed since the branch started (`handoff.py carry`):", ""]
     tail = {"carry": "", "large": ", large: not carried by default", "key": ", key file: copy by hand"}
     # A path holding a newline or another control character would print over several lines,
@@ -735,6 +735,13 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
         lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
     lines.append(SNAPSHOT_END)
     return "\n".join(lines)
+
+
+def _one_line(path: str) -> str:
+    """A path as the snapshot prints it where takeover does not read it back: on one line, with
+    a line break or another control character JSON-escaped, so it cannot forge the snapshot's
+    own lines (its ignored-files heading, its end marker)."""
+    return json.dumps(path)[1:-1] if _CONTROL.search(path) else path
 
 
 def _head(meta: dict) -> str:
@@ -894,7 +901,7 @@ def doctor(root: Path, *, home: Path | None = None) -> list[dict]:
         row(tool, bool(found), found or "not on PATH", f"install {tool}")
     setup = SETTINGS["setup_command"]
     for rel in SETTINGS["env_paths"]:
-        where = next((home_ / rel for home_ in (root, _main_checkout(root)) if (home_ / rel).exists()), None)
+        where = next((home_ / rel for home_ in (root, _main_checkout(root)) if _exists(home_ / rel)), None)
         row(f"environment: {rel}", where is not None,
             str(where) if where else "not in this checkout or the main one",
             setup or "set the checkout up as the project's instructions say")
@@ -902,7 +909,7 @@ def doctor(root: Path, *, home: Path | None = None) -> list[dict]:
     row("assistants", bool(found), ", ".join(found) or "none of " + ", ".join(ASSISTANTS),
         "install the one that continues, and log in")
     if SETTINGS["key_files"]:
-        present = [name for name in SETTINGS["key_files"] if (home / name).exists()]
+        present = [name for name in SETTINGS["key_files"] if _exists(home / name)]
         missing = [name for name in SETTINGS["key_files"] if name not in present]
         row("key files", not missing,
             "present: " + (", ".join(f"~/{n}" for n in present) or "none")
@@ -1042,11 +1049,14 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
     if not path.is_file():
         report["available"] = available(root)
         return report
-    text = _redact(path.read_text(encoding="utf-8"))
+    raw = path.read_text(encoding="utf-8")
+    text = _redact(raw)
     report["note"] = _relative(path, root)
     report["other_notes"].remove(path.name)
     report["meta"] = _frontmatter(text)
-    snap = text.split(SNAPSHOT_START, 1)[-1]
+    # The paths are read from the note as written, so each is checked under its own name; what
+    # looks like a key is redacted only where the report prints it.
+    snap = raw.split(SNAPSHOT_START, 1)[-1]
     snap = (_split_end(snap) or (snap, ""))[0]
     head = re.search(r"^- Branch `[^`]+` at `(\w+)`", snap, re.MULTILINE)
     if head:
@@ -1089,9 +1099,11 @@ def takeover(root: Path, *, home: Path | None = None) -> dict:
             report["unlisted_ignored"] += int(cut.group(1))  # a note from before 0.1.4, or a damaged line
         else:
             paths += [(item["path"], item["kind"] == "key") for item in rest]
+    elif any(line.startswith(REST_START) for line in listed.splitlines()):
+        report["unlisted_ignored"] += 1  # a rest line whose cut line is gone: how many it held is unknown
     for rel, key in paths:
         if not _exists(root / rel):
-            report["missing_keys" if key else "missing_ignored"].append(rel)
+            report["missing_keys" if key else "missing_ignored"].append(_redact(rel))
     report["next_step"] = _section(text, "Next step")
     # What stands between this checkout and the work: the tools and the environment the project
     # names, and a remote unless the note says the work stays on this machine. The base branch,

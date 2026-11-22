@@ -969,10 +969,10 @@ def test_include_does_not_reach_through_an_ignored_link(repo, tmp_path):
 
 # --- every ignored path the note was written with is checked (issue 28) ---
 
-def _ignored_note(repo: Path, tmp_path: Path, names: list[str]) -> tuple[Path, Path]:
+def _ignored_note(repo: Path, tmp_path: Path, names: list[str], ignore: str = "") -> tuple[Path, Path]:
     """Ignored paths ``names``, largest first, a filled note written and committed, and a clone
     with none of them in it. Returns the clone and the clone's note."""
-    write(repo, ".gitignore", "out*/\nz*/\n.env.local\n")
+    write(repo, ".gitignore", "out*/\nz*/\n.env.local\n" + ignore)
     for i, name in enumerate(names):
         size = (len(names) - i) * 100
         write(repo, name.rstrip("/") + "/f.bin" if name.endswith("/") else name, "x" * size)
@@ -1200,3 +1200,53 @@ def test_t16b_a_second_write_replaces_a_snapshot_that_lists_a_file_named_like_it
     assert text.count("## Snapshot") == 1 and text.count("Files git ignores, changed since") == 1
     assert text.count(handoff.SNAPSHOT_END + "\n") == 1
     assert "run the total tests" in text
+
+
+# Phase-1-r4 F1: a paused phase's path is printed in the snapshot too.
+def test_t17_a_paused_phase_named_like_the_snapshots_own_lines_cannot_hide_the_ignored_list(repo, tmp_path):
+    odd = "a\nFiles git ignores\n\n- none\n<!-- snapshot:end -->\nb"
+    write(repo, f".planning/phases/{odd}/.continue-here.md", "paused\n")
+    dest, note = _ignored_note(repo, tmp_path, ["out0/"])  # out0/ is not in the clone
+    text = note.read_text()
+    assert text.count(handoff.SNAPSHOT_END + "\n") == 1 and text.count("\nFiles git ignores") == 1
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["missing_ignored"] == ["out0/"] and report["ready"] is False
+
+
+# Phase-1-r4 F2: an ignored path that looks like a key is checked as it is, and printed redacted.
+@pytest.mark.parametrize("before", [0, 25])
+def test_t18_a_path_that_looks_like_a_key_is_checked_before_it_is_redacted(repo, tmp_path, before):
+    odd = "sk-" + "a" * 32 + "/"
+    names = OUT[:before] + [odd]
+    dest, note = _ignored_note(repo, tmp_path, names, ignore="sk-*/\n")
+    assert f"`{odd}`" in note.read_text() or odd in note.read_text().split("ignored-rest: ")[-1]
+    _copy(repo, dest, OUT[:before])
+    (dest / handoff.REMOVED).mkdir()
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["ready"] is False and report["missing_ignored"] == [handoff.REMOVED + "/"]
+    assert odd.rstrip("/") not in json.dumps(report)
+
+
+# Phase-3-r4 F1: a rest line whose cut line was deleted is damage, not a note of 25 paths.
+def test_t19_a_rest_line_without_its_cut_line_withholds_ready(repo, tmp_path):
+    dest, note = _ignored_note(repo, tmp_path, OUT)
+    text = note.read_text()
+    cut = next(l for l in text.splitlines() if l.startswith("- and 1 smaller path"))
+    note.write_text(text.replace(cut + "\n", ""))
+    _copy(repo, dest, OUT[:25])
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["unlisted_ignored"] == 1 and report["ready"] is False
+
+
+# Phase-1-r4 F3: Python before 3.14 raises for a name too long, in doctor as well.
+@pytest.mark.parametrize("setting", ["env_paths", "key_files"])
+def test_t20_doctor_never_raises_on_a_name_the_file_system_refuses(repo, tmp_path, monkeypatch, setting):
+    monkeypatch.setitem(handoff.SETTINGS, setting, ["x" * 300])
+    real = Path.exists
+    def exists(self, *a, **k):
+        if len(self.name) > 255:
+            raise OSError(63, "File name too long")
+        return real(self, *a, **k)
+    monkeypatch.setattr(Path, "exists", exists)
+    rows = {r["name"]: r for r in handoff.doctor(repo, home=tmp_path)}
+    assert setting != "env_paths" or rows["environment: " + "x" * 300]["ok"] is False
