@@ -203,3 +203,16 @@ same count) and changed `takeover`, `write_note` and `check_note`:
 `takeover` now ends the snapshot with `_split_end`, counts a snapshot without its ignored
 section as unlisted, refuses a bullet or rest path that `_inside` rejects, and checks with
 `_exists`; `write_note` and `check_note` find the end marker with `_split_end`.
+
+## Addendum: the phase-1-r4 repair
+
+Written by the driving agent after `22d6258`, which added one definition (78 now):
+
+| Name | Line | What the body does |
+|---|---|---|
+| `_one_line` | 740 | A path as the snapshot prints it outside the ignored list: JSON-escaped when it holds a control character or line separator, else as it is. |
+
+`_snapshot_text` prints uncommitted and paused-phase paths through `_one_line`. `takeover`
+reads the paths from the note before redaction and redacts only what it reports, counts a
+rest line without its cut line as unlisted, and `doctor` checks `env_paths` and
+`key_files` with `_exists`.
