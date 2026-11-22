@@ -26,4 +26,6 @@ note did not list is missing.
 - **Index:** [`.devtools/components/`](../../../.devtools/components/COMPONENTS.md), built in
   phase 3.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md),
-  [003-phase-2.md](003-phase-2.md), [004-phase-3.md](004-phase-3.md).
+  [003-phase-2.md](003-phase-2.md), [004-phase-3.md](004-phase-3.md),
+  [005-phase-3-reread.md](005-phase-3-reread.md): every entry read in full, and the
+  third review rounds of phases 1 and 2.
