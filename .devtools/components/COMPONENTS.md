@@ -29,6 +29,9 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - build plugins: plugins.build
 - bump and rebuild plugins: subsystem.release
 - bump version: plugins.release
+- bytes changed since brief: review.rounds
+- canonical component has a test: components.rules
+- capabilities stale: phase.state
 - carry ignored files: handoff.notes
 - changed paths: phase.codex_gate
 - changed since base: components.index
@@ -37,14 +40,17 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - check plans: phase.state
 - check plans of a phase: components.rules
 - check plugins stale: plugins.build
+- claims to test: review.rounds
+- claude fallback: phase.coder_pool
 - claude reviewer: review.rounds
 - claude_plugin_root: plugins.build
 - close review: review.rounds
+- coder accounts: phase.coder_pool
 - coder effort: phase.coder_pool
 - coder model: phase.coder_pool
 - coder pool: phase.coder_pool
 - coder tracks: subsystem.phase_status
-- codex accounts: phase.coder_pool
+- codex home: phase.coder_pool
 - codex review: review.rounds
 - coding assistants: phase.coder_pool
 - coding round gate: phase.codex_gate
@@ -56,10 +62,14 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - component rules: components.rules
 - conftest: phase.test_selection
 - continue on another machine: handoff.notes
+- conversion record: migrate.from_gsd
 - convert planning folder: migrate.from_gsd
 - copy skills into project: sync.copies
 - count extra dirs: components.index
 - coverage: components.index
+- credential files left out: review.rounds
+- deferred ledger: phase.state
+- delete files no longer shipped: sync.copies
 - deselect tests: phase.test_selection
 - devtools token: plugins.build
 - devtools-receipt: sync.copies
@@ -68,56 +78,86 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - does the project already have: components.index
 - draft entries: components.index
 - dry run conversion: migrate.from_gsd
+- dry run sync: sync.copies
+- dry run tag: plugins.release
+- duplicate names: components.index
 - dvt-milestone: plugins.build
 - dvt-phase: plugins.build
+- effective tracks: phase.coder_pool
+- entries to reread: components.index
 - evidence check: phase.state
+- exclude files: sync.copies
+- external libraries: components.index
 - facts for rules: components.index
+- file mode drift: sync.copies
+- file modes: plugins.build
 - fill tokens: sync.copies
 - find existing code: components.index
 - findings ledger: review.rounds
 - forbidden imports: components.rules
+- force overwrite: sync.copies
 - gate problems: phase.state
 - gemini coder: phase.coder_pool
 - generate index: components.index
 - generate plugins folder: plugins.build
+- git ignores delivered files: sync.copies
 - git numstat: phase.codex_gate
 - github release: plugins.release
 - gnd check: components.rules
 - golden diff: phase.state
+- gsd hooks in settings: migrate.from_gsd
 - gsd requirements: migrate.from_gsd
 - gsd roadmap: migrate.from_gsd
 - gsd state: migrate.from_gsd
 - guarded rules: components.rules
 - hand edit: sync.copies
 - hand off: handoff.notes
+- hand-off level: handoff.notes
 - handoff note: handoff.notes
 - how many coders: phase.coder_pool
 - ignore supervisor files: phase.codex_gate
 - ignored inventory: handoff.notes
 - import graph: components.index
+- import loop rule: components.rules
+- import loops: components.index
 - independent review: review.rounds
+- init phase folder: phase.state
 - inserted phase: phase.test_selection
 - install skills: sync.copies
+- installed from plugin note: plugins.build
+- interrupted apply: sync.copies
 - is a release due: plugins.release
+- json envelope: phase.state
 - judge rules over facts: subsystem.rule_check
+- key decisions to decisions md: migrate.from_gsd
 - key files: handoff.notes
 - layers: components.rules
 - layers toml: components.rules
+- ledger validation: review.rounds
 - line budget: phase.codex_gate
+- lines only the project has: sync.copies
+- list components by area: components.index
 - list handoffs: handoff.notes
+- major version: plugins.release
 - map requirement ids: migrate.from_gsd
 - marketplace json: plugins.build
 - max added: phase.codex_gate
 - max tracks: phase.coder_pool
 - merge toml settings: phase.coder_pool
 - migrate gsd: migrate.from_gsd
+- migration check: phase.state
+- minor version: plugins.release
 - move from gsd: migrate.from_gsd
 - near misses: components.rules
+- new caller of deprecated component: components.index
 - new violation since base: components.rules
 - next phase: phase.state
 - outside allowlist: phase.codex_gate
 - parallel tracks: phase.coder_pool
+- parked phases: migrate.from_gsd
+- parse cache: components.index
 - patch version: plugins.release
+- paused phase: handoff.notes
 - phase branch: phase.state
 - phase diff review: review.rounds
 - phase state: phase.state
@@ -125,7 +165,9 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - plan facts: phase.state
 - plan order: phase.state
 - plan review: review.rounds
+- plan scope drift: phase.state
 - plan waves: subsystem.phase_status
+- plugin agents: plugins.build
 - plugin copy of a skill: plugins.build
 - plugin manifest: plugins.build
 - plugin version: plugins.release
@@ -133,8 +175,9 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - plugins-v tag: plugins.release
 - post review to pull request: review.rounds
 - pr review: review.rounds
-- publish plugin: plugins.release
+- private module rule: components.rules
 - pull ignored files: handoff.notes
+- push release tag: plugins.release
 - pytest phase option: phase.test_selection
 - pytest plugin: phase.test_selection
 - raise version: plugins.release
@@ -146,8 +189,9 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - release plugins: plugins.release
 - release status: plugins.release
 - remedy: components.rules
+- remove stale plugin files: plugins.build
 - requirements coverage: phase.state
-- resume work elsewhere: handoff.notes
+- restarted phase numbering: migrate.from_gsd
 - review brief: review.rounds
 - review round: review.rounds
 - review status: review.rounds
@@ -155,6 +199,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - reviewed or unreviewed: review.rounds
 - rewrite script paths: plugins.build
 - roadmap: phase.state
+- roadmap lint: phase.state
+- rsync over ssh: handoff.notes
 - rule check: components.rules
 - rule check flow: subsystem.rule_check
 - rules json: components.rules
@@ -163,12 +209,18 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - run tests of one phase: phase.test_selection
 - sanitize review: review.rounds
 - search components: components.index
+- secret in note: handoff.notes
 - select acceptance tests: phase.test_selection
 - sessions per account: phase.coder_pool
 - settings files: sync.copies
 - show component: components.index
+- show note: handoff.notes
+- skill lint: phase.state
+- slash commands in note: handoff.notes
 - snapshot of the checkout: handoff.notes
+- starter catalog: components.index
 - starter config: sync.copies
+- starter rules: components.rules
 - state md: phase.state
 - strict check: components.index
 - suggest rules: components.rules
@@ -179,13 +231,18 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - tag release: plugins.release
 - take over: handoff.notes
 - takeover ready: handoff.notes
+- template citations: phase.state
 - test lock: phase.state
 - test rules on examples: components.rules
+- to-merge drafts: migrate.from_gsd
+- toml without tomllib: phase.coder_pool
 - track cap: subsystem.phase_status
+- tracked files never replaced: handoff.notes
 - unassigned baseline: components.index
 - unassigned modules: components.index
 - unfinished phase: migrate.from_gsd
 - untracked files: phase.codex_gate
+- validate catalog: components.index
 - what would be lost: handoff.notes
 - which areas may import which: components.rules
 - which coders are on path: phase.coder_pool
@@ -195,132 +252,122 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## The plugins
 
 ### plugins.build
-- does: Build the dvt-phase and dvt-milestone plugins in plugins/ and the marketplace from skills/ (build_plugins.py); --check finds a stale copy
-- verbs: build plugins, rebuild plugins, generate plugins folder, regenerate plugins, marketplace json, plugin manifest, check plugins stale, rewrite script paths, CLAUDE_PLUGIN_ROOT, devtools token, plugin copy of a skill, dvt-phase, dvt-milestone
+- does: Build the dvt-phase and dvt-milestone plugins in plugins/ and the marketplace from skills/, agents/ and devtools/PLUGIN_VERSION; --check finds a stale, extra or wrong-mode file (build_plugins.py)
+- verbs: build plugins, rebuild plugins, generate plugins folder, regenerate plugins, marketplace json, plugin manifest, check plugins stale, rewrite script paths, CLAUDE_PLUGIN_ROOT, devtools token, plugin copy of a skill, dvt-phase, dvt-milestone, installed from plugin note, plugin agents, file modes, remove stale plugin files
 - status: canonical
 - modules: devtools/build_plugins.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.release
 - tests: tests/test_plugins.py, tests/test_release_plugins.py
-- checked: partial
-- notes: Read: the module docstring, the function list and the command line. Copies scripts byte for byte and fails the build when a rewrite stops matching.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Copies every file but Markdown byte for byte with its mode and rewrites paths in Markdown only; the build fails when a rewrite matches nothing, a token has no value or a SKILL.md has no frontmatter. A build deletes files under plugins/ that no source makes. release_plugins.py loads it with importlib (subsystem.release).
 
 ### plugins.release
-- does: Release the plugins: status says whether a release is due, bump raises the version and rebuilds, tag makes plugins-vX.Y.Z on main (release_plugins.py)
-- verbs: release plugins, plugin version, bump version, raise version, patch version, tag release, plugins-v tag, release notes, is a release due, release status, publish plugin, github release, PLUGIN_VERSION
+- does: Release the plugins: status says whether a release is due or plugins/ is stale, bump raises the version and rebuilds, tag checks main, a clean tree, a fresh build and a real change, then makes plugins-vX.Y.Z with notes; --push and --github send it (release_plugins.py)
+- verbs: release plugins, plugin version, bump version, raise version, patch version, minor version, major version, tag release, plugins-v tag, release notes, is a release due, release status, push release tag, github release, dry run tag, PLUGIN_VERSION
 - status: canonical
 - modules: devtools/release_plugins.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.release
 - tests: tests/test_release_plugins.py
-- checked: partial
-- notes: Read: the module docstring, the function list and the command line. bump loads build_plugins.py at run time (subsystem.release).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). bump starts from the higher of PLUGIN_VERSION and the last tag, and writes PLUGIN_VERSION before the build runs. Nothing leaves the machine without --push or --github; a failed push or gh call leaves the local tag made. It loads build_plugins.py with importlib when imported, and every command uses it (subsystem.release).
 
 ## Taking the skills into a project
 
 ### sync.copies
-- does: Copy dev-tools skills and scripts into a project from its .devtools.toml and keep the copies honest with a receipt (sync.py apply, check, survey, compare)
-- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens
+- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift, survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
+- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has
 - status: canonical
 - modules: devtools/sync.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_sync.py
 - duplicates: devtools/from_gsd.py
-- checked: partial
-- notes: Read: the module docstring, the documented functions and the four commands. survey and compare write nothing; adopt-devtools is the skill that drives them. from_gsd.py repeats its other_plans and OTHER_PLANS (REVIEW.md).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
 
 ### migrate.from_gsd
-- does: Move a project's planning folder from GSD to the dev-tools phase workflow: survey reads it, convert rewrites STATE, ROADMAP and REQUIREMENTS (from_gsd.py)
-- verbs: move from gsd, migrate gsd, convert planning folder, gsd roadmap, gsd requirements, gsd state, archive gsd files, map requirement ids, workstreams, unfinished phase, survey gsd, dry run conversion
+- does: Move a project's planning folder from GSD to the dev-tools phase workflow: survey says what a move would do and what to settle; convert archives GSD's files, rewrites STATE, ROADMAP and REQUIREMENTS, adds the missing planning files without overwriting any, and records the move in CONVERSION.md (from_gsd.py)
+- verbs: move from gsd, migrate gsd, convert planning folder, gsd roadmap, gsd requirements, gsd state, archive gsd files, map requirement ids, workstreams, unfinished phase, survey gsd, dry run conversion, restarted phase numbering, parked phases, key decisions to decisions md, conversion record, to-merge drafts, gsd hooks in settings
 - status: canonical
 - modules: devtools/from_gsd.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_from_gsd.py
 - distinct_from: plugins.release, plugins.build
-- checked: partial
-- notes: Read: the module docstring and the documented functions. It never calls git to change anything; move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins.
 
 ## The component index
 
 ### components.index
-- does: Generate and search the component catalog from source ASTs: write, check, search, stats, draft, changed, review, show, facts (components_index.py)
-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, unassigned modules, coverage, draft entries, changed since base, review the index, show component, import graph, facts for rules, unassigned baseline, count extra dirs
+- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show (components_index.py)
+- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, count extra dirs, draft entries, changed since base, new caller of deprecated component, entries to reread, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
 - status: canonical
 - modules: skills/components/scripts/components_index.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py, tests/test_index_cache.py
-- checked: partial
-- notes: Read: the module docstring, the command line and, during phase 2 of component-index, the settings, coverage, draft, changed, review and show code. The cache and search ranking were not reread.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). search and --check read a parse cache in $XDG_CACHE_HOME/components-index/, outside the checkout, and drop cache files older than 30 days. review's per-module leads (same-named definitions) look only under package_dir. In a plugin install the settings come from the current folder's checkout, whatever --root says.
 
 ### components.rules
-- does: Check the project's own rules about which components may use which, with GND: init, check, check --phase, test the rules on their examples, suggest rules (rules_check.py)
-- verbs: rule check, component rules, layers, forbidden imports, which areas may import which, gnd check, guarded rules, rules json, layers toml, test rules on examples, suggest rules, near misses, check plans of a phase, new violation since base, remedy
+- does: Judge the project's own rules about its components and plans with GND, over the facts components_index.py extracts: init writes starter rules and layers, check (against a base, or --phase NN for plans), test judges each rule on its examples, suggest proposes layers and near misses (rules_check.py)
+- verbs: rule check, component rules, layers, forbidden imports, which areas may import which, gnd check, guarded rules, rules json, layers toml, starter rules, test rules on examples, suggest rules, near misses, check plans of a phase, new violation since base, remedy, import loop rule, canonical component has a test, private module rule
 - status: canonical
 - modules: skills/components/scripts/rules_check.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py
-- checked: partial
-- notes: Read: the module docstring and the documented functions. Without GND it prints skip: and exits 0. It runs components_index.py and phase_tool.py (subsystem.rule_check).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Without GND, check, test and suggest print skip: and exit 0 (1 with --require); a check that could not run exits 2. It runs components_index.py facts and phase_tool.py facts as subprocesses and loads phase_tool.py with importlib (subsystem.rule_check), and keeps its own copy of phase_tool's PLAN_KEYS. In a dvt-milestone install its default phase_script is missing (that plugin ships no phase_tool.py), so check --phase cannot run there.
 
 ## Moving work between assistants and machines
 
 ### handoff.notes
-- does: Hand a branch to another assistant, developer or machine and take one over: write the note, check it, carry ignored files, takeover says ready or not (handoff.py)
-- verbs: hand off, handoff note, take over, takeover ready, continue on another machine, switch assistant, carry ignored files, pull ignored files, what would be lost, list handoffs, doctor, snapshot of the checkout, key files, ignored inventory, resume work elsewhere
+- does: Hand a branch to another assistant, developer or machine: write the note with a snapshot of the checkout, check what would be lost at its hand-off level, list ignored files by kind, carry or pull them, list the notes on local and origin branches; on arrival takeover and doctor say whether this checkout is ready (handoff.py)
+- verbs: hand off, handoff note, take over, takeover ready, continue on another machine, switch assistant, carry ignored files, pull ignored files, what would be lost, list handoffs, doctor, snapshot of the checkout, key files, ignored inventory, hand-off level, show note, secret in note, slash commands in note, paused phase, rsync over ssh, tracked files never replaced
 - status: canonical
 - modules: skills/dev-handoff/scripts/handoff.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_handoff.py
-- checked: partial
-- notes: Read: the module docstring and the documented functions, and during phase 1 of component-index the snapshot and takeover code. carry and pull are dry runs until --yes.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 repair (e2b2762). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with is missing or cannot be read. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
 
 ## The milestone workflow
 
 ### review.rounds
-- does: Run one independent review round: brief writes the question and file hashes, run starts the other tool as reviewer, status, post, sanitize (review_tool.py)
-- verbs: independent review, review round, review brief, findings ledger, run reviewer, codex review, claude reviewer, reviewed or unreviewed, review status, post review to pull request, sanitize review, plan review, phase diff review, close review, pr review
+- does: Run one independent review round in its own folder: brief writes the question, claims and every file's SHA-256, run starts the other tool as a read-only reviewer once the bytes match, status checks the run, the findings ledger and which files are unreviewed, post, sanitize (review_tool.py)
+- verbs: independent review, review round, review brief, findings ledger, run reviewer, codex review, claude reviewer, reviewed or unreviewed, review status, post review to pull request, sanitize review, plan review, phase diff review, close review, pr review, claims to test, bytes changed since brief, ledger validation, credential files left out
 - status: canonical
 - modules: skills/milestone/process-phase/scripts/review_tool.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_review_tool.py
-- checked: partial
-- notes: Read: the module docstring and the documented functions. A brief refuses a credential file it is asked to name, and leaves out one a diff would bring in.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A bad settings file exits 1, where the docstring says 2.
 
 ## The phase workflow
 
 ### phase.state
-- does: Own the phase workflow's state and planning checks: setup, status, activate, check, testlock, advance, complete, facts (phase_tool.py)
-- verbs: phase state, phase status, next phase, roadmap, advance phase, complete phase, activate phase, gate problems, check plans, plan order, requirements coverage, test lock, golden diff, evidence check, phase branch, plan facts, state md
+- does: Own a phase's state in the planning folder (STATE.md, ROADMAP.md, REQUIREMENTS.md) and its planning checks: setup, init, status, roadmap, activate, advance, complete, branch, check, req-coverage, testlock, golden-diff, evidence-check, migration-check, facts (phase_tool.py)
+- verbs: phase state, phase status, next phase, roadmap, roadmap lint, init phase folder, advance phase, complete phase, activate phase, gate problems, check plans, plan order, plan scope drift, requirements coverage, test lock, golden diff, evidence check, deferred ledger, migration check, skill lint, template citations, capabilities stale, phase branch, plan facts, state md, json envelope
 - status: canonical
 - modules: skills/phase/process-phase/scripts/phase_tool.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.phase_status, subsystem.rule_check
 - tests: tests/test_tools.py
-- checked: partial
-- notes: Read: the module docstring, the command list and the documented functions. It asks coder_pool.py for the track cap (subsystem.phase_status) and runs a project's generator with runpy.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a bad phase_tool.settings.json exits 1 at import with no envelope. check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
 
 ### phase.coder_pool
-- does: Say which coding assistants Implement may use and how many at once, from the team's and the developer's TOML files (coder_pool.py show)
-- verbs: coder pool, coding assistants, how many coders, parallel tracks, max tracks, sessions per account, codex accounts, gemini coder, coder model, coder effort, merge toml settings, which coders are on path
+- does: Say which coding assistants Implement may use and how many tracks at once: merge the team's and the developer's TOML files, keep the coders on PATH, fall back to claude, and give each account's model, effort and env (coder_pool.py show)
+- verbs: coder pool, coding assistants, how many coders, parallel tracks, effective tracks, max tracks, sessions per account, coder accounts, codex home, gemini coder, claude fallback, coder model, coder effort, merge toml settings, which coders are on path, toml without tomllib
 - status: canonical
 - modules: skills/phase/process-phase/scripts/coder_pool.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.phase_status
 - tests: tests/test_tools.py
-- checked: partial
-- notes: Read: the module docstring and the documented functions. It carries its own small TOML reader for a Python without tomllib.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). show exits 0 even with an empty pool (nothing on PATH gives effective_tracks 0); bad limits warn and use 4, bad TOML exits 1. A linked worktree reads the main checkout's local file. It carries its own small TOML reader for a Python without tomllib. phase_tool.py runs show --json (subsystem.phase_status).
 
 ### phase.codex_gate
 - does: Check a coding round's changed paths against an allowlist and its added lines against a budget (codex_gate.py)
@@ -343,13 +390,13 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## Where one script runs another
 
 ### subsystem.release
-- does: Release the plugins: release_plugins.py bump writes the version and rebuilds plugins/ through build_plugins.py
+- does: Release the plugins: release_plugins.py builds plugins/ through build_plugins.py, in memory for status and tag and on disk for bump
 - verbs: release flow, bump and rebuild plugins
 - status: canonical
 - components: plugins.release, plugins.build
 - members_uses: (none)
 - flow: plugins.release -> plugins.build
-- notes: A run-time load, which the import graph cannot see: release_plugins.py loads build_plugins.py with importlib.
+- notes: A load at import, which the import graph cannot see: release_plugins.py loads build_plugins.py with importlib; bump runs its main, status and tag its build and stale, and all read its version pattern.
 
 ### subsystem.rule_check
 - does: Judge the project's component rules: rules_check.py reads the catalog and import graph from components_index.py facts, and the plans and fact types of the phase workflow from phase_tool.py
@@ -357,14 +404,14 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - status: canonical
 - components: components.rules, components.index, phase.state
 - members_uses: (none)
-- flow: components.rules -> components.index -> phase.state
-- notes: Run-time calls, which the import graph cannot see. check and test run components_index.py facts as a subprocess, and test then loads phase_tool.py with importlib for its fact types; check --phase runs phase_tool.py facts first, then components_index.py facts.
+- flow: components.rules -> phase.state -> components.index
+- notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
 
 ### subsystem.phase_status
-- does: Order the plans of a phase: phase_tool.py asks coder_pool.py how many tracks run at once
+- does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
 - verbs: track cap, plan waves, coder tracks
 - status: canonical
 - components: phase.state, phase.coder_pool
 - members_uses: (none)
 - flow: phase.state -> phase.coder_pool
-- notes: A run-time call, which the import graph cannot see: phase_tool.py runs coder_pool.py show --json as a subprocess and reads effective_tracks.
+- notes: A run-time call, which the import graph cannot see: for a wave of more than one plan, phase_tool.py runs coder_pool.py show --json as a subprocess, reads effective_tracks and warns when more plans can start at once.

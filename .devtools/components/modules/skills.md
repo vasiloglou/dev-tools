@@ -139,26 +139,26 @@ handoff.py: hand a branch to another coding assistant, developer or machine, and
 | `plugin_root(script)` | function | 45 | The plugin install that holds this script, or None. A plugin keeps it in |
 | `checkout_root() -> Path` | function | 54 | The git checkout that holds the working directory, or the working directory. |
 | `load_settings(path) -> dict` | function | 86 | (no docstring) |
-| `note_dir(root) -> Path` | function | 171 | (no docstring) |
-| `note_path(root, branch) -> Path` | function | 175 | (no docstring) |
-| `other_notes(root) -> list[str]` | function | 179 | (no docstring) |
-| `current_branch(root) -> str` | function | 183 | (no docstring) |
-| `base_ref(root, base) -> str` | function | 203 | The ref ``base`` names in this checkout, the local branch or origin's; '' when there is |
-| `default_base(root) -> str` | function | 212 | The branch work starts from: the setting, the phase workflow's, origin's default, main. |
-| `snapshot(root, base, *, ignored) -> dict` | function | 223 | What git and the planning folder say about the branch right now. ``ignored`` is an |
-| `branch_start(root, base) -> float \| None` | function | 281 | Commit time of the point where the branch left ``base``; None when unknown. |
-| `ignored_inventory(root, *, max_mb, since, include) -> list[dict]` | function | 366 | Files git ignores in this checkout: {path, kind, bytes, files}, largest first. |
-| `carry(root, dest, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 556 | Copy the ignored files worth carrying to another checkout: a local path or host:path. |
-| `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 608 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
-| `level(sender, to, machine) -> int` | function | 640 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
-| `detect_sender() -> str` | function | 647 | The assistant running this process, when it says so in the environment. |
-| `HandoffError` | class(Exception) | 755 | The command cannot do what was asked; the message says why. |
-| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 775 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
-| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 809 | What the next machine would not get: findings as dicts, most severe first. |
-| `doctor(root, *, home) -> list[dict]` | function | 877 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
-| `available(root) -> list[dict]` | function | 932 | Hand-off notes that can be taken over, one per branch, newest first. |
-| `takeover(root, *, home) -> dict` | function | 990 | Everything the receiving side checks before continuing, in one report. |
-| `main(argv) -> int` | function | 1184 | (no docstring) |
+| `note_dir(root) -> Path` | function | 173 | (no docstring) |
+| `note_path(root, branch) -> Path` | function | 177 | (no docstring) |
+| `other_notes(root) -> list[str]` | function | 181 | (no docstring) |
+| `current_branch(root) -> str` | function | 185 | (no docstring) |
+| `base_ref(root, base) -> str` | function | 205 | The ref ``base`` names in this checkout, the local branch or origin's; '' when there is |
+| `default_base(root) -> str` | function | 214 | The branch work starts from: the setting, the phase workflow's, origin's default, main. |
+| `snapshot(root, base, *, ignored) -> dict` | function | 225 | What git and the planning folder say about the branch right now. ``ignored`` is an |
+| `branch_start(root, base) -> float \| None` | function | 283 | Commit time of the point where the branch left ``base``; None when unknown. |
+| `ignored_inventory(root, *, max_mb, since, include) -> list[dict]` | function | 368 | Files git ignores in this checkout: {path, kind, bytes, files}, largest first. |
+| `carry(root, dest, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 558 | Copy the ignored files worth carrying to another checkout: a local path or host:path. |
+| `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 610 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
+| `level(sender, to, machine) -> int` | function | 642 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
+| `detect_sender() -> str` | function | 649 | The assistant running this process, when it says so in the environment. |
+| `HandoffError` | class(Exception) | 757 | The command cannot do what was asked; the message says why. |
+| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 777 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
+| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 811 | What the next machine would not get: findings as dicts, most severe first. |
+| `doctor(root, *, home) -> list[dict]` | function | 879 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
+| `available(root) -> list[dict]` | function | 934 | Hand-off notes that can be taken over, one per branch, newest first. |
+| `takeover(root, *, home) -> dict` | function | 1016 | Everything the receiving side checks before continuing, in one report. |
+| `main(argv) -> int` | function | 1216 | (no docstring) |
 
 ## skills.milestone.process-phase.scripts.review_tool — `skills/milestone/process-phase/scripts/review_tool.py`
 Components: review.rounds
