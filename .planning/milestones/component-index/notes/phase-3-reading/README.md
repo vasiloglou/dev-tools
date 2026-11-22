@@ -57,3 +57,10 @@ and `review_tool.py`'s bad settings raise `SystemExit` with a message, exit 1.
 `handoff.py` moved after it was read: the phase-1-r3 repair (`e2b2762`) changed its
 `takeover`, `write` and `check`. The driving agent read that diff and wrote the entry from
 both.
+
+## Review of the reread
+
+Declared before it runs: one round, `phase-3-r2`, Codex through the review helper, over the
+rewritten entries and the modules they describe (base `caffae7`), also reading the phase
+r1 repairs. One further round only if r2 returns a blocking finding, and none once the
+self-inflicted ratio is above one half (`review-convergence.md`).
