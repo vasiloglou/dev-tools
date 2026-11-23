@@ -25,6 +25,10 @@ note did not list is missing.
 - **Branches:** phases 1, 2 and 3 are vasiloglou/dev-tools#29, #30 and #32, merged into
   `main` in that order on 2026-11-23, after `main`'s vasiloglou/dev-tools#34 was merged
   into each. Phase 4 is on `claude/component-index-phase-4`, cut from `main` at `827e766`.
+  After record 006, `main`'s vasiloglou/dev-tools#35 was merged into it (`05abd23`): the
+  new test failed on that merge, since #35 changed `review_tool.py`, and the index was
+  brought up to date at `181bde9` (the full suite then exited 0, 350 passed). The close
+  record takes this up.
 - **Index:** [`.devtools/components/`](../../../.devtools/components/COMPONENTS.md), built in
   phase 3.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md),
