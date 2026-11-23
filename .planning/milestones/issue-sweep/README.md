@@ -21,6 +21,5 @@ the fix. Issues 39 and 40 are left for milestones of their own.
 - **Ruled by the owner, 2026-11-23:** the lane, a milestone (D2); the eight issues (D1);
   D3 to D11, as proposed.
 - **Pending decisions:** D1 to D5 of the phase 1 spec, at its owner gate.
-- **Next action:** commit the plan, the review round and the plan-gate record
-  (`001-plan.md`), on the owner's word; then phase 1's owner gate.
-- **Records:** none yet.
+- **Next action:** phase 1's owner gate, over [notes/phase-1-spec.md](notes/phase-1-spec.md).
+- **Records:** [001-plan.md](001-plan.md): the plan gate.
