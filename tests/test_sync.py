@@ -1145,8 +1145,8 @@ def own_checkout_as_is(monkeypatch):
     monkeypatch.setattr(sync.subprocess, "run", guarded)
     real_resolve = getattr(sync, "resolve_source", None)
     if real_resolve is not None:
-        def resolve(path, *, as_is):
-            return real_resolve(path, as_is=as_is or Path(path).resolve() == sync.SOURCE_ROOT)
+        def resolve(path, *, as_is, **kwargs):
+            return real_resolve(path, as_is=as_is or Path(path).resolve() == sync.SOURCE_ROOT, **kwargs)
         monkeypatch.setattr(sync, "resolve_source", resolve)
 
 
@@ -1522,3 +1522,34 @@ def test_a_sync_entry_of_the_wrong_shape_is_a_configuration_error(source, projec
     assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
     assert err.startswith("warning: not compared with dev-tools: ")
     assert out_of(capsys, "apply", "--project", project, "--source", source)[0] == 2
+
+
+# Regression tests for the pull request's review round 1 (.planning/reviews/pr-47-r1).
+
+def test_own_work_in_any_path_the_config_takes_keeps_the_checkout(behind, capsys):
+    # pr-47-r1 F1: a source outside skills, agents, devtools and examples.
+    write(behind["upstream"] / "scripts/one.py", "ONE = 1\n")
+    commit(behind["upstream"], "script")
+    git(behind["clone"], "pull", "-q")
+    write(behind["upstream"] / "scripts/one.py", "ONE = 2\n")
+    commit(behind["upstream"], "script again")
+    write(behind["clone"] / "scripts/one.py", "ONE = 'mine'\n")
+    (behind["project"] / ".devtools.toml").write_text('[[sync]]\nsource = "scripts/one.py"\ndest = "one.py"\n')
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and (behind["project"] / "one.py").read_text() == "ONE = 'mine'\n"
+    assert OWN + "main and has work of its own" in err
+
+
+def test_a_source_that_is_not_a_folder_is_not_compared(source, tmp_path, capsys):
+    # pr-47-r1 F2
+    project = tmp_path / "empty"
+    project.mkdir()
+    (project / ".devtools.toml").write_text("sync = []\n")
+    assert apply(source, project) == 0
+    capsys.readouterr()
+    missing = tmp_path / "does-not-exist"
+    code, out, err = out_of(capsys, *check_source(project, missing))
+    assert (code, out) == (0, "0 managed file(s), 0 problem(s)\n")
+    assert err.startswith("warning: not compared with dev-tools: ")
+    assert out_of(capsys, *check_source(project, missing, "--strict"))[0] == 5
+    assert out_of(capsys, "apply", "--project", project, "--source", missing)[0] == 2

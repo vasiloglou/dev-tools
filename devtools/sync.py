@@ -314,7 +314,7 @@ def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> Non
 
 # --------------------------------------------------------------------------- which commit of dev-tools is read
 
-DIRTY_PATHS = ("skills", "agents", "devtools", "examples")  # what the sync reads and runs
+DIRTY_PATHS = ("skills", "agents", "devtools", "examples")  # what the sync reads and runs, beside the config's sources
 FETCH_SECONDS = 60
 
 
@@ -323,7 +323,7 @@ def git_line(text: str) -> str:
     return text[:-1] if text.endswith("\n") else text
 
 
-def resolve_source(path: Path, *, as_is: bool) -> dict:
+def resolve_source(path: Path, *, as_is: bool, sources: tuple[str, ...] = ()) -> dict:
     """Which files a run reads for the dev-tools source at ``path``.
 
     A checkout that is only behind its upstream is read at the upstream's commit, from a temporary
@@ -384,8 +384,8 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
     # Asked so that no setting hides work: modes are compared, untracked files are listed, and a
     # file git was told to stop looking at (assume-unchanged, skip-worktree) counts as changed.
     uncommitted = [line for line in out("-c", "core.fileMode=true", "status", "--porcelain", "--untracked-files=all",
-                                        "--", *DIRTY_PATHS).splitlines() if line.strip()]
-    uncommitted += [line for line in out("ls-files", "-v", "--", *DIRTY_PATHS).splitlines()
+                                        "--", *DIRTY_PATHS, *sources).splitlines() if line.strip()]
+    uncommitted += [line for line in out("ls-files", "-v", "--", *DIRTY_PATHS, *sources).splitlines()
                     if line[:1].islower() or line[:1] == "S"]
     if ahead or uncommitted:
         return result("own-work", head, lines + [
@@ -445,8 +445,17 @@ def read_commit(checkout: Path, commit: str, folder: Path) -> None:
 
 
 def open_source(args, path: Path) -> Path:
-    """Resolve the source a command reads, print what was decided, and remember how to clean up."""
-    resolved = resolve_source(path, as_is=getattr(args, "as_is", False))
+    """Resolve the source a command reads, print what was decided, and remember how to clean up.
+    A source that is not a folder is a configuration error. The project's config, where it can be
+    read, adds its sources to the paths whose own work keeps the checkout as it is."""
+    if not path.is_dir():
+        raise SyncError(f"the dev-tools source {path} is not a folder")
+    try:
+        sources = tuple(entry["source"] for entry in read_config(args.project.resolve()).get("sync", [])
+                        if entry.get("source"))
+    except SyncError:
+        sources = ()
+    resolved = resolve_source(path, as_is=getattr(args, "as_is", False), sources=sources)
     for line in resolved["lines"]:
         print(line, file=sys.stderr)
     args.cleanups.append(resolved["cleanup"])
@@ -551,8 +560,8 @@ def cmd_check(args) -> int:
     source_root = None if args.receipt_only else (args.source or default_source())
     noted = source_root is None  # with no source, nothing was compared
     if source_root is not None:
-        source_root = open_source(args, source_root.resolve())
         try:
+            source_root = open_source(args, source_root.resolve())
             config = read_config(project)
             wanted = desired_files(source_root, config, project)
             report = unit_report(source_root, config, wanted, receipt)
