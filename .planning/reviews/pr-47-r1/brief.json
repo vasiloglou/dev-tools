@@ -1,0 +1,41 @@
+{
+  "base": null,
+  "claims": [
+    "A shipped unit the config does not take, named by a synced file, is reported by apply and check, with the file that names it.",
+    "A unit added to dev-tools since the last sync is reported until the next apply.",
+    "declined in .devtools.toml silences a unit for good; a workflow folder the project takes nothing from is never reported.",
+    "check run from a dev-tools checkout, or with --source, says how many files an apply would update; check --receipt-only is the old check.",
+    "Every new line is a note with exit 0; check --strict exits 5 when there is anything to report; drift still exits 1; exits 0 to 4 keep their meaning, and no existing test was edited.",
+    "A checkout only behind its upstream delivers the upstream commit's files and is not changed; one with work of its own, a detached HEAD or tag, or no upstream is delivered as it is; --as-is skips the fetch; these lines go to standard error only."
+  ],
+  "created": "2026-11-23T21:03:48.114322+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-47-r1/diff.patch",
+      "sha256": "bcd1e55d378350bd2b04e86122401c9ff59a03f86b4a0671c19c40acf66603a8"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/sync-reports-plan.md",
+      "sha256": "d89a7175429c521932aba262848aff0989044355590c50f80d7a5f52a1936ad9"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/004-close.md",
+      "sha256": "baf7b4f263ac6332e3739e2c33e92cb2e7221ca7ed0ba59ed9837ada28fec5d8"
+    }
+  ],
+  "head": "fe1c2c2bf4f7efe3842bd08e473e047e7fa49d07",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "a8d6f42ffb2929d38afd8512e0f07d3f27f2f966",
+    "head": "fe1c2c2bf4f7efe3842bd08e473e047e7fa49d07",
+    "number": 47,
+    "title": "sync.py names what a project has not taken, says when it is behind, and reads the latest dev-tools",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/47"
+  },
+  "question": "Does this pull request do what its description says, and what does it break for a project that syncs dev-tools or for the dev-tools checkout it reads from?",
+  "subject": "pr",
+  "version": 1
+}
