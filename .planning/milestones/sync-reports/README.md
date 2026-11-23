@@ -19,4 +19,5 @@ upstream delivers the upstream's files.
   owner's lane ruling. Pushing, the pull request, merging, tagging and releasing need the
   owner.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md): the unit
-  report, `declined`, `check` against a source and `--strict`.
+  report, `declined`, `check` against a source and `--strict`;
+  [003-phase-2.md](003-phase-2.md): the sync reads the latest dev-tools.
