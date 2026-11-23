@@ -225,8 +225,9 @@ a release is due.
 ## Developed with itself
 
 Since 2026-11-21 this repository is a project that uses dev-tools, as well as the place
-dev-tools is kept. No milestone has run here yet; the first one will leave the first
-records.
+dev-tools is kept. Its first milestone, `component-index`, gave the project an index of
+its own code; its plan, specs, review rounds and records are in
+`.planning/milestones/component-index/`.
 
 - **Which workflow.** The milestone workflow, from the released `dvt-milestone` plugin,
   which `.claude/settings.json` turns on. The released version runs, not the branch: a
@@ -239,7 +240,13 @@ records.
   run and kept, the design rules every spec answers, and what needs the owner each time.
   It is a complete example of the file a project writes for itself when it installs a
   plugin.
-- **What it changes for a contributor.** Nothing. A fix is a pull request, as
+- **Where its component index is.** [`.devtools/components/`](.devtools/components/COMPONENTS.md):
+  one entry for each module of `devtools/` and `skills/`, searched before a module or a
+  function is written. `search-cases.md` beside it holds the questions it was tested
+  against.
+- **What it changes for a contributor.** One thing: a test fails while that index is out
+  of date, which a change to a script usually makes it, and the failure names the command
+  that regenerates it. Otherwise a fix is a pull request, as
   [CONTRIBUTING.md](CONTRIBUTING.md) says, with no milestone and no record.
 
 The site has the same account with the lanes side by side:
@@ -264,8 +271,8 @@ The site has the same account with the lanes side by side:
 | `devtools/build_plugins.py`, `devtools/release_plugins.py` | Build `plugins/` from the skills (`--check` reports a stale build), and release a plugin version (`status`, `bump`, `tag`). |
 | `devtools/from_gsd.py` | Reads a GSD planning folder (`survey`) and rewrites it in the phase workflow's format (`convert`). |
 | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
-| `tests/` | Tests for the sync command, the GSD converter, the plugin build and release, and the scripts a project runs after a sync or from a plugin. |
-| `.planning/`, `.devtools/project.md`, `AGENTS.md` | dev-tools' own use of the milestone workflow, which it is developed with: its milestones and their records, its rules for the skills, and the words the work uses. Not part of what a project takes. |
+| `tests/` | Tests for the sync command, the GSD converter, the plugin build and release, and the scripts a project runs after a sync or from a plugin. One test fails while dev-tools' own component index is out of date. |
+| `.planning/`, `.devtools/project.md`, `.devtools/components/`, `AGENTS.md` | dev-tools' own use of the milestone workflow, which it is developed with: its milestones and their records, its rules for the skills, the component index of its own code, and the words the work uses. Not part of what a project takes. |
 
 ## Tests
 

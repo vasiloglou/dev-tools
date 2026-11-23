@@ -107,6 +107,7 @@ no component: src/shelf/export.py (add it to the modules of an entry in docs/com
       <p>The tool does the mechanical half: it lists every file, class and function straight from the source, and prints a stub for each file with its summary, what it imports and what imports it.</p>
       <p>The agent does the half that needs reading. It opens the code, groups files into capabilities, and writes each entry in the words someone would search for. A stub left as it came is refused. Whatever cannot be finished in one sitting is recorded in a list that is only allowed to shrink.</p>
       <p>It ends by using the map: it searches for things a newcomer would ask for, and fixes the entries until they are found.</p>
+      <p>dev-tools keeps an index of its own code, written this way: <a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/components/COMPONENTS.md"><code>.devtools/components/COMPONENTS.md</code></a>, with the questions it was tested against in <code>search-cases.md</code> beside it.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the same project with no index</b><em>captured</em></div>

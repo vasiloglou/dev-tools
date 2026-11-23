@@ -71,6 +71,13 @@ python3 devtools/build_plugins.py --check
 After changing a skill or an agent, `python3 devtools/release_plugins.py bump` raises the
 plugin version and rebuilds `plugins/`; commit both with the change.
 
+Before writing a module or a function, search the component index
+(`.devtools/components/`) for what already exists:
+
+```bash
+python3 plugins/dvt-milestone/skills/components/scripts/components_index.py search <words>
+```
+
 ## Before you finish
 
 - Commit, push, merge, tag or post to GitHub only when the owner asks.

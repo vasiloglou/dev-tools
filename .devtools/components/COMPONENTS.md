@@ -220,6 +220,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - skill lint: phase.state
 - slash commands in note: handoff.notes
 - snapshot of the checkout: handoff.notes
+- standing check for code fitted to its examples: review.rounds
 - starter catalog: components.index
 - starter config: sync.copies
 - starter rules: components.rules
@@ -339,13 +340,13 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 
 ### review.rounds
 - does: Run one independent review round in its own folder: brief writes the question, claims and every file's SHA-256, run starts the other tool as a read-only reviewer once the bytes match, status checks the run, the findings ledger and which files are unreviewed, post, sanitize (review_tool.py)
-- verbs: independent review, review round, review brief, findings ledger, run reviewer, codex review, claude reviewer, reviewed or unreviewed, review status, post review to pull request, sanitize review, plan review, phase diff review, close review, pr review, claims to test, bytes changed since brief, ledger validation, credential files left out
+- verbs: independent review, review round, review brief, findings ledger, run reviewer, codex review, claude reviewer, reviewed or unreviewed, review status, post review to pull request, sanitize review, plan review, phase diff review, close review, pr review, claims to test, bytes changed since brief, ledger validation, credential files left out, standing check for code fitted to its examples
 - status: canonical
 - modules: skills/milestone/process-phase/scripts/review_tool.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_review_tool.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A bad settings file exits 1, where the docstring says 2.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A bad settings file exits 1, where the docstring says 2. Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
 
 ## The phase workflow
 
