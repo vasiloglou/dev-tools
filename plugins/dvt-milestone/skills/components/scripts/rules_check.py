@@ -381,7 +381,7 @@ def named_facts(value) -> set:
 
 def run(command: list, what: str, **options) -> subprocess.CompletedProcess:
     try:
-        return subprocess.run(command, capture_output=True, text=True, **options)
+        return subprocess.run(command, capture_output=True, text=True, check=False, **options)
     except OSError as exc:
         raise Problem(f'{what} could not start: {exc}')
 
@@ -509,8 +509,8 @@ def hidden(comparison: dict) -> list[str]:
     """`reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code."""
     notes = []
     if comparison.get('schema_version') != COMPARISON:
-        return [f'the rules were edited, and gnd wrote no comparison this script reads '
-                f'({comparison.get("schema_version")!r})']
+        return [(f'the rules were edited, and gnd wrote no comparison this script reads '
+                 f'({comparison.get("schema_version")!r})')]
     for row in comparison.get('rules') or []:
         name = str(row.get('address', '')).removeprefix('constraint:')
         if name.startswith(RESERVED):
@@ -814,8 +814,8 @@ def generated(gnd: list, types: dict, rules: list[dict], noted: set) -> list[tup
         try:
             manifest = json.loads((folder / 'cases' / 'guarded-cases.json').read_text(encoding='utf-8'))
         except (OSError, ValueError):
-            return [('note', f'gnd synth --guarded-cases built no cases (exit {done.returncode}): '
-                             f'{(done.stderr or done.stdout).strip()[:300]}')]
+            return [('note', (f'gnd synth --guarded-cases built no cases (exit {done.returncode}): '
+                              f'{(done.stderr or done.stdout).strip()[:300]}'))]
     if manifest.get('schema_version') != CASES:
         return [('note', f'gnd synth --guarded-cases wrote {manifest.get("schema_version")!r}; this script reads {CASES}')]
     found = []
@@ -882,8 +882,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
                 first = (verdict.get('offending_facts') or [None])[0]
                 results.append(('wrong', f'{label} breaks the rule: {describe(first)}'))
             elif kind == 'passes' and empty:
-                results.append(('note', f'{label} matched nothing{why}, so it shows only that the rule is quiet '
-                                        f'with no subject'))
+                results.append(('note', (f'{label} matched nothing{why}, so it shows only that the rule is '
+                                         f'quiet with no subject')))
     if '--guarded-cases' in features(gnd, 'synth', ('--guarded-cases',)):
         results.extend(generated(gnd, types, rules, typos))
     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
@@ -905,7 +905,7 @@ def test(root: Path, require: bool, as_json: bool) -> int:
 def joined(gnd: list, head: dict) -> dict:
     """GND's guarded-join discovery over the component facts: the report of `gnd discover`."""
     areas = {row['area'] for row in head['facts']['component_in_area']}
-    stamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+    stamp = datetime.datetime.now(datetime.UTC).replace(microsecond=0).isoformat()
     with tempfile.TemporaryDirectory() as name:
         folder = Path(name)
         (folder / 'model.json').write_text(json.dumps(model(head['types'], [])), encoding='utf-8')
