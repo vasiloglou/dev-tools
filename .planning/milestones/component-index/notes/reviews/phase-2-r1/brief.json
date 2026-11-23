@@ -1,0 +1,101 @@
+{
+  "base": "ca6712a",
+  "claims": [
+    "With count_extra_dirs absent or false, every command of components_index.py prints and exits exactly as it does at ca6712a, the order of every list included.",
+    "With count_extra_dirs true, --check --strict, stats, draft, changed and review name a module under extra_source_dirs that no component covers, and show prints a module section for one that has a component.",
+    "draft gives a stub for any module counted_modules returns and never raises, whatever extra_source_dirs holds.",
+    "A value of count_extra_dirs that is not a JSON boolean stops the script with 'count_extra_dirs must be true or false'.",
+    "The import graph (package_imports, module_graph, changed's existed set, show's imports and outside importers) is unchanged: it stays inside package_dir.",
+    "Each new test fails at ca6712a except T1 and T10, which pin unchanged behaviour.",
+    "The docs/adopt.html caption says truly what the 0.1.5 survey prints, and the capture above it is unchanged.",
+    "plugins/ is rebuilt from skills/ at 0.1.5 and nothing under plugins/ was edited by hand."
+  ],
+  "created": "2026-11-21T21:26:00.320968+00:00",
+  "deleted": [],
+  "dirty": true,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/diff.patch",
+      "sha256": "150edc5fcdfee21375f9bc0c18a878c403bc2fa9928cd89fbb9872fa59ec5eed"
+    },
+    {
+      "path": "devtools/PLUGIN_VERSION",
+      "sha256": "800cf1c0392b24de7c0a1c6ea6778ecb433dec71c49a150bce96a98477527b2f"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "82fbf18d3138cee2acecc760218b02dd5ec97fb8dc326b85da4e1f932bbe2e37"
+    },
+    {
+      "path": "examples/phase-project.devtools.toml",
+      "sha256": "af7c9ba367e74745fbe582fdd4d2788ca85b46aebd8ff512b638d6aadbedeae1"
+    },
+    {
+      "path": "plugins/dvt-milestone/.claude-plugin/plugin.json",
+      "sha256": "45246108b8375f6611f5bcb69f9b648a0277079ea868fad3ae2ae34ef4e77037"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/SKILL.md",
+      "sha256": "2c2749ca50f13a5bc7c3c04c8495977f6f0298365d276c39d1c1679af7d80182"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/references/build.md",
+      "sha256": "176eb03fc41690ae96dce99b507bd4ae456ccf41da16af88b87565a5a191a17e"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/components_index.py",
+      "sha256": "820f0902253d69b5e0b101023774e3958db853b4c2b6c44032e47cc7d0301836"
+    },
+    {
+      "path": "plugins/dvt-phase/.claude-plugin/plugin.json",
+      "sha256": "eb0ef4b7304dab31dec56c2db48978bdd0600baed88631180846f4531f33ace6"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/SKILL.md",
+      "sha256": "1d5ca3a23d20cf658b4ff636c42382de8f599c2ca56c36ea72ea57c5b937816a"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/references/build.md",
+      "sha256": "176eb03fc41690ae96dce99b507bd4ae456ccf41da16af88b87565a5a191a17e"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/components_index.py",
+      "sha256": "820f0902253d69b5e0b101023774e3958db853b4c2b6c44032e47cc7d0301836"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "1232e277b0b9b116325956b0084027963491aa02065d441392698eb5013d1e10"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "f01ae0b3865c4f5028a2075b988a3a84ec4665436d2120a7df97a1c82562fb32"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "820f0902253d69b5e0b101023774e3958db853b4c2b6c44032e47cc7d0301836"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "4657de24467e731a8fe21744430222f2c883009dd4a712b0bdb5f48971d3164f"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-2-spec.md",
+      "sha256": "da85aa946edfe4fd8435cfd6e06518db2ef22e2f4b02d8965c5e4f7c1247df16"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "3cc5eb4924e69fb5584fd2613a0246718a27b5b3dd9e58f34afebabb97b886a9"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "ca6712a1236a2f0ee58b3204131be5c4675137d4",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this diff do what notes/phase-2-spec.md requires of it, and where can its claims below be shown false, by a settings file, a folder layout or a command?",
+  "subject": "phase",
+  "version": 1
+}

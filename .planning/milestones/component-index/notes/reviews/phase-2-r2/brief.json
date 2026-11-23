@@ -1,0 +1,135 @@
+{
+  "base": "ca6712a",
+  "claims": [
+    "With count_extra_dirs absent or false, every command of components_index.py prints and exits exactly as it does at ca6712a, for any spelling of package_dir and extra_source_dirs that ca6712a accepts.",
+    "With count_extra_dirs true, --check --strict, stats, draft, changed and review name a module under extra_source_dirs that no component covers, and show prints a module section for one that has a component.",
+    "draft gives a stub for any module counted_modules returns and never raises, whatever spelling extra_source_dirs and package_dir use.",
+    "A value of count_extra_dirs that is not a JSON boolean stops the script with 'count_extra_dirs must be true or false'.",
+    "The import-graph functions (package_imports, module_graph, changed's existed set, show's imports and outside importers) are unchanged by this diff.",
+    "docs/components.html, skills/components/SKILL.md and references/build.md describe the setting truly, and the docs/adopt.html caption says truly what the 0.1.5 survey prints.",
+    "plugins/ is rebuilt from skills/ at 0.1.5 and nothing under plugins/ was edited by hand."
+  ],
+  "created": "2026-11-21T21:32:15.734825+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r2/diff.patch",
+      "sha256": "374857c9fad97c42b2874789c11abca5afdd24f614dee73970a2dd0726860e8b"
+    },
+    {
+      "path": "devtools/PLUGIN_VERSION",
+      "sha256": "800cf1c0392b24de7c0a1c6ea6778ecb433dec71c49a150bce96a98477527b2f"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "82fbf18d3138cee2acecc760218b02dd5ec97fb8dc326b85da4e1f932bbe2e37"
+    },
+    {
+      "path": "docs/components.html",
+      "sha256": "cee6abaf6d2eb176487a16ef48f6d3c5c0953a757b772b46793c02b9ec31a976"
+    },
+    {
+      "path": "examples/phase-project.devtools.toml",
+      "sha256": "af7c9ba367e74745fbe582fdd4d2788ca85b46aebd8ff512b638d6aadbedeae1"
+    },
+    {
+      "path": "plugins/dvt-milestone/.claude-plugin/plugin.json",
+      "sha256": "45246108b8375f6611f5bcb69f9b648a0277079ea868fad3ae2ae34ef4e77037"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/SKILL.md",
+      "sha256": "2c2749ca50f13a5bc7c3c04c8495977f6f0298365d276c39d1c1679af7d80182"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/references/build.md",
+      "sha256": "176eb03fc41690ae96dce99b507bd4ae456ccf41da16af88b87565a5a191a17e"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/components_index.py",
+      "sha256": "26d01d3135f74d787e45bc389cc34577e97691cec2e3dc04199182d7492c5a60"
+    },
+    {
+      "path": "plugins/dvt-phase/.claude-plugin/plugin.json",
+      "sha256": "eb0ef4b7304dab31dec56c2db48978bdd0600baed88631180846f4531f33ace6"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/SKILL.md",
+      "sha256": "1d5ca3a23d20cf658b4ff636c42382de8f599c2ca56c36ea72ea57c5b937816a"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/references/build.md",
+      "sha256": "176eb03fc41690ae96dce99b507bd4ae456ccf41da16af88b87565a5a191a17e"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/components_index.py",
+      "sha256": "26d01d3135f74d787e45bc389cc34577e97691cec2e3dc04199182d7492c5a60"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "1232e277b0b9b116325956b0084027963491aa02065d441392698eb5013d1e10"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "f01ae0b3865c4f5028a2075b988a3a84ec4665436d2120a7df97a1c82562fb32"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "26d01d3135f74d787e45bc389cc34577e97691cec2e3dc04199182d7492c5a60"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "f7b414bc91c1fedeb792bf2e00ae22988239600bd84199e5a211116ee36ef438"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/BRIEF.md",
+      "sha256": "5803d2e106ec7ac34e3c88699d37c4118367cadc4b69bcf43f7e73667a72f4d0"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/FINDINGS.md",
+      "sha256": "caca54f89a9bfea201e468a36f6a5d599bf315f789bbacff181817c6a58918c7"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/brief.json",
+      "sha256": "975f9a5b72b158731099a0ddf0e1707024d4ebe20cbb2a67fb1c44ea4a762e4a"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/diff.patch",
+      "sha256": "150edc5fcdfee21375f9bc0c18a878c403bc2fa9928cd89fbb9872fa59ec5eed"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/review.md",
+      "sha256": "922431c27090b0dd425447d4c42a328ddcf23a67923e39b5945333b784df39c9"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-2-r1/run.json",
+      "sha256": "4e7fef71e23f9d66da832a49072ba01f34350c4e1b4490af2ecfd6c14493acb4"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-2-spec.md",
+      "sha256": "da85aa946edfe4fd8435cfd6e06518db2ef22e2f4b02d8965c5e4f7c1247df16"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "3cc5eb4924e69fb5584fd2613a0246718a27b5b3dd9e58f34afebabb97b886a9"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "cc0010733d9017aad24f6047dbf41796a83c7a2c",
+  "left_out": [],
+  "notes": [
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/BRIEF.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/FINDINGS.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/brief.json (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/diff.patch (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/review.md (not tracked yet, so not in the diff: read it whole)",
+    "new: .planning/milestones/component-index/notes/reviews/phase-2-r1/run.json (not tracked yet, so not in the diff: read it whole)"
+  ],
+  "pr": null,
+  "question": "Round 2. Do the repairs of round 1 (phase-2-r1/FINDINGS.md) hold, and does this diff do what notes/phase-2-spec.md requires of it? Where can its claims below be shown false, by a settings file, a folder layout or a command?",
+  "subject": "phase",
+  "version": 1
+}

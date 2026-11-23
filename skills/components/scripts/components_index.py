@@ -66,6 +66,8 @@ DEFAULT_SETTINGS = {
     'package_dir': 'src',
     'import_prefix': '',
     'extra_source_dirs': [],
+    # Whether coverage, --check --strict, draft, changed and review count the modules of extra_source_dirs too.
+    'count_extra_dirs': False,
     'docs_dir': 'docs/components',
     'script_path': 'scripts/components_index.py',
     # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
@@ -84,6 +86,8 @@ def load_settings(path: Path) -> dict:
         settings.update(loaded)
     if settings['verb_list'] not in {'all', 'shared', 'none'}:
         raise SystemExit(f'{path}: verb_list must be all, shared or none')
+    if not isinstance(settings['count_extra_dirs'], bool):
+        raise SystemExit(f'{path}: count_extra_dirs must be true or false')
     return settings
 
 
@@ -233,8 +237,22 @@ def sources(root: Path, directory: str):
             yield path
 
 
-def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
+def counted_modules(root: Path) -> list[str]:
+    """The repo-relative paths every module must have a component for: the package's, and
+    with count_extra_dirs those of the extra source folders after them. Each path once."""
     paths = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
+    if SETTINGS['count_extra_dirs']:
+        for directory in EXTRA_DIRS:
+            paths.extend(p.relative_to(root).as_posix() for p in sources(root, directory))
+    return list(dict.fromkeys(paths))
+
+
+def counted_dirs() -> str:
+    return ', '.join(dict.fromkeys((PACKAGE_DIR, *EXTRA_DIRS))) if SETTINGS['count_extra_dirs'] else PACKAGE_DIR
+
+
+def coverage(root: Path, entries: list[dict]) -> tuple[list[str], int]:
+    paths = counted_modules(root)
     return [p for p in paths if not any(covers(e, p) for e in entries)], len(paths)
 
 
@@ -895,7 +913,7 @@ def coverage_line(root: Path, entries: list[dict]) -> str:
     unassigned, total = coverage(root, entries)
     _, versions = recorded_external(root)
     external = ', '.join(f'{k} {v}' for k, v in versions.items()) or 'none'
-    return f'coverage: {total - len(unassigned)}/{total} {PACKAGE_DIR} modules assigned to components; external: {external}'
+    return f'coverage: {total - len(unassigned)}/{total} {counted_dirs()} modules assigned to components; external: {external}'
 
 
 def generated_paths(root: Path) -> set[str]:
@@ -1021,9 +1039,13 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool = 
     taken = {e['id'] for e in entries}
     for path in unassigned:
         tree = parse(root / path)
-        parts = [p for p in Path(path).relative_to(PACKAGE_DIR).with_suffix('').parts if p != '__init__']
+        # Compared under the root, so a folder written './tools', 'tools/' or absolute holds 'tools/x.py'.
+        folder = next((d for d in (PACKAGE_DIR, *EXTRA_DIRS) if (root / path).is_relative_to(root / d)), PACKAGE_DIR)
+        parts = [p for p in (root / path).relative_to(root / folder).with_suffix('').parts if p != '__init__']
         words = [re.sub(r'[^a-z0-9_]', '_', p.lower()).strip('_') or 'x' for p in parts]
-        area = words[0] if len(words) > 1 else PACKAGE.lower()
+        top = PACKAGE.lower() if folder == PACKAGE_DIR else \
+            re.sub(r'[^a-z0-9_]', '_', Path(folder).name.lower()).strip('_') or 'x'
+        area = words[0] if len(words) > 1 else top
         name = '_'.join(words[1:] if len(words) > 1 else words) or 'package'
         ident = '.'.join(w if w[0].isalpha() else 'x' + w for w in (area, name))
         while ident in taken:
@@ -1088,7 +1110,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
     files, fails = build_index(root)
     fails = list(fails)
     fails.extend(f'stale or missing: {name} (run `python3 {LABEL} write`)' for name in stale_files(root, files))
-    package = {p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)}
+    package = set(counted_modules(root))
     for path in sorted(status):
         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
             fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
@@ -1442,7 +1464,8 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
         groups.append(('No subsystem entries', [([], 'the main paths through the system are not described')]))
     groups.append(('Modules with no docstring (the search cannot describe them)',
                    [(owners[p], p) for p in undocumented]))
-    groups.append(('Modules with no component', [([], p) for p in package if not owners[p]]))
+    groups.append(('Modules with no component', [([], p) for p in counted_modules(root)
+                                                 if not any(covers(e, p) for e in components)]))
 
     def wanted(ids):
         return not areas or any(i.startswith(area) for i in ids for area in areas)
@@ -1485,7 +1508,7 @@ def show(root: Path, name: str) -> list[str]:
     def owned(paths):
         return ', '.join(f'{p} ({", ".join(owners.get(p, [])) or "no component"})' for p in sorted(paths))
 
-    for path in [p for p in package if covers(entry, p)]:
+    for path in [p for p in counted_modules(root) if covers(entry, p)]:
         text = (root / path).read_text(encoding='utf-8', errors='replace')
         tree = parse(root / path)
         private = [n.name for n in tree.body

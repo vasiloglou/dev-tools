@@ -6,6 +6,12 @@ Draft, 2026-11-21. Written as phase 1 and renumbered phase 2 the same day, when 
 added issue 28 as the new phase 1 (o). **Implementable once the plan gate is recorded,
 phase 1 is merged, and this spec's owner gate rules D1 to D3.** No code has been written. No review has run over these bytes.
 
+**Approved, 2026-11-21: delegated approval (auto=true).** The ruling is in section 12. The
+plan gate is recorded (`001-plan.md`). Phase 1 is not merged: amendment a3 of the plan
+stacks this phase's branch on phase 1's, so that condition is replaced (section 12).
+The status paragraph above is the draft's, kept as written; its last sentence was true of
+the bytes before round 1. Rounds r1 to r3 read this spec (section 2).
+
 ## 2. Provenance
 
 - **Plan.** `notes/component-index-plan.md`, a draft written on 2026-11-21: phase 2 in
@@ -20,7 +26,10 @@ phase 1 is merged, and this spec's owner gate rules D1 to D3.** No code has been
   SHA-256 listed in its `BRIEF.md`. Its F3, F4 and F5 were repaired here, marked
   `(r1 F3)` to `(r1 F5)`. `reviews/plan-r2` (Codex, 2026-11-21) read the repaired bytes;
   its F1 was repaired here, marked `(r2 F1)`. **The bytes repaired after round 2 carry no
-  review opinion.**
+  review opinion.** `reviews/plan-r3` (Codex, 2026-11-21) then read them, with no finding
+  against this spec; `review_tool.py status` calls these bytes `reviewed` at r3. The
+  status line, section 12 and the D2 and text additions written at the gate are not
+  reviewed.
 
 ## 3. Obligations (step 0 harvest)
 
@@ -203,3 +212,33 @@ The measured figures go in the record.
 This prose. The phase's shape (settings, exit codes) is not one of the three for which
 `review-convergence.md` makes corpus-first the default, so it is asked, not inherited.
 Proposed: prose, with T1 to T8 as the corpus written first in step 3.
+
+## 12. Owner gate: delegated approval (auto=true), 2026-11-21
+
+- **Authorization.** The owner's invocation `/dvt-milestone:process-milestone auto` in
+  this session, for component-index. That covers this spec's ruling. It does not cover
+  merging, tagging 0.1.5 or posting to GitHub.
+- **Instrument.** Prose, with T1 to T10 written first and seen to fail (section 11; T9
+  and T10 were added at r1, so the corpus is all ten).
+- **D1: (A), as proposed.** A new key, `count_extra_dirs`.
+- **D3: leave as is, as proposed.** The survey writes `count_extra_dirs = "TODO"`, as it
+  does for every setting it cannot read, `phase_gaps` (also a boolean, default false)
+  included.
+- **D2: (d), not the proposed (a).** Reading (a) assumed that a re-made demo could give
+  the same situation. It cannot. The capture's later lines (the `compare` rows for
+  `process-phase/SKILL.md`, `verify.md` and `phase_tool.py`, and the caption's "two lines
+  are older wording") come from `shelf`'s own older copies of those files. Those copies
+  are gone with `demo/`, and neither the maintainer's notes nor commit `294f769` record
+  them. A retake would have to invent them, which is what the standing rule forbids.
+  **(d)**: keep the 2026-11-05 capture byte for byte, and have its caption say it was
+  taken with the scripts of that day. The caption also says what 0.1.5 adds: the `grep`
+  prints a second line, `count_extra_dirs = "TODO"`, and the first `compare` names both
+  settings. The capture then shows what that day's commands printed, and the page says
+  what today's print besides. This is weaker than a retake, and the record names it.
+- **Phase 1 not merged.** Plan amendment a3 (the plan's status and section 8) cuts this
+  phase's branch from phase 1's branch tip, `24b2d83`, and its pull request names phase 1's
+  branch as its base. The code shares no file with phase 1 except
+  `devtools/PLUGIN_VERSION` and the rebuilt `plugins/` copies, which 0.1.5 takes from 0.1.4
+  in order.
+- **Text, added at the gate.** `docs/adopt.html`: the caption of the "before anything is
+  replaced" capture (D2 (d)).
