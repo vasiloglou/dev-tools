@@ -1285,10 +1285,14 @@ def _own_lines(note: str) -> tuple[int, int, int]:
             sum(line.startswith("Files git ignores") for line in lines))
 
 
-@pytest.mark.parametrize("breaker", ["\n", "\r\n", "\x0b", "\x0c", "\x1c", "\x85", " ", " "])
+# Every character Python's splitlines breaks a line at, asked of Python and not listed here, and CR LF.
+_LINE_BREAKS = [chr(c) for c in range(sys.maxunicode + 1) if len(f"a{chr(c)}b".splitlines()) == 2] + ["\r\n"]
+
+
+@pytest.mark.parametrize("breaker", _LINE_BREAKS, ids=lambda b: "+".join(f"U+{ord(c):04X}" for c in b))
 def test_t22_no_value_the_note_prints_can_add_a_line_of_its_own(repo, monkeypatch, breaker):
     """Every string of the snapshot and of the note's header, whatever field it is in, and the
-    project's setup command: with each kind of line break Python splits lines at."""
+    project's setup command: with each line break Python splits lines at."""
     snap = handoff.snapshot(repo, "base")
     snap.update(state={"status": "ok"}, paused_phases=["phase"], dirty=["file"], commits=["abc a subject"])
     meta = handoff._meta({}, snap, "2026-11-23", "claude", "codex", "new")
