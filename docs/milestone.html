@@ -242,7 +242,7 @@ review_tool.py status notes/reviews</pre>
 <section id="own-use"><div class="wrap">
   <div class="section-head">
     <h2>dev-tools runs on this workflow</h2>
-    <p>Since 2026-11-21 the repository that holds these skills is also a project that uses them. No milestone has run there yet, so this page shows no record of its own. The first milestone will leave the first ones.</p>
+    <p>Since 2026-11-21 the repository that holds these skills is also a project that uses them. Its first milestone, <code>component-index</code>, gave the project an index of its own code, and left its plan, specs, review rounds and records in the repository.</p>
   </div>
   <div class="two">
     <div class="prose">
@@ -253,7 +253,8 @@ review_tool.py status notes/reviews</pre>
       <div class="table-scroll"><table>
         <tr><th>Path</th><th>What</th></tr>
         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.planning/PROJECT.md"><code>.planning/PROJECT.md</code></a></td><td>The one-page statement of the project. The milestone skills read it first.</td></tr>
-        <tr><td><code>.planning/milestones/</code></td><td>One folder per milestone: its plan, its phase specs, its review rounds and its numbered records. Empty until the first milestone is planned.</td></tr>
+        <tr><td><code>.planning/milestones/</code></td><td>One folder per milestone: its plan, its phase specs, its review rounds and its numbered records. The first is <a href="https://github.com/vasiloglou/dev-tools/tree/main/.planning/milestones/component-index"><code>component-index</code></a>.</td></tr>
+        <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/components/COMPONENTS.md"><code>.devtools/components/</code></a></td><td>The project's own <a href="components.html">component index</a>: one entry for each module of <code>devtools/</code> and <code>skills/</code>, searched before a module or a function is written. A test fails while it is out of date.</td></tr>
         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/project.md"><code>.devtools/project.md</code></a></td><td>The project's own rules for the skills.</td></tr>
         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/AGENTS.md"><code>AGENTS.md</code></a></td><td>The words the work uses (milestone, phase, spec, owner gate, record, review round) and the project's names. <code>CLAUDE.md</code> points to it, so both tools read one file.</td></tr>
       </table></div>
@@ -264,7 +265,7 @@ review_tool.py status notes/reviews</pre>
       <ul>
         <li>which workflow runs, and where the planning folder is;</li>
         <li>which work takes which lane;</li>
-        <li>the gate commands: all tests, one test file, and whether the plugins match the skills;</li>
+        <li>the gate commands: all tests, one test file, whether the plugins match the skills, and whether the component index is current;</li>
         <li>how a review is run, and where its rounds are kept;</li>
         <li>seven design rules, each with what it prevents and what a spec must name to answer it;</li>
         <li>what needs the owner each time, whatever was delegated: a merge into <code>main</code>, a release tag, anything posted to GitHub.</li>

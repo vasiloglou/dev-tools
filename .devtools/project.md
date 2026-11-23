@@ -16,10 +16,20 @@ project belongs in the shared skill under `skills/`, not here.
   2026-11-21 when the project took the workflow. Nothing else is scaffolded: a milestone
   adds its own folder under `.planning/milestones/`. If `PROJECT.md` is missing, restore
   it from git; no skill writes it again.
-- **Component index.** None yet, so a phase skips the three component steps. `docs/` is
-  the public site, so the default folder `docs/components` is not free to use: the folder
-  is chosen when the index is built, set as `docs_dir` in
-  `.devtools/components_index.settings.json`, and named here.
+- **Component index.** In `.devtools/components/`, with its settings in
+  `.devtools/components_index.settings.json`. It has a component for every module of
+  `devtools/` and `skills/`. (`docs/` is the public site, so the default folder
+  `docs/components` was not free to use.)
+  - A phase runs the three component steps with the copy of the script in `plugins/`,
+    from the repository root:
+    `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py`.
+  - Not the copy under `skills/`: it reads its settings from beside itself, inside the
+    product.
+  - Not an installed plugin older than 0.1.5: it refuses the settings file with
+    `unknown setting(s): count_extra_dirs`.
+  - After a change to a module of `devtools/` or `skills/`: rebuild the plugins, run that
+    script's `write`, and commit `.devtools/components/` with the change. The generated
+    pages hold each definition's line number, so most changes to a module move them.
 - **Workflow skills of its own.** None. `adopt-devtools` and `move-from-gsd` are part of
   the product; they do not own work in this repository.
 
@@ -48,6 +58,8 @@ Run from the repository root, with Python 3.11 or newer.
 | One test file (a focused gate) | `uv run --no-project --with pytest python -m pytest tests/<file>.py -q` |
 | The plugins match the skills | `python3 devtools/build_plugins.py --check` |
 | Whether a release is due | `python3 devtools/release_plugins.py status` |
+| The component index is current (when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
+| The index against what a change touched (before a pull request) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base main` |
 
 There is no lint command and no CI: the tests run on the machine that makes the change.
 

@@ -16,6 +16,11 @@ Nobody else can approve or merge.
    uv run --no-project --with pytest python -m pytest tests -q
    ```
 
+   One test fails while dev-tools' index of its own code (`.devtools/components/`) is out
+   of date, which a change to a script under `skills/` or `devtools/` usually makes it.
+   The failure names the command that regenerates the index; commit the result with the
+   change.
+
    In Claude Code, this repository's `.claude/settings.json` turns on the released
    `dvt-milestone` plugin (`/dvt-milestone:review-pr`, `/dvt-milestone:handle-issue` and the
    rest). Claude Code offers to add the `dvt` marketplace and install it the first time you
