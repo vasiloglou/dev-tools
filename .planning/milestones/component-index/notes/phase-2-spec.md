@@ -235,6 +235,9 @@ Proposed: prose, with T1 to T8 as the corpus written first in step 3.
   prints a second line, `count_extra_dirs = "TODO"`, and the first `compare` names both
   settings. The capture then shows what that day's commands printed, and the page says
   what today's print besides. This is weaker than a retake, and the record names it.
+  **Owner's ruling, 2026-11-22:** (d) accepted. D2 bent a standing rule, so it was the
+  owner's to rule, not the delegation's; the owner ruled it in this session ("go", in
+  answer to "do you accept D2 (d) as your ruling?"). The delegated wording above is kept.
 - **Phase 1 not merged.** Plan amendment a3 (the plan's status and section 8) cuts this
   phase's branch from phase 1's branch tip, `24b2d83`, and its pull request names phase 1's
   branch as its base. The code shares no file with phase 1 except

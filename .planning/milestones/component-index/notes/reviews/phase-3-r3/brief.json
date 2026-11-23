@@ -1,0 +1,72 @@
+{
+  "base": "0b95fbb",
+  "claims": [
+    "Every statement the repair added or changed in COMPONENTS.md is true of its module at this commit.",
+    "The handoff reading's addendum lists every definition handoff.py has that its table lacks, and says truly what each does.",
+    "The nine search cases of search-cases.md still put their component first, and 'normative document ownership' finds phase.state."
+  ],
+  "created": "2026-11-22T09:18:26.188651+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r3/diff.patch",
+      "sha256": "773e451793f2a1405a744a14716c6b98334f8d90eb425dbd8a8fa9dea49a26cc"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "925a71b720971e4bb0645b2a219ee20c76a48024753c4c0155f3fa305acfa251"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-3-reading/handoff.md",
+      "sha256": "db4b38baff1254c2b551b0c12f784271644fb6c2c90852680a7d165df6c5ea91"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/BRIEF.md",
+      "sha256": "901ac741a94b73ee97e07e7a29f9320a21bad5175ac706818dfe5ebb48368752"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/FINDINGS.md",
+      "sha256": "3d8b4824d94a55cc7e75bff6ebf273baf378c4a92319d760e978b54a07072ca9"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/brief.json",
+      "sha256": "2b9c82835b11a19d2847d993ce664e68d94c269a2ff945122e7b3bcf3bc6c1d4"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/diff.patch",
+      "sha256": "7a84e2b18fbfa7412895a24db3176330ddf059064cf766bd50fa32100a1b3ef8"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/review.md",
+      "sha256": "5fa535009cd6026706ecab2586c0996fe84343ca08db6431b5a7efeff4c2aa8c"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-3-r2/run.json",
+      "sha256": "ae83c6a9ae8435b827570f5b29ec996feb09ee745f237d6ea7c7f3af4748bec4"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "74de4ada6271fc728c3929a7bce68dc3f3de11a1d460c76bbaa6b534d2162285"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/coder_pool.py",
+      "sha256": "f657307c1e0f1f5c377aa3fcdd69e85daf7be81de91689ecc503c17e9ceb7b1d"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/phase_tool.py",
+      "sha256": "08dadf9fc68e96320f9c3bdaf6ae3483ed330a8d8608bf2c321232f4bf73be8e"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "21491549a980102cd8cbe497fc5aa370670edf3f",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Round 3. Do the repairs of round 2 (notes/reviews/phase-3-r2/FINDINGS.md, repaired at 27ca753) hold, and where can the claims below be shown false, by the code, a command or a search?",
+  "subject": "phase",
+  "version": 1
+}
