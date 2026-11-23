@@ -85,8 +85,8 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
   files, and from which commit the project was synced. `check --receipt-only` does the
   first part alone and needs only the project, for a CI job with no dev-tools checkout.
 - Both name a shipped unit the config does not take when a synced file names it (a skill
-  that cites `review-pr`, say, when `review-pr` is not synced), and once a unit that is
-  new in dev-tools since the last sync. A workflow the project takes nothing from is not
+  that cites `review-pr`, say, when `review-pr` is not synced), and a unit that is new
+  in dev-tools since the last sync, until the next `apply`. A workflow the project takes nothing from is not
   named. To stop hearing of a unit, list it in `.devtools.toml`:
   `declined = ["skills/milestone/review-pr"]`; a folder covers every unit under it.
 - The sync reads the latest dev-tools. Before it reads the checkout, `apply` (and

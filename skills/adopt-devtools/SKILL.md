@@ -159,7 +159,8 @@ own copies had written into them, so every setting is a decision about this proj
   Nothing deletes it; you do, in step 7.
 - **`declined`**, at the top, lists the shipped units the project leaves out on purpose.
   `apply` and `check` name a unit the config does not take when a synced file names it,
-  and once when it is new in dev-tools; a path in `declined` ends both. Put a unit there
+  and, until the next `apply`, one that is new in dev-tools; a path in `declined` ends
+  both. Put a unit there
   only when the user chose to leave it out: a unit the shipped text names and the
   project lacks is usually one it needs.
 - **A command to run after a sync.** If a synced script generates files (the component

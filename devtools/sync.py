@@ -29,7 +29,7 @@ told to (``--force``, ``--adopt``).
 ``--source``, it then compares the project with that source: whether an apply would change files,
 and which units it does not take. ``--receipt-only`` does the first part alone and needs only the
 project. ``apply`` reports the same units. A unit is reported when a file the project has names it,
-and once when it is new since the last apply; ``declined`` ends both, and a workflow folder the
+and, until the next apply, when it is new since the last one; ``declined`` ends both, and a workflow folder the
 config takes nothing from (``skills/phase``, ``skills/milestone``) is never reported.
 
 For a project that already has its own copies of these skills: ``survey`` finds them and can
@@ -128,6 +128,13 @@ def read_config(project: Path) -> dict:
     for entry in entries:
         if not all(isinstance(entry.get(key, ""), str) for key in ("source", "dest", "replaces")):
             raise SyncError(f"{config_path}: source, dest and replaces in [[sync]] must be strings")
+        exclude, values, settings = entry.get("exclude", []), entry.get("values", {}), entry.get("settings", {})
+        if not isinstance(exclude, list) or not all(isinstance(name, str) for name in exclude):
+            raise SyncError(f"{config_path}: exclude in [[sync]] must be a list of paths")
+        if not isinstance(values, dict):
+            raise SyncError(f"{config_path}: values in [[sync]] must be a table, such as {{ planning_dir = \".planning\" }}")
+        if not isinstance(settings, dict) or not all(isinstance(block, dict) for block in settings.values()):
+            raise SyncError(f"{config_path}: each [sync.settings.\"<file>\"] must be a table of settings")
     commands = config.get("after_apply", [])
     if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
         raise SyncError(f"{config_path}: after_apply must be a list of commands")

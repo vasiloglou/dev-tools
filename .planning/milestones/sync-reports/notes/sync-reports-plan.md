@@ -216,7 +216,7 @@ another update than the one that arrives.
 | on a detached `HEAD`, or a branch with no upstream | the checkout | nothing: a tag checked out on purpose is how a project pins dev-tools |
 | a branch whose upstream is configured but has no ref after the fetch (the remote branch was deleted, or never fetched) (r1 F5) | the checkout | one warning: the upstream is named and was not found, so the checkout is delivered as it is |
 | level with its upstream after the fetch, or only ahead of it | the checkout | nothing |
-| behind its upstream, with no commit of its own and nothing uncommitted | the upstream commit, read with `git archive` into a temporary folder that is removed at exit (D9) | one line: how far behind, which commit is read, and that the checkout is not changed |
+| behind its upstream, with no commit of its own and nothing uncommitted | the upstream commit, read from git's tree (`ls-tree`, `cat-file`) into a temporary folder that is removed at exit (D9). *Repaired at the close, 2026-11-23, from `003-phase-2.md` (phase 2 r1 F1, F3): `git archive` drops `export-ignore` paths and applies `tar.umask`. Prior wording: "read with `git archive` into a temporary folder that is removed at exit (D9)".* | one line: how far behind, which commit is read, and that the checkout is not changed |
 | behind its upstream, with commits of its own or uncommitted changes | the checkout | a warning before anything is written: how far behind, and that it is delivered as it is |
 
 - **The fetch.** `git fetch <the upstream's remote>`, with no prompt for credentials and a
@@ -291,8 +291,10 @@ existing test without editing one (section 6, K3).
 
 ### What the code depends on
 
-The standard library and the `git` command, as today. Phase 2 adds `tarfile` and
-`tempfile` (already imported) to read `git archive` output.
+The standard library and the `git` command, as today. *Repaired at the close,
+2026-11-23, from `003-phase-2.md`: phase 2 adds `shutil` and reads the upstream's tree
+with `git ls-tree` and `git cat-file --batch`. Prior wording: "Phase 2 adds `tarfile`
+and `tempfile` (already imported) to read `git archive` output."*
 
 ### Artifact homes
 
@@ -499,6 +501,9 @@ Commands run from the repository root.
   omission?
 - Q3. Should a checkout that is behind run the fetched tool? It would close K6, and it
   runs code the owner has not pulled.
+- Q4 (raised in `002-phase-1.md`). The adopt walk-through frames of `docs/adopt.html`
+  come from the demo project `shelf`, which is not in the repository, and were older than
+  main's output before this milestone. Retaking them needs the demo project rebuilt.
 
 ### Obligation-to-phase map
 

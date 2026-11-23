@@ -76,7 +76,7 @@ dest   = "scripts/components_index.py"</pre>
         <div>
           <p>One command copies the files and writes a receipt that lists every file it manages, with a fingerprint of each. Nothing is written unless everything can be written.</p>
           <p>A second command checks, at any time, that the copies are still what was delivered. Run from a dev-tools checkout, it also says whether dev-tools has moved on since your sync. With <code>--receipt-only</code> it needs only your project, so it can run in your automated checks.</p>
-          <p>Both name a shared piece you do not take when one of your synced files mentions it, and once a piece that is new since your last sync. To stop hearing of one, list it under <code>declined</code>.</p>
+          <p>Both name a shared piece you do not take when one of your synced files mentions it, and a piece that is new since your last sync, until the next update. To stop hearing of one, list it under <code>declined</code>.</p>
         </div>
         <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · first sync</b><em>captured</em></div>
@@ -182,7 +182,7 @@ to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, 
         <tr><td>Your dev-tools checkout is behind its upstream</td><td>Fetches, and delivers the upstream's files without changing the checkout. A checkout with changes of its own, or a pinned tag, is delivered as it is; <code>--as-is</code> skips the fetch</td></tr>
         <tr><td>Dev-tools has moved on since your sync</td><td>The check says how many files an update would change, and from which version you synced</td></tr>
         <tr><td>Your synced files mention a shared piece you do not take</td><td>Names it, with the file that mentions it, on every update and check</td></tr>
-        <tr><td>A shared piece is new since your last sync</td><td>Names it once, on the next update or check</td></tr>
+        <tr><td>A shared piece is new since your last sync</td><td>Names it on every check until your next update, and in that update</td></tr>
         <tr><td>You leave a piece out on purpose</td><td>List it under <code>declined</code>; it is not named again. A workflow you take nothing from is never named</td></tr>
         <tr><td>Your automated checks should fail on any of these</td><td><code>check --strict</code> exits 5 while there is something to report; a changed file still exits 1</td></tr>
       </table></div>

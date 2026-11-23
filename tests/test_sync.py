@@ -1510,3 +1510,15 @@ def test_a_run_that_reads_the_upstream_leaves_no_folder(behind, capsys, monkeypa
     assert apply(behind["clone"], behind["project"]) == 0
     assert run("check", "--project", behind["project"], "--source", behind["clone"]) == 0
     assert len(made) == 2 and not any(Path(folder).exists() for folder in made)
+
+
+@pytest.mark.parametrize("bad", ['values = []', 'exclude = "x"', 'settings = 1', '[sync.settings]\n"a.json" = 1'])
+def test_a_sync_entry_of_the_wrong_shape_is_a_configuration_error(source, project, capsys, bad):
+    # close review r1 F1
+    assert apply(source, project) == 0
+    (project / ".devtools.toml").write_text(f'[[sync]]\nsource = "skills/demo"\ndest = "copies"\n{bad}\n')
+    capsys.readouterr()
+    code, out, err = out_of(capsys, *check_source(project, source))
+    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
+    assert err.startswith("warning: not compared with dev-tools: ")
+    assert out_of(capsys, "apply", "--project", project, "--source", source)[0] == 2
