@@ -13,9 +13,22 @@ behind its upstream delivers the upstream's files, not the old ones.
 - **One owner ruling so far (o).** 2026-11-23, in this session, to "Should `apply` fetch and
   deliver the latest dev-tools by default?": "Yes, by default". It is D8, and phase 2
   exists because of it.
-- **Plan review: not run yet.** Instrument: the review helper with `--subject plan`,
-  reviewer Codex (`.devtools/project.md`, "Review instrument"). This line is replaced when
-  a round has run.
+- **Lane ruled, 2026-11-23 (o).** The owner chose "Milestone, auto=true", relayed to this
+  session by the session that started it. D1 is ruled by it, and the plan, spec and close
+  rulings of this milestone are delegated (auto=true). Not delegated: pushing, opening the
+  pull request, merging, tagging and releasing.
+- **Plan review, round 1 (r1).** `notes/reviews/plan-r1`, run 2026-11-23 with the review
+  helper and `--subject plan`; reviewer Codex, read-only, its default model at effort
+  `high`; brief SHA-256
+  `742e3a0cbb0de4e28fb85eef22d2db713888793bd832488e2e6446932858740c`. `VERDICT:
+  CHANGES_REQUESTED`, with 6 findings: 3 blocking (all in the phase 1 spec's tests and
+  error handling) and 3 completeness. All 6 were reproduced and repaired, marked
+  `(r1 Fn)` at each site. **The repaired bytes carry no review opinion.**
+- **Review budget** (declared before r1, section 8): at most r1 and r2.
+
+  | Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
+  |---|---|---|---|---|---|---|
+  | r1 | 1 (Codex) | 6 | 0 / 6 (first round) | 3 / 6 | blocking | CHANGES_REQUESTED |
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 
@@ -195,6 +208,7 @@ another update than the one that arrives.
 |---|---|---|
 | not a git checkout of its own (a copy, a folder inside another repository) | the folder | nothing, as today |
 | on a detached `HEAD`, or a branch with no upstream | the checkout | nothing: a tag checked out on purpose is how a project pins dev-tools |
+| a branch whose upstream is configured but has no ref after the fetch (the remote branch was deleted, or never fetched) (r1 F5) | the checkout | one warning: the upstream is named and was not found, so the checkout is delivered as it is |
 | level with its upstream after the fetch, or only ahead of it | the checkout | nothing |
 | behind its upstream, with no commit of its own and nothing uncommitted | the upstream commit, read with `git archive` into a temporary folder that is removed at exit (D9) | one line: how far behind, which commit is read, and that the checkout is not changed |
 | behind its upstream, with commits of its own or uncommitted changes | the checkout | a warning before anything is written: how far behind, and that it is delivered as it is |
@@ -352,8 +366,10 @@ and every other state of the checkout is either delivered as it is or said aloud
   commit, and the checkout's `HEAD`, branch and `git status` are as before (C4, S0.2).
 - P2.2. Behind with a commit of its own, and behind with an uncommitted change: the
   checkout is delivered as it is, and the warning is printed before any file is written.
-- P2.3. Level, ahead only, detached, and not a checkout: delivered as today, with no new
-  line.
+- P2.3. Level, ahead only, detached, no upstream, and not a checkout: delivered as today,
+  with no new line.
+- P2.3b. An upstream that is configured and has no ref: delivered as it is, with the one
+  warning, exit 0 (r1 F5).
 - P2.4. A fetch that fails: one warning, exit 0, and the rule applied to the refs already
   there.
 - P2.5. `--as-is`: no `git fetch` is started, and a checkout that is behind is delivered
@@ -416,8 +432,10 @@ test requires to be current after any change to `sync.py`.
 ## 8. Execution, approval and review protocol
 
 - **Workflow.** `process-milestone sync-reports`, phase by phase with `process-phase`.
-  `auto=false` unless the owner says otherwise: the plan gate, each spec's owner gate and
-  the close stop for the owner.
+  *Amended 2026-11-23 (o):* with `auto=true`, by the owner's lane ruling: the plan gate,
+  each spec's owner gate and the close ruling are delegated approvals, recorded as such.
+  The prior wording, kept: "`auto=false` unless the owner says otherwise: the plan gate,
+  each spec's owner gate and the close stop for the owner."
 - **Branches** (D12). Phase 1 on `claude/sync-report-untaken-and-stale-32f991`, where this
   plan is; phase 2 on a branch cut from phase 1's tip, its pull request based on phase
   1's branch until that merges. One pull request per phase. The plan and the milestone's
@@ -442,9 +460,9 @@ Commands run from the repository root.
 | 1 | `uv run --no-project --with pytest python -m pytest tests -q` | exits 0 | Same |
 | 1 | `python3 devtools/build_plugins.py --check` | exits 0 | Plugin users: no change |
 | 1 | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` | exits 0 | dev-tools' own sessions |
-| 1 | By hand, on a scratch copy of the observed-case fixture: `apply --dry-run`, `check`, `check --strict` | The lines of section 2, pasted into the record with their exits (0, 0, 5) | The owner, who reads them |
+| 1 | By hand, on a scratch copy of the observed-case fixture: the three commands of the phase 1 spec, section 8, "By hand" (`python3 devtools/sync.py apply --project "$SCRATCH/project" --source "$SCRATCH/source" --dry-run`, then `check` and `check --strict` with the same two options) (r1 F6) | The lines of section 2, pasted into the record with their exits (0, 0, 5) | The owner, who reads them |
 | 2 | The four commands of phase 1 | exit 0 each | Every project that syncs from a checkout on a branch |
-| 2 | By hand, on a scratch clone that is behind a scratch upstream: `apply --dry-run`, then `git status` and `git rev-parse HEAD` in the clone | The line that names the commit read; the clone unchanged | Same |
+| 2 | By hand, with `$SCRATCH/upstream` a scratch repository and `$SCRATCH/clone` a clone of it one commit behind: `python3 "$SCRATCH/clone/devtools/sync.py" apply --project "$SCRATCH/project" --dry-run`, then `git -C "$SCRATCH/clone" status --short` and `git -C "$SCRATCH/clone" rev-parse HEAD` before and after (r1 F6) | The line that names the commit read; the status and `HEAD` the same before and after | Same |
 
 ## 10. Owner decisions and open questions
 
@@ -452,7 +470,7 @@ Commands run from the repository root.
 
 | # | Question | Readings and their cost | Proposed |
 |---|---|---|---|
-| D1 | The lane | **Evidence lane, this milestone:** a plan, specs, records and review rounds for a change of roughly 400 lines of code and tests. **Fast lane:** one tested pull request; `.devtools/project.md` reserves that for changes that touch no format and no gate, and this one adds a config key, a receipt field and an exit | Evidence lane |
+| D1 | The lane (ruled by the owner, 2026-11-23: "Milestone, auto=true") | **Evidence lane, this milestone:** a plan, specs, records and review rounds for a change of roughly 400 lines of code and tests. **Fast lane:** one tested pull request; `.devtools/project.md` reserves that for changes that touch no format and no gate, and this one adds a config key, a receipt field and an exit | Evidence lane |
 | D2 | How the sync knows a file names a unit | **From the delivered text** (backticked name, or a folder in a relative path): nothing to maintain, the report can name the file, and it follows `exclude`; it can miss a name written another way and report a passing mention (K1, K2). **A hand-kept table** in dev-tools of which unit uses which: exact, but it goes stale silently, and cannot name the file | From the text |
 | D3 | A workflow folder the config takes nothing from | **Silent in `apply` and `check`:** a milestone project never hears of the phase workflow, and `survey` still lists it. **Reported:** every phase project is told of three milestone skills that `handle-issue` and `dev-handoff` name | Silent |
 | D4 | The shape of the opt-out | **`declined`, a top-level list of paths, a folder covering what is under it:** one place, and `declined = ["skills/phase"]` covers units added there later. **A key per `[[sync]]` entry:** there is no entry for a unit that is not taken | The top-level list |

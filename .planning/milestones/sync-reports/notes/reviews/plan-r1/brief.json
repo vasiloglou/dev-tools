@@ -1,0 +1,76 @@
+{
+  "base": null,
+  "claims": [
+    "The baseline in plan section 3 describes what devtools/sync.py prints at 811b4a3 for a project with that config.",
+    "Under the phase 1 design, a caller that passes no new option gets every line and exit that apply and check produce on main, with new lines only after the summary line.",
+    "The named rule of the phase 1 spec reports skills/milestone/review-pr for the baseline's config, and reports nothing for either example config as the spec changes them.",
+    "The normative order in section 6 of the phase 1 spec gives every unit exactly one outcome, and each step has a test in section 8 that fails when the step is wrong.",
+    "No existing test of tests/test_sync.py needs an edit under the design, plan decision D5 included.",
+    "The table of phase 2 in plan section 2 gives one outcome for every state a git checkout can be in, and none of them changes the checkout.",
+    "Every completion predicate C1 to C7 has a gate or ruling that can fail it, and every gate command in plan section 9 can run as written from the repository root."
+  ],
+  "created": "2026-11-23T19:54:18.400918+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/sync-reports/notes/sync-reports-plan.md",
+      "sha256": "d25a141852307716eb358b66d97fd4731a3abd148025a6f940c1f04c44886d1e"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-1-spec.md",
+      "sha256": "b69a3e79763368c20a6d7c5f41692f1f09e5f69447c56a4fb7e79f0bf15c4d02"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "1637af6f38ec3472e42da7ea3207445ba7b0fd25a0e3e73bba46b140e8da06f6"
+    },
+    {
+      "path": "tests/test_sync.py",
+      "sha256": "83923df083064d0833c81f037008344642c70ee2987b7a3311df0799ad63c2fa"
+    },
+    {
+      "path": "examples/milestone-project.devtools.toml",
+      "sha256": "6cb9f40fca5c929df1c07c5734b6e476522a5c24a48656f5520cc5bed7ee82b5"
+    },
+    {
+      "path": "examples/phase-project.devtools.toml",
+      "sha256": "af7c9ba367e74745fbe582fdd4d2788ca85b46aebd8ff512b638d6aadbedeae1"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "1e485b868fde627032c65f9bf311899d4cb18d8a5a0ba91c8ffec8b9de54ff3e"
+    },
+    {
+      "path": ".planning/PROJECT.md",
+      "sha256": "d6b274e2937a8e44fa652ba46e4fdf1260460a8fb1a2a28dd37d67eea591df08"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "2aa20beafc95d7fda49583f5c852b8091f40ff64e1d21c5c0ee0c1c3c9730e60"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "21f65706f46e6c6677d7202170dbc5f834e75832c88926324fbc611acc19d64f"
+    },
+    {
+      "path": "README.md",
+      "sha256": "18ff55e0a7cadc3ce46ec668699ae83a768742eff82b7e7282359c07fc90462d"
+    },
+    {
+      "path": "skills/adopt-devtools/SKILL.md",
+      "sha256": "42f1e199c9d99bda2db3f985c4a3df9ed7f7a078c735e99b63ed06da4eed1022"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "82fbf18d3138cee2acecc760218b02dd5ec97fb8dc326b85da4e1f932bbe2e37"
+    }
+  ],
+  "head": "632c8337a88932e5e4651b4f6c49f46ac5dcc889",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Can each phase of this plan be implemented and tested as written, and would a project that syncs see the behaviour section 2 describes?",
+  "subject": "plan",
+  "version": 1
+}

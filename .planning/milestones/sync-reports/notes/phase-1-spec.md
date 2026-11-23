@@ -77,7 +77,11 @@ alone. `pytest tests -q`, `build_plugins.py --check` and the built
 
 ### `devtools/sync.py` (1,098 lines today; about 170 added)
 
-**The config.** `read_config` accepts one more top-level key, `declined`.
+**The config.** `read_config` accepts one more top-level key, `declined`. It also turns
+the errors of reading the file into `SyncError` (exit 2): a file that is not valid TOML
+(`tomllib.TOMLDecodeError`), one that cannot be read (`OSError`) and one that is not
+UTF-8 (`UnicodeDecodeError`). On main these end in a traceback with exit 1, for `apply`,
+`compare` and `survey` alike (r1 F1).
 
 ```python
 def declined_paths(config: dict, units: list[dict]) -> tuple[list[str], list[str]]:
@@ -209,8 +213,9 @@ check --project DIR [--source DIR] [--receipt-only] [--strict]
 2. The source: none with `--receipt-only`; else `--source`; else `default_source()`.
    `--receipt-only` with `--source`, or with `--strict`, is a usage error (exit 2).
 3. With a source: read the config, `desired_files`, `pending`, `unit_report`, and print
-   `report_lines`. A `SyncError` here (no config, an invalid one, a source that lacks an
-   entry's path) is caught: one line on standard error,
+   `report_lines`. A `SyncError` here (no config, one that cannot be read or parsed, an
+   invalid one, a source that lacks an entry's path) is caught, and since `read_config`
+   raises nothing else for a bad file (r1 F1), nothing else is: one line on standard error,
    `warning: not compared with dev-tools: <the error>`, and the comparison counts as not
    made.
 4. Exit: 1 with problems. Else, with `--strict`: 5 when `pending` is not `None`, or
@@ -287,30 +292,33 @@ All in `tests/test_sync.py`. New fixtures, built under `tmp_path`:
 | T3 | T1's config with `declined = ["skills/milestone/review-pr"]`, after an apply that leaves nothing pending | `apply` and `check --source` print no unit block; `check --source --strict` exits 0 |
 | T4 | A config that takes `skills/phase/process-phase` and `skills/handle-issue` | No block names `review-pr` or `start-milestone`, which `handle-issue` names: `skills/milestone` is untaken |
 | T5 | T4's `handle-issue` also holds `` `process-phase` `` | `skills/milestone/process-phase` is not reported in a config that takes `skills/phase/process-phase` and `skills/milestone/start-milestone`: the name is satisfied |
-| T6 | After an apply, add `skills/extra/SKILL.md` to the source | `apply --dry-run` and `check --source` list `skills/extra` under `new`; `check --source --strict` exits 5; the next `apply` lists it and writes it into `shipped`; the `apply` after that prints no block |
-| T7 | As T6, with the new unit at `skills/phase/extra` in `milestone_project`, and at `skills/extra` with `declined = ["skills/extra"]` | No block in either |
+| T6 | `milestone_project` with `declined = ["skills/milestone/review-pr", "agents"]`, applied, then `skills/extra/SKILL.md` added to the source | `apply --dry-run` and `check --source` list `skills/extra` under `new` and print no other block; `check --source --strict` exits 5 (nothing is pending: the source's other files are unchanged); the next `apply` lists it and writes it into `shipped`; the `apply` after that prints no block, and `check --source --strict` exits 0 (r1 F2, F4) |
+| T7 | As T6, with the new unit at `skills/phase/extra`; and at `skills/extra` with `skills/extra` added to `declined` | No block in either; `check --source --strict` exits 0 (r1 F2) |
 | T8 | Remove `shipped` from the receipt of an applied `milestone_project`, with `review-pr` declined | `check --source` lists `agents` under the one-time heading and nothing else; neither phase unit is listed; `check --source --strict` exits 5; after `apply`, `check --source` prints no block and `--strict` exits 0 |
 | T9 | The first `apply` of `milestone_project` | The `named` block; no `new` block and no one-time block |
 | T10 | `declined` as a string; with `/abs`; with `../x`; covering a taken unit; covering nothing shipped | Exit 2 for the first four, with no file and no receipt written; exit 0 for the fifth, with the warning on standard error and `check --source --strict` exiting 0 |
 | T11 | The only file that names `review-pr` is under the entry's `exclude` | `named` is empty |
 | T12 | A delivered file holds `` `phase-implementer` ``; another holds `` `phase_selection.py` ``, in a config that takes one phase skill | `agents` and `skills/phase/pytest/phase_selection.py` are each in `named`, with that file |
 | T13 | A delivered file holds the bare words `review-pr`, the token `` `review-pr/SKILL.md` ``, and the path `docs/components/` in a config without `skills/components` | Neither unit is in `named`. The same file with `` `components` `` added puts `skills/components` in `named` |
-| T14 | `check --source` with no `.devtools.toml`; with a config that holds an unknown key | The warning line on standard error; exit 0; with `--strict`, exit 5 |
+| T14 | `check --source` with no `.devtools.toml`; with a config that holds an unknown key; with one that is not valid TOML; with one that cannot be read (mode 000, skipped when run as root) | The warning line on standard error; exit 0; with `--strict`, exit 5, for each (r1 F1) |
+| T14b | `apply` with a config that is not valid TOML | Exit 2 and one line `error: …` on standard error, where main raises (r1 F1) |
 | T15 | T1's state with one managed file edited, `check --source --strict` | Exit 1 |
 | T16 | `sync.default_source` as imported, on the repository and on an empty folder; `check --receipt-only` with `subprocess.run` replaced by a function that raises; `check --receipt-only --source X`; `check --receipt-only --strict`; `check --strict` with no source | The repository's root, then `None`; exit 0 and the summary line; exit 2; exit 2; exit 5 |
 | T17 | `survey` on T3's project, and on `milestone_project` without `declined` | `skills/milestone/review-pr  [declined in .devtools.toml]`; then `skills/milestone/review-pr  [named by .claude/skills/handle-issue/SKILL.md]` |
-| T18 | Each example, applied from the repository | Exit 0; standard output is the one line `applied: {…}` |
+| T18 | Each example, applied from the repository | Exit 0; standard output holds none of the four block headings of section 6 and not the closing line. Other lines, such as `after_apply:`, are as on main (r1 F3) |
 | T19 | A project with everything current and nothing to report: `apply` and `check --source` | Standard output is exactly `applied: {"keep": N}` and exactly `N managed file(s), 0 problem(s)` |
 | T20 | `pending` with one file to create, one to update and one to delete; with a source that is not a git repository | `create 1, update 1 and delete 1 file(s)`; `an unknown commit` |
 | T21 | `takes` and `covers` on `skills/phase` against `skills/phase-extra`, `skills/phase/x`, `skills/phase/` | False, True, True |
 | T22 | A config that takes `skills/milestone/review-pr` and no `process-phase` | `skills/milestone/process-phase` is in `named`, by `.claude/skills/review-pr/SKILL.md` (the `../` form); `skills/phase/process-phase` is not: its workflow folder is untaken |
+| T23 | One cause at a time, for `check --source --strict`: (a) pending only: T3's project after one source file changes; (b) named only: T1's project after `apply`, with nothing declined; (c) new only: T6 | Exit 5 in each; in each the other blocks and the `not current` line are absent, so the exit can come from that cause alone (r1 F4) |
+| T24 | A unit that is new and named: after an apply of `milestone_project` with `review-pr` declined, a new unit `skills/milestone/extra` is added, and a delivered file of the source gains `` `extra` `` | `skills/milestone/extra` appears under `named` and not under `new` (S3; r1 F4) |
 
 **Branches, walked against the normative order.** Step 1: T19. Step 2: T3, T7. Step 3:
 T4, T7. Step 4: T1, T2, T12. Step 5: T6. Step 6: T8. Step 7: T9. The two name forms:
 backticks in T1, T12 and T13; `../` in T22. A satisfied name: T5. `check`'s exits: 0
-(T1), 1 (T15), 2 (T16), and 5 for each cause: pending and named (T1; T3 shows 0 once
-both are gone), new (T6), unlisted (T8, run once more with `--strict`), not compared
-(T14), and no source (T16).
+(T1), 1 (T15), 2 (T16), and 5 for each cause on its own: pending (T23a), named (T23b),
+new (T6, T23c), unlisted (T8), not compared (T14), and no source (T16). T3 and T7 show 0
+once every cause is gone (r1 F4).
 
 **Existing tests.** None is edited. `no_implicit_source` keeps plain `check` receipt-only
 in all of them, as on main.
@@ -324,10 +332,19 @@ in all of them, as on main.
 | `python3 devtools/build_plugins.py --check` | exits 0 |
 | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py write`, then the same with `--check --strict` | exit 0 each |
 
-**By hand.** A scratch copy of the T1 state, built outside the repository by the same
-steps. `apply --dry-run`, `check` and `check --strict` are run on it with the
-repository's `sync.py` and `--source` naming the scratch source; the exact lines and
-exits (0, 0, 5) go into the phase record and into the new capture of `docs/adopt.html`.
+**By hand** (r1 F6). A scratch copy of the T1 state, built outside the repository by the
+same steps, in `$SCRATCH` (the session's scratch folder): `$SCRATCH/source` is the
+two-commit source, and `$SCRATCH/project` the project applied from its first commit.
+From the repository root:
+
+```bash
+python3 devtools/sync.py apply --project "$SCRATCH/project" --source "$SCRATCH/source" --dry-run
+python3 devtools/sync.py check --project "$SCRATCH/project" --source "$SCRATCH/source"
+python3 devtools/sync.py check --project "$SCRATCH/project" --source "$SCRATCH/source" --strict
+```
+
+Expected exits 0, 0 and 5. The exact lines and exits go into the phase record and into
+the new capture of `docs/adopt.html`.
 
 ## 9. Out of scope for this phase
 
