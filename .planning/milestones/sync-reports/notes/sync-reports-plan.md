@@ -5,11 +5,9 @@ it lacks a unit its own synced files name, that dev-tools has added a unit since
 sync, and that it is behind dev-tools. An `apply` run from a dev-tools checkout that is only
 behind its upstream delivers the upstream's files, not the old ones.
 
-**Status.** Draft, 2026-11-23, written with `start-milestone` (the installed dvt-milestone
-0.1.3; the scripts run are the built copies under `plugins/`, at 0.1.5).
-
-- **Not approved.** The plan gate has not been ruled. The lane is itself a proposal (D1):
-  the owner was asked on 2026-11-23 and has not said.
+**Status.** Approved, 2026-11-23, by delegated approval (auto=true): `001-plan.md`.
+Written with `start-milestone` (the installed dvt-milestone 0.1.3; the scripts run are
+the built copies under `plugins/`, at 0.1.5).
 - **One owner ruling so far (o).** 2026-11-23, in this session, to "Should `apply` fetch and
   deliver the latest dev-tools by default?": "Yes, by default". It is D8, and phase 2
   exists because of it.
@@ -29,6 +27,14 @@ behind its upstream delivers the upstream's files, not the old ones.
   | Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
   |---|---|---|---|---|---|---|
   | r1 | 1 (Codex) | 6 | 0 / 6 (first round) | 3 / 6 | blocking | CHANGES_REQUESTED |
+
+  Round 2 is not run. The three blocking findings were test rows and an error path of the
+  phase 1 spec, where the discharge is a test that runs, not more prose
+  (`review-convergence.md`, "Specify decisions, discover facts"); the design of section 2
+  drew none. Phase 1's diff review reads the code that implements those rows.
+- **Plan gate: delegated approval (auto=true), 2026-11-23.** Recorded in `001-plan.md`,
+  which binds these bytes by SHA-256. D2 to D7 and D9 to D13 are ruled as proposed. The r1
+  repairs are unreviewed (above).
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 
@@ -466,7 +472,7 @@ Commands run from the repository root.
 
 ## 10. Owner decisions and open questions
 
-### Decisions for the plan gate
+### Decisions for the plan gate (ruled 2026-11-23: D1 and D8 by the owner, the rest by delegated approval (auto=true), each as proposed)
 
 | # | Question | Readings and their cost | Proposed |
 |---|---|---|---|
