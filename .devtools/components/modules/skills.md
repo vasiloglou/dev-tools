@@ -166,44 +166,44 @@ review_tool.py: the independent review of the milestone workflow (process-phase 
 
 | Symbol | Kind | Line | Summary |
 | --- | --- | --- | --- |
-| `plugin_root(script)` | function | 64 | The plugin install that holds this script, or None. A plugin keeps it in |
-| `checkout_root() -> Path` | function | 73 | The git checkout that holds the working directory, or the working directory. |
-| `Stop` | class(Exception) | 117 | The command cannot run; exit 2 with this message. |
-| `load_settings(path) -> dict` | function | 121 | (no docstring) |
-| `now(precise) -> str` | function | 134 | (no docstring) |
-| `sha256(path) -> str` | function | 139 | (no docstring) |
-| `git(root, *args, check) -> subprocess.CompletedProcess` | function | 143 | (no docstring) |
-| `repo_root() -> Path` | function | 148 | (no docstring) |
-| `looks_secret(path) -> bool` | function | 155 | (no docstring) |
-| `write_json(path, data) -> None` | function | 159 | (no docstring) |
-| `read_json(path) -> dict` | function | 165 | (no docstring) |
-| `shown(root, path) -> str` | function | 169 | A path as a brief names it: relative to the repository when inside it. |
-| `unquote(path) -> str` | function | 177 | A path as git prints it in a diff header: C-quoted when it holds a special byte. |
-| `strip_prefix(path) -> str` | function | 197 | (no docstring) |
-| `header_paths(line) -> list[str]` | function | 201 | Both paths of a 'diff --git' line, quoted or not. |
-| `split_diff(text) -> list[tuple[list[str], str]]` | function | 214 | (paths, block) for each file of a unified git diff. The paths come from the block's |
-| `without_secrets(text) -> tuple[str, list[str]]` | function | 239 | The diff without any block that names a credential file on either side, and every |
-| `cmd_brief(args, settings) -> int` | function | 253 | (no docstring) |
-| `brief_text(root, out, brief) -> str` | function | 363 | (no docstring) |
+| `plugin_root(script)` | function | 65 | The plugin install that holds this script, or None. A plugin keeps it in |
+| `checkout_root() -> Path` | function | 74 | The git checkout that holds the working directory, or the working directory. |
+| `Stop` | class(Exception) | 118 | The command cannot run; exit 2 with this message. |
+| `load_settings(path) -> dict` | function | 122 | (no docstring) |
+| `now(precise) -> str` | function | 135 | (no docstring) |
+| `sha256(path) -> str` | function | 141 | (no docstring) |
+| `git(root, *args, check) -> subprocess.CompletedProcess` | function | 145 | (no docstring) |
+| `repo_root() -> Path` | function | 150 | (no docstring) |
+| `looks_secret(path) -> bool` | function | 158 | (no docstring) |
+| `write_json(path, data) -> None` | function | 162 | (no docstring) |
+| `read_json(path) -> dict` | function | 168 | (no docstring) |
+| `shown(root, path) -> str` | function | 172 | A path as a brief names it: relative to the repository when inside it. |
+| `unquote(path) -> str` | function | 180 | A path as git prints it in a diff header: C-quoted when it holds a special byte. |
+| `strip_prefix(path) -> str` | function | 200 | (no docstring) |
+| `header_paths(line) -> list[str]` | function | 204 | Both paths of a 'diff --git' line, quoted or not. |
+| `split_diff(text) -> list[tuple[list[str], str]]` | function | 217 | (paths, block) for each file of a unified git diff. The paths come from the block's |
+| `without_secrets(text) -> tuple[str, list[str]]` | function | 242 | The diff without any block that names a credential file on either side, and every |
+| `cmd_brief(args, settings) -> int` | function | 256 | (no docstring) |
+| `brief_text(root, out, brief) -> str` | function | 366 | (no docstring) |
 | `ledger_text(out) -> str` | function | 423 | (no docstring) |
 | `load_brief(path) -> tuple[Path, dict]` | function | 442 | (no docstring) |
 | `changed_files(root, out, brief) -> list[str]` | function | 450 | (no docstring) |
 | `pick_reviewer(args, settings) -> str` | function | 461 | (no docstring) |
 | `command(name, settings) -> tuple[list[str], str]` | function | 472 | The reviewer's argv with the brief folder as {dir}, and the file its stdout goes to. |
 | `preconditions(name) -> list[str]` | function | 486 | (no docstring) |
-| `cmd_run(args, settings) -> int` | function | 496 | (no docstring) |
-| `watch(root, out) -> int` | function | 527 | (no docstring) |
-| `rounds(paths) -> list[Path]` | function | 564 | (no docstring) |
-| `alive(pid) -> bool` | function | 576 | (no docstring) |
-| `run_state(run) -> str` | function | 584 | (no docstring) |
-| `split_row(line) -> list[str]` | function | 591 | The cells of a table row, with or without its outer pipes. |
-| `ledger_rows(text) -> list[dict]` | function | 599 | The rows of the findings table: from its Id header to the next heading or table, |
-| `says_none(text) -> bool` | function | 624 | (no docstring) |
-| `ledger_problems(root, out, finished) -> tuple[list[dict], list[str]]` | function | 628 | (no docstring) |
-| `cmd_status(args, settings) -> int` | function | 669 | (no docstring) |
-| `run_gh(args) -> str` | function | 741 | (no docstring) |
-| `pr_view(number) -> dict` | function | 750 | (no docstring) |
-| `cmd_post(args, settings) -> int` | function | 756 | (no docstring) |
+| `cmd_run(args, settings) -> int` | function | 497 | (no docstring) |
+| `watch(root, out) -> int` | function | 528 | (no docstring) |
+| `rounds(paths) -> list[Path]` | function | 563 | (no docstring) |
+| `alive(pid) -> bool` | function | 575 | (no docstring) |
+| `run_state(run) -> str` | function | 583 | (no docstring) |
+| `split_row(line) -> list[str]` | function | 590 | The cells of a table row, with or without its outer pipes. |
+| `ledger_rows(text) -> list[dict]` | function | 598 | The rows of the findings table: from its Id header to the next heading or table, |
+| `says_none(text) -> bool` | function | 623 | (no docstring) |
+| `ledger_problems(root, out, finished) -> tuple[list[dict], list[str]]` | function | 627 | (no docstring) |
+| `cmd_status(args, settings) -> int` | function | 667 | (no docstring) |
+| `run_gh(args) -> str` | function | 739 | (no docstring) |
+| `pr_view(number) -> dict` | function | 749 | (no docstring) |
+| `cmd_post(args, settings) -> int` | function | 755 | (no docstring) |
 | `cmd_sanitize(args, settings) -> int` | function | 800 | (no docstring) |
 | `main(argv) -> int` | function | 830 | (no docstring) |
 
