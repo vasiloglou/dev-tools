@@ -9,8 +9,8 @@ upstream delivers the upstream's files.
   2026-11-23 by delegated approval (auto=true): [001-plan.md](001-plan.md).
 - **Plan review:** one round (Codex), `notes/reviews/plan-r1`, 6 findings, each
   reproduced and fixed.
-- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md), a draft, blocked on the
-  plan gate. Phase 2's is written when phase 1 is recorded.
+- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md) and
+  [notes/phase-2-spec.md](notes/phase-2-spec.md).
 - **Phases:**
   1. The sync names what a project has not taken, and `check` can say it is behind.
   2. The sync reads the latest dev-tools.
@@ -18,4 +18,5 @@ upstream delivers the upstream's files.
 - **Execution:** `process-milestone sync-reports auto=true`, from 2026-11-23, by the
   owner's lane ruling. Pushing, the pull request, merging, tagging and releasing need the
   owner.
-- **Records:** [001-plan.md](001-plan.md).
+- **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md): the unit
+  report, `declined`, `check` against a source and `--strict`.
