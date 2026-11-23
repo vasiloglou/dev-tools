@@ -49,7 +49,6 @@ import argparse
 import ast
 import difflib
 import hashlib
-import io
 import json
 import os
 import re
@@ -58,7 +57,6 @@ import shutil
 import stat
 import subprocess
 import sys
-import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 
@@ -332,8 +330,9 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
             return error
 
     def out(*args: str) -> str:
+        """One git answer, without its line terminator only: a path may end in a space."""
         done = git(*args)
-        return done.stdout.strip() if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
+        return done.stdout.rstrip("\n") if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
 
     def result(state: str, commit: str | None, lines: list[str] | None = None, root: Path | None = None,
                cleanup=lambda: None) -> dict:
@@ -370,7 +369,8 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
     if as_is:
         return result("as-is", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name}; delivering the checkout as it is (--as-is)"])
-    uncommitted = [line for line in out("status", "--porcelain", "--", *DIRTY_PATHS).splitlines() if line.strip()]
+    uncommitted = [line for line in out("status", "--porcelain", "--untracked-files=all", "--", *DIRTY_PATHS).splitlines()
+                   if line.strip()]
     if ahead or uncommitted:
         return result("own-work", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name} and has work of its own ({ahead} commit(s) "
@@ -378,23 +378,54 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
     folder = Path(tempfile.mkdtemp(prefix="devtools-upstream-"))
     cleanup = lambda: shutil.rmtree(folder, ignore_errors=True)
     try:
-        archive = subprocess.run(["git", "-C", str(path), "archive", "--format=tar", upstream],
-                                 capture_output=True, check=True)
-        with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as tar:
-            if hasattr(tarfile, "data_filter"):
-                tar.extractall(folder, filter="data")
-            else:
-                tar.extractall(folder)
-    except (OSError, subprocess.CalledProcessError, tarfile.TarError) as error:
+        read_commit(path, upstream, folder)
+    except (OSError, ValueError, SyncError, subprocess.CalledProcessError) as error:
         cleanup()
         return result("upstream-unreadable", head, lines + [
             f"warning: could not read {name} at {upstream[:7]} ({error}); delivering the checkout as it is"])
+    except BaseException:  # an interrupt: the folder is this function's until it returns
+        cleanup()
+        raise
     lines.append(f"note: dev-tools here is {behind} commit(s) behind {name}: delivering {name} at {upstream[:7]}; "
                  f"the checkout is not changed (git pull in {path} updates it)")
     tool = folder / "devtools/sync.py"
     if tool.is_file() and tool.read_bytes() != Path(__file__).read_bytes():
         lines.append(f"note: the sync.py that runs differs from the one at {name}; git pull in {path} updates it")
     return result("upstream", upstream, lines, folder, cleanup)
+
+
+def read_commit(checkout: Path, commit: str, folder: Path) -> None:
+    """Write every file of ``commit`` under ``folder`` with the mode git records for it (0755 or 0644).
+
+    Read from the tree itself, not with ``git archive``, which leaves out ``export-ignore`` paths and
+    applies the local ``tar.umask``. A symbolic link is written as one; a submodule is left out.
+    """
+    listing = subprocess.run(["git", "-C", str(checkout), "ls-tree", "-r", "-z", "--full-tree", commit],
+                             capture_output=True, check=True).stdout
+    entries = []
+    for record in listing.split(b"\0"):
+        if not record:
+            continue
+        meta, name = record.split(b"\t", 1)
+        mode, kind, sha = meta.decode().split()
+        if kind == "blob":
+            entries.append((mode, sha, os.fsdecode(name)))
+    batch = subprocess.run(["git", "-C", str(checkout), "cat-file", "--batch"],
+                           input="".join(f"{sha}\n" for _, sha, _ in entries).encode(),
+                           capture_output=True, check=True).stdout
+    offset = 0
+    for mode, sha, name in entries:
+        header_end = batch.index(b"\n", offset)
+        size = int(batch[offset:header_end].split()[2])
+        data = batch[header_end + 1:header_end + 1 + size]
+        offset = header_end + 1 + size + 1
+        target = folder / inside(folder, name).relative_to(folder)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if mode == "120000":
+            os.symlink(os.fsdecode(data), target)
+        else:
+            target.write_bytes(data)
+            os.chmod(target, 0o755 if mode == "100755" else 0o644)
 
 
 def open_source(args, path: Path) -> Path:

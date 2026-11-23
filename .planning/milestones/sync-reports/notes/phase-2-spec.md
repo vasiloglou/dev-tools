@@ -218,3 +218,11 @@ This prose.
 2. **The retaken frames of phase 1 print the same under phase 2**: re-run from this
    checkout, whose branch has no upstream (state `no-upstream`), the first-sync and
    hand-edit frames' output was byte for byte the same (`diff` exited 0).
+3. **Review round 1** (`notes/reviews/phase-2-r1`): five findings, each reproduced as a
+   failing test and fixed. The upstream is now read from git's tree (`ls-tree` and
+   `cat-file --batch`, in `read_commit`), not with `git archive`, which drops
+   `export-ignore` paths and applies `tar.umask` (F1, F3); the dirty check asks for
+   untracked files whatever `status.showUntrackedFiles` says (F2); a checkout path that
+   ends in a space is kept (F4); an interrupt while reading removes the folder (F5).
+   T16 now makes `ls-tree` fail; section 6's "Reading the archive" and the state
+   `"upstream-unreadable"` read "the upstream's tree" for "the archive" from here on.

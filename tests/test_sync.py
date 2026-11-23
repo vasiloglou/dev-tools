@@ -1364,11 +1364,11 @@ def test_as_is_on_a_checkout_known_to_be_behind_is_its_own_state(behind):
 
 
 def test_an_upstream_that_cannot_be_read_leaves_the_checkout_as_it_is(behind, capsys, monkeypatch):
-    # T16: git archive fails
+    # T16: reading the upstream's tree fails (phase 2 r1 F1 replaced git archive with ls-tree)
     real = sync.subprocess.run
 
     def no_archive(argv, *args, **kwargs):
-        if "archive" in argv:
+        if "ls-tree" in argv:
             raise subprocess.CalledProcessError(128, argv)
         return real(argv, *args, **kwargs)
     monkeypatch.setattr(sync.subprocess, "run", no_archive)
@@ -1383,3 +1383,61 @@ def test_the_upstream_follows_the_remote_s_fetch_refspec(behind, capsys):
     code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
     assert code == 0 and delivered(behind) == "second version\n"
     assert f"delivering mirror/main at {behind['second'][:7]}" in err
+
+
+# Regression tests for phase 2 review round 1 (notes/reviews/phase-2-r1).
+
+def test_an_export_ignore_attribute_does_not_drop_a_shipped_file(behind, capsys):
+    # r1 F1
+    write(behind["upstream"] / "skills/demo/guide.md", "a guide\n")
+    write(behind["upstream"] / ".gitattributes", "skills/demo/guide.md export-ignore\n")
+    commit(behind["upstream"], "guide")
+    capsys.readouterr()
+    assert apply(behind["clone"], behind["project"]) == 0
+    assert (behind["project"] / ".claude/skills/demo/guide.md").read_text() == "a guide\n"
+
+
+def test_status_settings_do_not_hide_untracked_work(behind, capsys):
+    # r1 F2
+    git(behind["clone"], "config", "status.showUntrackedFiles", "no")
+    write(behind["clone"] / "skills/demo/LOCAL.md", "the clone's own file\n")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and OWN + "main and has work of its own" in err
+    assert (behind["project"] / ".claude/skills/demo/LOCAL.md").is_file()
+
+
+def test_tar_umask_does_not_change_delivered_modes(behind, capsys):
+    # r1 F3
+    git(behind["clone"], "config", "tar.umask", "0077")
+    assert apply(behind["clone"], behind["project"]) == 0
+    assert (behind["project"] / ".claude/skills/demo/SKILL.md").stat().st_mode & 0o777 == 0o644
+
+
+def test_a_checkout_whose_path_ends_in_a_space_is_still_a_checkout(tmp_path, capsys):
+    # r1 F4
+    upstream = tmp_path / "up"
+    write(upstream / "skills/demo/SKILL.md", "first version\n")
+    git(upstream, "init", "-q", "-b", "main")
+    commit(upstream, "first")
+    clone = tmp_path / "clone "
+    subprocess.run(["git", "clone", "-q", str(upstream), str(clone)], check=True)
+    write(upstream / "skills/demo/SKILL.md", "second version\n")
+    commit(upstream, "second")
+    assert sync.resolve_source(clone, as_is=False)["state"] == "upstream"
+
+
+def test_an_interrupted_read_of_the_upstream_leaves_no_folder(behind, monkeypatch, tmp_path):
+    # r1 F5
+    made = []
+    real_mkdtemp = sync.tempfile.mkdtemp
+    monkeypatch.setattr(sync.tempfile, "mkdtemp", lambda *a, **k: made.append(real_mkdtemp(*a, **k)) or made[-1])
+    real = sync.subprocess.run
+
+    def interrupt(argv, *args, **kwargs):
+        if "cat-file" in argv or "archive" in argv or "ls-tree" in argv:
+            raise KeyboardInterrupt
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", interrupt)
+    with pytest.raises(KeyboardInterrupt):
+        sync.resolve_source(behind["clone"], as_is=False)
+    assert made and not any(Path(folder).exists() for folder in made)
