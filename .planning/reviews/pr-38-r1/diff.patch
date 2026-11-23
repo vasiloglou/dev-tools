@@ -1,0 +1,271 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index 365ce94..d4960e1 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -334,7 +334,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - uses: (none)
+ - used_by: (none)
+ - tests: tests/test_handoff.py
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 and r4 repairs (e2b2762, 22d6258). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, does not exist here, or while a line of the note's ignored list cannot be parsed; it checks existence only, never that a file can be read, and checks each path as the note wrote it, redacting one that looks like a key only in the report. A missing key file is reported in missing_keys and does not block. carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 and r4 repairs (e2b2762, 22d6258). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, does not exist here, or while a line of the note's ignored list cannot be parsed; it checks existence only, never that a file can be read, and checks each path as the note wrote it, redacting one that looks like a key only in the report. A missing key file is reported in missing_keys and does not block. write keeps every line it generates to one line: a value that holds a line break (the remote's path, the base, --from, the project's setup command) is JSON-escaped, so it cannot print a snapshot marker or the ignored-files heading on a line of its own (the review of vasiloglou/dev-tools#37, F1). carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
+ 
+ ## The milestone workflow
+ 
+diff --git a/.devtools/components/modules/skills.md b/.devtools/components/modules/skills.md
+index acb247c..596cbec 100644
+--- a/.devtools/components/modules/skills.md
++++ b/.devtools/components/modules/skills.md
+@@ -152,13 +152,13 @@ handoff.py: hand a branch to another coding assistant, developer or machine, and
+ | `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 610 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
+ | `level(sender, to, machine) -> int` | function | 642 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
+ | `detect_sender() -> str` | function | 649 | The assistant running this process, when it says so in the environment. |
+-| `HandoffError` | class(Exception) | 764 | The command cannot do what was asked; the message says why. |
+-| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 784 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
+-| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 818 | What the next machine would not get: findings as dicts, most severe first. |
+-| `doctor(root, *, home) -> list[dict]` | function | 886 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
+-| `available(root) -> list[dict]` | function | 941 | Hand-off notes that can be taken over, one per branch, newest first. |
+-| `takeover(root, *, home) -> dict` | function | 1023 | Everything the receiving side checks before continuing, in one report. |
+-| `main(argv) -> int` | function | 1228 | (no docstring) |
++| `HandoffError` | class(Exception) | 766 | The command cannot do what was asked; the message says why. |
++| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 786 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
++| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 820 | What the next machine would not get: findings as dicts, most severe first. |
++| `doctor(root, *, home) -> list[dict]` | function | 888 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
++| `available(root) -> list[dict]` | function | 943 | Hand-off notes that can be taken over, one per branch, newest first. |
++| `takeover(root, *, home) -> dict` | function | 1025 | Everything the receiving side checks before continuing, in one report. |
++| `main(argv) -> int` | function | 1230 | (no docstring) |
+ 
+ ## skills.milestone.process-phase.scripts.review_tool — `skills/milestone/process-phase/scripts/review_tool.py`
+ Components: review.rounds
+diff --git a/devtools/PLUGIN_VERSION b/devtools/PLUGIN_VERSION
+index 9faa1b7..c946ee6 100644
+--- a/devtools/PLUGIN_VERSION
++++ b/devtools/PLUGIN_VERSION
+@@ -1 +1 @@
+-0.1.5
++0.1.6
+diff --git a/plugins/dvt-milestone/.claude-plugin/plugin.json b/plugins/dvt-milestone/.claude-plugin/plugin.json
+index 35b6aa4..602d70f 100644
+--- a/plugins/dvt-milestone/.claude-plugin/plugin.json
++++ b/plugins/dvt-milestone/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-milestone",
+-  "version": "0.1.5",
++  "version": "0.1.6",
+   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+index 9b58e23..ce5f79f 100755
+--- a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+@@ -734,18 +734,20 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+         rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
+         lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+-    return "\n".join(lines)
++    # Each element is one line of the note. A value printed in one (the remote, the base, a
++    # setup command) may hold a line break, so the line is kept to one here, whatever it holds.
++    return "\n".join(_one_line(line) for line in lines)
+ 
+ 
+-def _one_line(path: str) -> str:
+-    """A path as the snapshot prints it where takeover does not read it back: on one line, with
+-    a line break or another control character JSON-escaped, so it cannot forge the snapshot's
+-    own lines (its ignored-files heading, its end marker)."""
+-    return json.dumps(path)[1:-1] if _CONTROL.search(path) else path
++def _one_line(text: str) -> str:
++    """A path or a whole line as the note prints it where takeover does not read it back: on
++    one line, with a line break or another control character JSON-escaped, so it cannot forge
++    the note's own lines (a snapshot marker, the ignored-files heading)."""
++    return json.dumps(text)[1:-1] if _CONTROL.search(text) else text
+ 
+ 
+ def _head(meta: dict) -> str:
+-    return "\n".join(["---", *(f"{k}: {v}" for k, v in meta.items()), "---", ""])
++    return "\n".join(["---", *(_one_line(f"{k}: {v}") for k, v in meta.items()), "---", ""])
+ 
+ 
+ def _hint(heading: str, lvl: int) -> str:
+@@ -769,9 +771,9 @@ def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
+     then = f", then {_files(snap['instructions'][:1])}" if snap["instructions"] else ""
+     head = [
+         _head(meta),
+-        f"# Hand-off: {snap['branch']}",
++        _one_line(f"# Hand-off: {snap['branch']}"),
+         "",
+-        f"Read this first{then}. Delete this file before the branch merges.",
++        _one_line(f"Read this first{then}. Delete this file before the branch merges."),
+         "",
+         _snapshot_text(snap, meta),
+         "",
+diff --git a/plugins/dvt-phase/.claude-plugin/plugin.json b/plugins/dvt-phase/.claude-plugin/plugin.json
+index 6e4c4c5..684541c 100644
+--- a/plugins/dvt-phase/.claude-plugin/plugin.json
++++ b/plugins/dvt-phase/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-phase",
+-  "version": "0.1.5",
++  "version": "0.1.6",
+   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+index 9b58e23..ce5f79f 100755
+--- a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+@@ -734,18 +734,20 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+         rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
+         lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+-    return "\n".join(lines)
++    # Each element is one line of the note. A value printed in one (the remote, the base, a
++    # setup command) may hold a line break, so the line is kept to one here, whatever it holds.
++    return "\n".join(_one_line(line) for line in lines)
+ 
+ 
+-def _one_line(path: str) -> str:
+-    """A path as the snapshot prints it where takeover does not read it back: on one line, with
+-    a line break or another control character JSON-escaped, so it cannot forge the snapshot's
+-    own lines (its ignored-files heading, its end marker)."""
+-    return json.dumps(path)[1:-1] if _CONTROL.search(path) else path
++def _one_line(text: str) -> str:
++    """A path or a whole line as the note prints it where takeover does not read it back: on
++    one line, with a line break or another control character JSON-escaped, so it cannot forge
++    the note's own lines (a snapshot marker, the ignored-files heading)."""
++    return json.dumps(text)[1:-1] if _CONTROL.search(text) else text
+ 
+ 
+ def _head(meta: dict) -> str:
+-    return "\n".join(["---", *(f"{k}: {v}" for k, v in meta.items()), "---", ""])
++    return "\n".join(["---", *(_one_line(f"{k}: {v}") for k, v in meta.items()), "---", ""])
+ 
+ 
+ def _hint(heading: str, lvl: int) -> str:
+@@ -769,9 +771,9 @@ def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
+     then = f", then {_files(snap['instructions'][:1])}" if snap["instructions"] else ""
+     head = [
+         _head(meta),
+-        f"# Hand-off: {snap['branch']}",
++        _one_line(f"# Hand-off: {snap['branch']}"),
+         "",
+-        f"Read this first{then}. Delete this file before the branch merges.",
++        _one_line(f"Read this first{then}. Delete this file before the branch merges."),
+         "",
+         _snapshot_text(snap, meta),
+         "",
+diff --git a/skills/dev-handoff/scripts/handoff.py b/skills/dev-handoff/scripts/handoff.py
+index 9b58e23..ce5f79f 100755
+--- a/skills/dev-handoff/scripts/handoff.py
++++ b/skills/dev-handoff/scripts/handoff.py
+@@ -734,18 +734,20 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
+         rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
+         lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
+     lines.append(SNAPSHOT_END)
+-    return "\n".join(lines)
++    # Each element is one line of the note. A value printed in one (the remote, the base, a
++    # setup command) may hold a line break, so the line is kept to one here, whatever it holds.
++    return "\n".join(_one_line(line) for line in lines)
+ 
+ 
+-def _one_line(path: str) -> str:
+-    """A path as the snapshot prints it where takeover does not read it back: on one line, with
+-    a line break or another control character JSON-escaped, so it cannot forge the snapshot's
+-    own lines (its ignored-files heading, its end marker)."""
+-    return json.dumps(path)[1:-1] if _CONTROL.search(path) else path
++def _one_line(text: str) -> str:
++    """A path or a whole line as the note prints it where takeover does not read it back: on
++    one line, with a line break or another control character JSON-escaped, so it cannot forge
++    the note's own lines (a snapshot marker, the ignored-files heading)."""
++    return json.dumps(text)[1:-1] if _CONTROL.search(text) else text
+ 
+ 
+ def _head(meta: dict) -> str:
+-    return "\n".join(["---", *(f"{k}: {v}" for k, v in meta.items()), "---", ""])
++    return "\n".join(["---", *(_one_line(f"{k}: {v}") for k, v in meta.items()), "---", ""])
+ 
+ 
+ def _hint(heading: str, lvl: int) -> str:
+@@ -769,9 +771,9 @@ def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
+     then = f", then {_files(snap['instructions'][:1])}" if snap["instructions"] else ""
+     head = [
+         _head(meta),
+-        f"# Hand-off: {snap['branch']}",
++        _one_line(f"# Hand-off: {snap['branch']}"),
+         "",
+-        f"Read this first{then}. Delete this file before the branch merges.",
++        _one_line(f"Read this first{then}. Delete this file before the branch merges."),
+         "",
+         _snapshot_text(snap, meta),
+         "",
+diff --git a/tests/test_handoff.py b/tests/test_handoff.py
+index d047c53..a18f442 100644
+--- a/tests/test_handoff.py
++++ b/tests/test_handoff.py
+@@ -1250,3 +1250,65 @@ def exists(self, *a, **k):
+     monkeypatch.setattr(Path, "exists", exists)
+     rows = {r["name"]: r for r in handoff.doctor(repo, home=tmp_path)}
+     assert setting != "env_paths" or rows["environment: " + "x" * 300]["ok"] is False
++
++
++# pr-37-r1 F1: a value the note prints, with line breaks in it, cannot print a line of the note's own.
++_FORGED_LINES = "\nFiles git ignores\n\n- none\n" + handoff.SNAPSHOT_END + "\n"
++
++
++def test_t21_a_remote_whose_path_holds_line_breaks_cannot_hide_the_ignored_list(repo, tmp_path):
++    git(repo, "remote", "add", "origin", "./remote" + _FORGED_LINES + "repo")
++    dest, note = _ignored_note(repo, tmp_path, ["out0/"])  # out0/ is not in the clone
++    lines = note.read_text().splitlines()
++    assert lines.count(handoff.SNAPSHOT_END) == 1
++    assert sum(line.startswith("Files git ignores") for line in lines) == 1
++    report = handoff.takeover(dest, home=tmp_path)
++    assert report["missing_ignored"] == ["out0/"] and report["ready"] is False
++
++
++def _text_values(value, path=()):
++    """The path to every string inside nested dicts and lists."""
++    if isinstance(value, dict):
++        for key, inner in value.items():
++            yield from _text_values(inner, (*path, key))
++    elif isinstance(value, list):
++        for i, inner in enumerate(value):
++            yield from _text_values(inner, (*path, i))
++    elif isinstance(value, str):
++        yield path
++
++
++def _own_lines(note: str) -> tuple[int, int, int]:
++    """How many of the lines takeover reads the note by: start markers, end markers, ignored headings."""
++    lines = note.splitlines()
++    return (lines.count(handoff.SNAPSHOT_START), lines.count(handoff.SNAPSHOT_END),
++            sum(line.startswith("Files git ignores") for line in lines))
++
++
++@pytest.mark.parametrize("breaker", ["\n", "\r\n", "\x0b", "\x0c", "\x1c", "\x85", " ", " "])
++def test_t22_no_value_the_note_prints_can_add_a_line_of_its_own(repo, monkeypatch, breaker):
++    """Every string of the snapshot and of the note's header, whatever field it is in, and the
++    project's setup command: with each kind of line break Python splits lines at."""
++    snap = handoff.snapshot(repo, "base")
++    snap.update(state={"status": "ok"}, paused_phases=["phase"], dirty=["file"], commits=["abc a subject"])
++    meta = handoff._meta({}, snap, "2026-11-23", "claude", "codex", "new")
++    monkeypatch.setitem(handoff.SETTINGS, "setup_command", "make setup")
++    usual = _own_lines(handoff._new_note(snap, meta))
++    assert usual == (1, 1, 1)
++    odd = "x" + (breaker + handoff.SNAPSHOT_START + _FORGED_LINES).replace("\n", breaker) + "y"
++    forged = []
++    for source, name in ((snap, "snap"), (meta, "meta")):
++        for path in _text_values(source):
++            if path[0] == "level":  # read as a number
++                continue
++            changed = {"snap": json.loads(json.dumps(snap)), "meta": dict(meta)}
++            target = changed[name]
++            for step in path[:-1]:
++                target = target[step]
++            target[path[-1]] = odd
++            if _own_lines(handoff._new_note(changed["snap"], changed["meta"])) != usual:
++                forged.append((name, *path))
++    monkeypatch.setitem(handoff.SETTINGS, "setup_command", odd)
++    if _own_lines(handoff._new_note(snap, meta)) != usual:
++        forged.append(("settings", "setup_command"))
++    assert forged == []
