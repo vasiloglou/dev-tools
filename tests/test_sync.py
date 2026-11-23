@@ -1423,7 +1423,9 @@ def test_a_checkout_whose_path_ends_in_a_space_is_still_a_checkout(tmp_path, cap
     subprocess.run(["git", "clone", "-q", str(upstream), str(clone)], check=True)
     write(upstream / "skills/demo/SKILL.md", "second version\n")
     commit(upstream, "second")
-    assert sync.resolve_source(clone, as_is=False)["state"] == "upstream"
+    resolved = sync.resolve_source(clone, as_is=False)
+    resolved["cleanup"]()
+    assert resolved["state"] == "upstream"
 
 
 def test_an_interrupted_read_of_the_upstream_leaves_no_folder(behind, monkeypatch, tmp_path):
@@ -1498,3 +1500,13 @@ def test_only_git_s_line_terminator_is_removed():
     assert sync.git_line("/virtual/source\n\n") == "/virtual/source\n"
     assert sync.git_line("/virtual/source \n") == "/virtual/source "
     assert sync.git_line("abc") == "abc"
+
+
+def test_a_run_that_reads_the_upstream_leaves_no_folder(behind, capsys, monkeypatch):
+    # S0.2, C6: main removes the folder it read from.
+    made = []
+    real_mkdtemp = sync.tempfile.mkdtemp
+    monkeypatch.setattr(sync.tempfile, "mkdtemp", lambda *a, **k: made.append(real_mkdtemp(*a, **k)) or made[-1])
+    assert apply(behind["clone"], behind["project"]) == 0
+    assert run("check", "--project", behind["project"], "--source", behind["clone"]) == 0
+    assert len(made) == 2 and not any(Path(folder).exists() for folder in made)
