@@ -2,17 +2,20 @@
 
 ## 1. Status
 
-Draft, awaiting owner review. Blocked: implementable once the plan gate is ruled (plan
-decisions D1 to D7, D11 and D13) and this spec's owner gate is signed off. No code is
-written.
+Owner-decided (2026-11-23), by delegated approval (auto=true): the plan gate is
+`001-plan.md`; this spec's gate is recorded below, under "Owner gate". Implementation may
+begin.
 
 ## 2. Provenance
 
 - Derives from `notes/sync-reports-plan.md`, sections 2 ("Phase 1"), 4 ("Phase 1"), 5, 6
   and 9, as drafted on 2026-11-23 with `start-milestone`.
 - No prior phase record: this is the milestone's first phase.
-- No review round has read this spec. This line is replaced when one has, with the
-  reviewed SHA-256.
+- Plan review round 1 (`notes/reviews/plan-r1`, brief SHA-256
+  `742e3a0cbb0de4e28fb85eef22d2db713888793bd832488e2e6446932858740c`) read this spec at
+  SHA-256 `b69a3e797633…`. Its six findings were repaired here and in the plan, marked
+  `(r1 Fn)`. The current bytes are not the reviewed ones, and the repairs carry no review
+  opinion.
 - Tags used at the site of a change: `(o)` an owner decision, `(rN Fn)` a review finding.
 
 ## 3. Obligations
@@ -258,8 +261,8 @@ gains `, or list it under declined`.
 
 ## 7. Decisions
 
-Open until the owner gate. Plan decisions D1 to D7, D11 and D13 are ruled at the plan
-gate and are not repeated here.
+Ruled 2026-11-23 by delegated approval (auto=true), each as proposed (o). Plan decisions
+D1 to D7, D11 and D13 are ruled at the plan gate and are not repeated here.
 
 | # | Question | Readings and their cost | Proposed |
 |---|---|---|---|
@@ -323,14 +326,18 @@ once every cause is gone (r1 F4).
 **Existing tests.** None is edited. `no_implicit_source` keeps plain `check` receipt-only
 in all of them, as on main.
 
-**Gates.**
+**Verification selection.**
 
-| Command | Expected |
-|---|---|
-| `uv run --no-project --with pytest python -m pytest tests/test_sync.py -q` | exits 0 |
-| `uv run --no-project --with pytest python -m pytest tests -q` | exits 0 |
-| `python3 devtools/build_plugins.py --check` | exits 0 |
-| `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py write`, then the same with `--check --strict` | exit 0 each |
+| Obligation | Disposition | Command | Input boundary | Justification | Invalidation |
+|---|---|---|---|---|---|
+| The phase's tests (T1 to T24) and every existing sync test (C2) | run | `uv run --no-project --with pytest python -m pytest tests/test_sync.py -q`, exits 0 | `devtools/sync.py`, `tests/test_sync.py`, `examples/*.devtools.toml` | The direct tests of every changed function | Any change to those files |
+| Plan section 9: the whole suite | run | `uv run --no-project --with pytest python -m pytest tests -q`, exits 0 | The repository | Plan-mandated; 2.5 minutes here. It holds the consumers: `test_own_index.py` (the index), `test_plugins.py` (the build) | Any change |
+| The plugins match the skills | run | `python3 devtools/build_plugins.py --check`, exits 0 | `skills/`, `agents/`, `plugins/` | Plan-mandated; shows that no plugin file changes | A change under `skills/` or `agents/` |
+| The component index is current | run | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py write`, then the same with `--check --strict`, exit 0 each | `devtools/sync.py`, `.devtools/components/` | `.devtools/project.md`, "Gates" | Any change to `sync.py` |
+| The index against the phase's changes | run | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base 811b4a3 --strict`, exits 0 | The phase's diff | process-phase step 6 | Any change |
+| The by-hand run (below) | run | The three commands under "By hand" | A scratch copy of the T1 state | Plan section 9 and the brief: the owner reads real lines | A change to what `apply` or `check` print |
+
+No broader lane exists: the suite is the repository's only test command.
 
 **By hand** (r1 F6). A scratch copy of the T1 state, built outside the repository by the
 same steps, in `$SCRATCH` (the session's scratch folder): `$SCRATCH/source` is the
@@ -345,6 +352,19 @@ python3 devtools/sync.py check --project "$SCRATCH/project" --source "$SCRATCH/s
 
 Expected exits 0, 0 and 5. The exact lines and exits go into the phase record and into
 the new capture of `docs/adopt.html`.
+
+## Owner gate
+
+    ruling: delegated (auto=true) approved
+    artifact: .planning/milestones/sync-reports/notes/phase-1-spec.md (the bytes of the
+      commit that adds this block; its SHA-256 is in the phase 1 record)
+    date: 2026-11-23
+    authorization: the owner's "Milestone, auto=true" for sync-reports (001-plan.md)
+    instrument: this prose (section 11); no review over the spec bytes beyond plan-r1
+    decisions: S1 to S5 as proposed
+    implementability sweep: each test row walked against section 6 and its fixtures, by
+      the agent, 2026-11-23; the r1 findings F1 to F4 were the rows that failed it before
+      the repair
 
 ## 9. Out of scope for this phase
 
