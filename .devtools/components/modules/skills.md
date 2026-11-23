@@ -152,13 +152,13 @@ handoff.py: hand a branch to another coding assistant, developer or machine, and
 | `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 610 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
 | `level(sender, to, machine) -> int` | function | 642 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
 | `detect_sender() -> str` | function | 649 | The assistant running this process, when it says so in the environment. |
-| `HandoffError` | class(Exception) | 764 | The command cannot do what was asked; the message says why. |
-| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 784 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
-| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 818 | What the next machine would not get: findings as dicts, most severe first. |
-| `doctor(root, *, home) -> list[dict]` | function | 886 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
-| `available(root) -> list[dict]` | function | 941 | Hand-off notes that can be taken over, one per branch, newest first. |
-| `takeover(root, *, home) -> dict` | function | 1023 | Everything the receiving side checks before continuing, in one report. |
-| `main(argv) -> int` | function | 1228 | (no docstring) |
+| `HandoffError` | class(Exception) | 766 | The command cannot do what was asked; the message says why. |
+| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 786 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
+| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 820 | What the next machine would not get: findings as dicts, most severe first. |
+| `doctor(root, *, home) -> list[dict]` | function | 888 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
+| `available(root) -> list[dict]` | function | 943 | Hand-off notes that can be taken over, one per branch, newest first. |
+| `takeover(root, *, home) -> dict` | function | 1025 | Everything the receiving side checks before continuing, in one report. |
+| `main(argv) -> int` | function | 1230 | (no docstring) |
 
 ## skills.milestone.process-phase.scripts.review_tool — `skills/milestone/process-phase/scripts/review_tool.py`
 Components: review.rounds
