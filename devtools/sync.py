@@ -17,10 +17,20 @@ Prototype. The project lists what it takes in ``.devtools.toml``::
     after_apply = ["python3 scripts/components_index.py write"]  # optional, top level: run when apply changed a file
                                                    # (no shell: write `env NAME=value command` to set a variable)
 
+    declined = ["skills/milestone/review-pr"]       # optional, top level: units the project does not take
+                                                   # on purpose; a folder covers every unit under it
+
 ``apply`` copies the files, writes the settings files and records every managed file in
-``.devtools-receipt.json`` (sha256 and mode). It refuses to overwrite a file the project
-changed by hand, or one it does not manage yet, unless told to (``--force``, ``--adopt``).
-``check`` needs only the project: it compares the managed files with the receipt.
+``.devtools-receipt.json`` (sha256 and mode), and every unit dev-tools ships (``shipped``). It
+refuses to overwrite a file the project changed by hand, or one it does not manage yet, unless
+told to (``--force``, ``--adopt``).
+
+``check`` compares the managed files with the receipt. Run from a dev-tools checkout, or given
+``--source``, it then compares the project with that source: whether an apply would change files,
+and which units it does not take. ``--receipt-only`` does the first part alone and needs only the
+project. ``apply`` reports the same units. A unit is reported when a file the project has names it,
+and, until the next apply, when it is new since the last one; ``declined`` ends both, and a workflow folder the
+config takes nothing from (``skills/phase``, ``skills/milestone``) is never reported.
 
 For a project that already has its own copies of these skills: ``survey`` finds them and can
 print a starter ``.devtools.toml`` (``--toml``), and ``compare`` shows, before anything is
@@ -28,7 +38,8 @@ written, which files an apply would replace and which of the project's lines wou
 Neither writes anything. ``skills/adopt-devtools/SKILL.md`` is the guide that uses them.
 
 Exit codes: 0 ok; 1 check found drift; 2 usage or configuration; 3 apply refused (nothing written);
-4 files were written but an after_apply command failed.
+4 files were written but an after_apply command failed; 5 ``check --strict``: no drift, but the project
+is not current, a unit is reported, or the comparison with dev-tools could not be made.
 
 Needs Python 3.11 or newer.
 """
@@ -42,11 +53,12 @@ import json
 import os
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 try:
     import tomllib
@@ -103,10 +115,29 @@ def read_config(project: Path) -> dict:
     config_path = project / CONFIG
     if not config_path.is_file():
         raise SyncError(f"{config_path} not found")
-    config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    unknown = sorted(set(config) - {"sync", "after_apply"})
+    try:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise SyncError(f"{config_path} cannot be read: {error}")
+    unknown = sorted(set(config) - {"sync", "after_apply", "declined"})
     if unknown:
         raise SyncError(f"{config_path}: unknown top-level keys: {unknown}")
+    entries = config.get("sync", [])
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise SyncError(f"{config_path}: sync must be a list of [[sync]] tables")
+    for entry in entries:
+        if not all(isinstance(entry.get(key, ""), str) for key in ("source", "dest", "replaces")):
+            raise SyncError(f"{config_path}: source, dest and replaces in [[sync]] must be strings")
+        exclude, values, settings = entry.get("exclude", []), entry.get("values", {}), entry.get("settings", {})
+        if not isinstance(exclude, list) or not all(isinstance(name, str) for name in exclude):
+            raise SyncError(f"{config_path}: exclude in [[sync]] must be a list of paths")
+        if not isinstance(values, dict):
+            raise SyncError(f"{config_path}: values in [[sync]] must be a table, such as {{ planning_dir = \".planning\" }}")
+        if not isinstance(settings, dict) or not all(isinstance(block, dict) for block in settings.values()):
+            raise SyncError(f"{config_path}: each [sync.settings.\"<file>\"] must be a table of settings")
+    commands = config.get("after_apply", [])
+    if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
+        raise SyncError(f"{config_path}: after_apply must be a list of commands")
     return config
 
 
@@ -178,7 +209,10 @@ def read_json(path: Path) -> dict:
 def source_identity(source_root: Path, config: dict | None = None) -> dict:
     """The dev-tools commit, and whether what the config takes from it has uncommitted changes."""
     def git(*args: str) -> str:
-        done = subprocess.run(["git", "-C", str(source_root), *args], capture_output=True, text=True)
+        try:
+            done = subprocess.run(["git", "-C", str(source_root), *args], capture_output=True, text=True)
+        except OSError:  # no git on this machine: the commit is unknown
+            return ""
         return done.stdout.strip() if done.returncode == 0 else ""
     taken = [entry["source"] for entry in (config or {}).get("sync", []) if "source" in entry]
     return {"commit": git("rev-parse", "HEAD") or None, "dirty": bool(git("status", "--porcelain", "--", *taken))}
@@ -278,11 +312,182 @@ def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> Non
                   file=sys.stderr)
 
 
+# --------------------------------------------------------------------------- which commit of dev-tools is read
+
+DIRTY_PATHS = ("skills", "agents", "devtools", "examples")  # what the sync reads and runs, beside the config's sources
+FETCH_SECONDS = 60
+
+
+def git_line(text: str) -> str:
+    """Git's answer without its one line terminator: a path may end in a space or a newline."""
+    return text[:-1] if text.endswith("\n") else text
+
+
+def resolve_source(path: Path, *, as_is: bool, sources: tuple[str, ...] = ()) -> dict:
+    """Which files a run reads for the dev-tools source at ``path``.
+
+    A checkout that is only behind its upstream is read at the upstream's commit, from a temporary
+    folder; every other source is read as it is. Starts ``git fetch`` unless ``as_is``, and changes
+    nothing else in the checkout. Returns {"root", "commit", "state", "lines", "cleanup"}; ``lines``
+    go to standard error. The states, in the order they are decided: folder, detached, no-upstream,
+    upstream-missing, current, as-is, own-work, upstream (or upstream-unreadable).
+    """
+    path = path.resolve()
+
+    def git(*args: str, timeout: int | None = None, env: dict | None = None):
+        try:
+            return subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True,
+                                  timeout=timeout, env=env)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return error
+
+    def out(*args: str) -> str:
+        """One git answer, without its line terminator only: a path may end in a space."""
+        done = git(*args)
+        return git_line(done.stdout) if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
+
+    def result(state: str, commit: str | None, lines: list[str] | None = None, root: Path | None = None,
+               cleanup=lambda: None) -> dict:
+        return {"root": root or path, "commit": commit, "state": state, "lines": lines or [], "cleanup": cleanup}
+
+    top = out("rev-parse", "--show-toplevel")
+    if not top or Path(top).resolve() != path:
+        return result("folder", None)
+    head = out("rev-parse", "HEAD") or None
+    branch = out("symbolic-ref", "-q", "--short", "HEAD")
+    if not branch:
+        return result("detached", head)
+    remote, merge = out("config", "--get", f"branch.{branch}.remote"), out("config", "--get", f"branch.{branch}.merge")
+    if not merge:
+        return result("no-upstream", head)
+    lines = []
+    if remote and remote != "." and not as_is:
+        done = git("fetch", "--quiet", remote, timeout=FETCH_SECONDS, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        if not isinstance(done, subprocess.CompletedProcess) or done.returncode != 0:
+            reason = (str(done) if not isinstance(done, subprocess.CompletedProcess)
+                      else (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[0])
+            lines.append(f"warning: could not fetch {remote} ({reason}); deciding from the refs already fetched")
+    # git maps the branch's upstream through the remote's fetch refspec; a name built by hand would not.
+    name = (out("rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+            or (f"{remote}/" if remote not in ("", ".") else "") + merge.removeprefix("refs/heads/"))
+    upstream = out("rev-parse", "--verify", "--quiet", f"{branch}@{{upstream}}^{{commit}}")
+    if not upstream:
+        return result("upstream-missing", head, lines + [
+            f"warning: this dev-tools branch's upstream, {name}, was not found; delivering the checkout as it is"])
+    counts = out("rev-list", "--left-right", "--count", f"HEAD...{upstream}").split()
+    ahead, behind = (int(counts[0]), int(counts[1])) if len(counts) == 2 else (0, 0)
+    if behind == 0:
+        return result("current", head, lines)
+    if as_is:
+        return result("as-is", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name}; delivering the checkout as it is (--as-is)"])
+    # Asked so that no setting hides work: modes are compared, untracked files are listed, and a
+    # file git was told to stop looking at (assume-unchanged, skip-worktree) counts as changed. The
+    # paths are literal (a config's source may hold pattern characters), and a query that fails
+    # counts as work of one's own: the checkout is then delivered as it is.
+    paths = ("--", *DIRTY_PATHS, *sources)
+    status = git("--literal-pathspecs", "-c", "core.fileMode=true", "status", "--porcelain", "--untracked-files=all",
+                 *paths)
+    flags = git("--literal-pathspecs", "ls-files", "-v", *paths)
+    failed = [done for done in (status, flags) if not isinstance(done, subprocess.CompletedProcess) or done.returncode]
+    if failed:
+        return result("own-work", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name}, and git could not tell whether it has work "
+            f"of its own; delivering the checkout as it is"])
+    uncommitted = [line for line in status.stdout.splitlines() if line.strip()]
+    uncommitted += [line for line in flags.stdout.splitlines() if line[:1].islower() or line[:1] == "S"]
+    if ahead or uncommitted:
+        return result("own-work", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name} and has work of its own ({ahead} commit(s) "
+            f"ahead, {len(uncommitted)} uncommitted path(s)); delivering the checkout as it is"])
+    folder = Path(tempfile.mkdtemp(prefix="devtools-upstream-"))
+    cleanup = lambda: shutil.rmtree(folder, ignore_errors=True)
+    try:  # the folder is this function's until it is returned with its cleanup
+        try:
+            read_commit(path, upstream, folder)
+        except (OSError, ValueError, SyncError, subprocess.CalledProcessError) as error:
+            cleanup()
+            return result("upstream-unreadable", head, lines + [
+                f"warning: could not read {name} at {upstream[:7]} ({error}); delivering the checkout as it is"])
+        lines.append(f"note: dev-tools here is {behind} commit(s) behind {name}: delivering {name} at {upstream[:7]}; "
+                     f"the checkout is not changed (git pull in {path} updates it)")
+        tool = folder / "devtools/sync.py"
+        if tool.is_file() and tool.read_bytes() != Path(__file__).read_bytes():
+            lines.append(f"note: the sync.py that runs differs from the one at {name}; git pull in {path} updates it")
+        return result("upstream", upstream, lines, folder, cleanup)
+    except BaseException:
+        cleanup()
+        raise
+
+
+def read_commit(checkout: Path, commit: str, folder: Path) -> None:
+    """Write every file of ``commit`` under ``folder`` with the mode git records for it (0755 or 0644).
+
+    Read from the tree itself, not with ``git archive``, which leaves out ``export-ignore`` paths and
+    applies the local ``tar.umask``. A symbolic link refuses the read (ValueError); a submodule is left out.
+    """
+    listing = subprocess.run(["git", "-C", str(checkout), "ls-tree", "-r", "-z", "--full-tree", commit],
+                             capture_output=True, check=True).stdout
+    entries = []
+    for record in listing.split(b"\0"):
+        if not record:
+            continue
+        meta, name = record.split(b"\t", 1)
+        mode, kind, sha = meta.decode().split()
+        if kind == "blob":
+            entries.append((mode, sha, os.fsdecode(name)))
+    batch = subprocess.run(["git", "-C", str(checkout), "cat-file", "--batch"],
+                           input="".join(f"{sha}\n" for _, sha, _ in entries).encode(),
+                           capture_output=True, check=True).stdout
+    offset = 0
+    for mode, sha, name in entries:
+        header_end = batch.index(b"\n", offset)
+        size = int(batch[offset:header_end].split()[2])
+        data = batch[header_end + 1:header_end + 1 + size]
+        offset = header_end + 1 + size + 1
+        target = folder / inside(folder, name).relative_to(folder)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if mode == "120000":  # its target may lie outside the commit, where this folder cannot follow
+            raise ValueError(f"{name} is a symbolic link")
+        target.write_bytes(data)
+        os.chmod(target, 0o755 if mode == "100755" else 0o644)
+
+
+def open_source(args, path: Path) -> Path:
+    """Resolve the source a command reads, print what was decided, and remember how to clean up.
+    A source that is not a folder is a configuration error. The project's config, where it can be
+    read, adds its sources to the paths whose own work keeps the checkout as it is."""
+    if not path.is_dir():
+        raise SyncError(f"the dev-tools source {path} is not a folder")
+    try:
+        sources = tuple(entry["source"] for entry in read_config(args.project.resolve()).get("sync", [])
+                        if entry.get("source"))
+    except SyncError:
+        sources = ()
+    resolved = resolve_source(path, as_is=getattr(args, "as_is", False), sources=sources)
+    for line in resolved["lines"]:
+        print(line, file=sys.stderr)
+    args.cleanups.append(resolved["cleanup"])
+    args.resolved = resolved
+    return resolved["root"]
+
+
+def identity(args, source_root: Path, config: dict) -> dict:
+    """The receipt's source: the upstream commit read, or what the checkout says of itself."""
+    resolved = getattr(args, "resolved", None)
+    if resolved and resolved["state"] == "upstream":
+        return {"commit": resolved["commit"], "dirty": False}
+    return source_identity(source_root, config)
+
+
 def cmd_apply(args) -> int:
     project = args.project.resolve()
     config = read_config(project)
-    wanted = desired_files(args.source.resolve(), config, project)
-    warn_if_dirty(args.source.resolve(), config)
+    source_root = open_source(args, args.source.resolve())
+    wanted = desired_files(source_root, config, project)
+    receipt_before = read_json(project / RECEIPT)
+    report = unit_report(source_root, config, wanted, receipt_before)
+    warn_if_dirty(source_root, config)
     actions, _ = plan(project, wanted)
     allowed = {"force"} if args.force else set()
     allowed |= {"adopt"} if args.adopt else set()
@@ -300,6 +505,7 @@ def cmd_apply(args) -> int:
             if action["do"] != "keep":
                 print(f"{action['do']}: {action['dest']}")
         print("dry run:", json.dumps(counts, sort_keys=True))
+        print_report(report)
         warn_if_ignored(project, config, wanted)
         return 0
     # The journal names what this run intends, so an interrupted run can be finished by running apply again.
@@ -312,13 +518,15 @@ def cmd_apply(args) -> int:
         elif action["do"] == "delete":
             path.unlink()
     receipt = {
-        "source": source_identity(args.source.resolve(), config),
+        "source": identity(args, source_root, config),
         "files": {dest: {"sha256": digest(item["data"]), "mode": oct(item["mode"]), "origin": item["origin"]}
                   for dest, item in sorted(wanted.items())},
+        "shipped": sorted(unit["source"] for unit in shipped_units(source_root)),
     }
     write_atomic(project / RECEIPT, (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8"), 0o644)
     (project / JOURNAL).unlink()
     print("applied:", json.dumps(counts, sort_keys=True))
+    print_report(report)
     warn_if_ignored(project, config, wanted)
     if set(counts) - {"keep"}:
         for command in config.get("after_apply", []):
@@ -356,7 +564,26 @@ def cmd_check(args) -> int:
     for problem in problems:
         print(problem)
     print(f"{len(receipt['files'])} managed file(s), {len(problems)} problem(s)")
-    return 1 if problems else 0
+    if args.receipt_only and (args.source or args.strict):
+        raise SyncError("--receipt-only reads no dev-tools source: it takes neither --source nor --strict")
+    source_root = None if args.receipt_only else (args.source or default_source())
+    noted = source_root is None  # with no source, nothing was compared
+    if source_root is not None:
+        try:
+            source_root = open_source(args, source_root.resolve())
+            config = read_config(project)
+            wanted = desired_files(source_root, config, project)
+            report = unit_report(source_root, config, wanted, receipt)
+            behind = pending(project, wanted, receipt, identity(args, source_root, config))
+        except SyncError as error:
+            print(f"warning: not compared with dev-tools: {error}", file=sys.stderr)
+            noted = True
+        else:
+            print_report(report, behind)
+            noted = bool(behind or report["named"] or report["new"] or report["unlisted"])
+    if problems:
+        return 1
+    return 5 if args.strict and noted else 0
 
 
 # --------------------------------------------------------------------------- survey and compare
@@ -401,6 +628,170 @@ def shipped_units(source_root: Path) -> list[dict]:
         if not SKIP_DIRS & set(path.parts) and not any(d in path.parents for d in folders):
             units.append({"source": path.relative_to(source_root).as_posix(), "kind": "file"})
     return [unit for unit in units if unit["source"] not in NOT_FOR_PROJECTS]
+
+
+# --------------------------------------------------------------------------- units the config does not take
+
+def _parts(path: str) -> tuple[str, ...]:
+    return PurePosixPath(path.rstrip("/")).parts
+
+
+def covers(path: str, unit: str) -> bool:
+    """``path`` is the unit's source or a folder above it, compared by whole path segments."""
+    outer, inner = _parts(path), _parts(unit)
+    return inner[:len(outer)] == outer
+
+
+def takes(path: str, unit: str) -> bool:
+    """A config path and a unit's source meet: equal, or either lies under the other."""
+    return covers(path, unit) or covers(unit, path)
+
+
+def declined_paths(config: dict, units: list[dict]) -> tuple[list[str], list[str]]:
+    """(the paths ``declined`` lists, those among them that cover no shipped unit). A value that is
+    not a list of relative paths, or that covers a unit the config takes, is a configuration error."""
+    declined = config.get("declined", [])
+    if not isinstance(declined, list) or not all(isinstance(path, str) and path.strip("/") for path in declined):
+        raise SyncError(f"declined in {CONFIG} must be a list of paths in dev-tools, such as "
+                        f'["skills/milestone/review-pr"]')
+    for path in declined:
+        if PurePosixPath(path).is_absolute() or ".." in _parts(path):
+            raise SyncError(f"declined in {CONFIG}: {path!r} must be a relative path in dev-tools")
+    taken = [entry["source"] for entry in config.get("sync", []) if "source" in entry]
+    for path in declined:
+        clash = sorted(unit["source"] for unit in units if covers(path, unit["source"])
+                       and any(takes(source, unit["source"]) for source in taken))
+        if clash:
+            raise SyncError(f"declined in {CONFIG}: {path} covers {', '.join(clash)}, which a [[sync]] entry takes")
+    stale = [path for path in declined if not any(covers(path, unit["source"]) for unit in units)]
+    return [path.rstrip("/") for path in declined], stale
+
+
+def unit_names(source_root: Path, unit: dict) -> set[str]:
+    """What a file can call the unit: a skill's folder name; for `agents`, each file's name without
+    its extension; for a script, its file name."""
+    path = source_root / unit["source"]
+    if unit["kind"] == "agents":
+        return {shipped.stem for shipped in shipped_files(path)}
+    return {path.name}
+
+
+def workflow_folder(unit: str) -> str | None:
+    """``skills/<folder>`` for a unit deeper than one level under ``skills/``; else None."""
+    parts = _parts(unit)
+    return "/".join(parts[:2]) if len(parts) > 2 and parts[0] == "skills" else None
+
+
+def names_in(text: str, name: str) -> bool:
+    """The text names ``name`` alone between backticks, or as the folder a relative path climbs into."""
+    return f"`{name}`" in text or f"../{name}/" in text
+
+
+def unit_report(source_root: Path, config: dict, wanted: dict[str, dict], receipt: dict) -> dict:
+    """What to say about the units the config does not take. Reads only.
+
+    Each unit takes the first of these that holds: taken, declined, under a workflow folder the
+    config takes nothing from (nothing is said of these three); named by a delivered file
+    (``named``); absent from the receipt's ``shipped`` (``new``); any unit, when the receipt has
+    no ``shipped`` (``unlisted``). A unit with none of these is not reported.
+    """
+    units = shipped_units(source_root)
+    declined, stale = declined_paths(config, units)
+    taken = [entry["source"] for entry in config.get("sync", []) if "source" in entry]
+    is_taken = lambda unit: any(takes(source, unit["source"]) for source in taken)
+    held = set().union(*[unit_names(source_root, unit) for unit in units if is_taken(unit)])
+    texts = {}
+    for dest, item in sorted(wanted.items()):
+        try:
+            texts[dest] = item["data"].decode("utf-8")
+        except UnicodeDecodeError:
+            pass
+    report = {"named": [], "new": [], "unlisted": [], "stale_declined": stale}
+    for unit in units:
+        source = unit["source"]
+        folder = workflow_folder(source)
+        if is_taken(unit) or any(covers(path, source) for path in declined):
+            continue
+        if folder is not None and not any(covers(folder, taken_source) for taken_source in taken):
+            continue
+        names = unit_names(source_root, unit) - held
+        by = [dest for dest, text in texts.items() if any(names_in(text, name) for name in names)]
+        if by:
+            report["named"].append({"unit": source, "by": by})
+        elif "files" in receipt and "shipped" in receipt:
+            if source not in receipt["shipped"]:
+                report["new"].append(source)
+        elif "files" in receipt:
+            report["unlisted"].append(source)
+    return report
+
+
+def pending(project: Path, wanted: dict[str, dict], receipt: dict, source: dict) -> dict | None:
+    """The files an apply would create, update and delete because the source differs from what the
+    receipt records: a file edited in the project is drift, not this, and a file already as shipped
+    is kept. None when there are none; else the counts and both commits."""
+    delivered = receipt.get("files", {})
+
+    def moved(dest: str) -> bool:
+        if dest not in wanted or dest not in delivered:
+            return True
+        item = wanted[dest]
+        return delivered[dest].get("sha256") != digest(item["data"]) or delivered[dest].get("mode") != oct(item["mode"])
+    actions, _ = plan(project, wanted)
+    counts = {do: sum(1 for action in actions if action["do"] == do and moved(action["dest"]))
+              for do in ("create", "update", "delete")}
+    if not any(counts.values()):
+        return None
+    return {"from": receipt.get("source", {}).get("commit"), "to": source.get("commit"), **counts}
+
+
+def short(commit: str | None) -> str:
+    return commit[:7] if commit else "an unknown commit"
+
+
+def report_lines(report: dict | None, behind: dict | None) -> list[str]:
+    """The lines to print about the units and about being current, in order; empty when there is
+    nothing to say."""
+    lines = []
+    if behind:
+        did = [f"{verb} {behind[verb]}" for verb in ("create", "update", "delete") if behind[verb]]
+        counts = did[0] if len(did) == 1 else ", ".join(did[:-1]) + " and " + did[-1]
+        if behind["from"] and behind["from"] == behind["to"]:
+            where = f"the same dev-tools commit, {short(behind['to'])}: the config or the source's files changed"
+        else:
+            where = f"synced from dev-tools at {short(behind['from'])}; this source is at {short(behind['to'])}"
+        lines.append(f"not current: an apply would {counts} file(s) ({where})")
+    if not report:
+        return lines
+    if report["named"]:
+        lines.append("not taken, and named by a file this project has:")
+        for row in report["named"]:
+            more = f" and {len(row['by']) - 1} more file(s)" if len(row["by"]) > 1 else ""
+            lines += [f"  {row['unit']}", f"      named by {row['by'][0]}{more}"]
+    if report["new"]:
+        lines.append("new in dev-tools since this project's last sync:")
+        lines += [f"  {unit}" for unit in report["new"]]
+    if report["unlisted"]:
+        lines.append("not taken (this receipt was written before the sync recorded what dev-tools ships; "
+                     "listed this once):")
+        lines += [f"  {unit}" for unit in report["unlisted"]]
+    if report["named"] or report["new"] or report["unlisted"]:
+        lines.append(f"to take a unit, add a [[sync]] entry to {CONFIG}; to stop hearing of one, "
+                     f"add its path to `declined` there")
+    return lines
+
+
+def print_report(report: dict | None, behind: dict | None = None) -> None:
+    for path in (report or {}).get("stale_declined", []):
+        print(f"warning: declined names nothing dev-tools ships: {path}", file=sys.stderr)
+    for line in report_lines(report, behind):
+        print(line)
+
+
+def default_source(root: Path = SOURCE_ROOT) -> Path | None:
+    """The folder that holds this file, when it is a dev-tools source (every example config is
+    there); None for a sync.py copied somewhere else."""
+    return root if all((root / example).is_file() for example in EXAMPLES) else None
 
 
 def walk(top: Path):
@@ -652,7 +1043,8 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
             lines += [inner] + [f"  {place}{state(place)}" for place in places]
     missing = [unit["source"] for unit in result["units"] if not result["found"][unit["source"]]]
     if missing:
-        lines += ["", "## Shipped, with no counterpart here"] + missing
+        marks = unit_marks(source_root, project)
+        lines += ["", "## Shipped, with no counterpart here"] + [source + marks.get(source, "") for source in missing]
     if result["clashes"]:
         lines += ["", "## Same name, different skill: a sync to this path would replace the project's own skill"]
         lines += [f"{clash['path']}  (dev-tools ships {clash['unit']})" for clash in result["clashes"]]
@@ -682,6 +1074,23 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
                   "git grep -l " + " ".join(f"-e '{name}'" for name in names) + " -- . "
                   + " ".join(f"':!{folder}'" for folder in dict.fromkeys(folders))]
     return lines
+
+
+def unit_marks(source_root: Path, project: Path) -> dict[str, str]:
+    """Unit -> the mark survey adds to it: declined in the config, or named by a file the config
+    delivers. Empty without a config, or with one the sync refuses."""
+    try:
+        config = read_config(project)
+        wanted = desired_files(source_root, config, project)
+        declined, _ = declined_paths(config, shipped_units(source_root))
+        report = unit_report(source_root, config, wanted, read_json(project / RECEIPT))
+    except SyncError:
+        return {}
+    marks = {row["unit"]: f"  [named by {row['by'][0]}]" for row in report["named"]}
+    for unit in shipped_units(source_root):
+        if any(covers(path, unit["source"]) for path in declined):
+            marks[unit["source"]] = f"  [declined in {CONFIG}]"
+    return marks
 
 
 def by_folder(paths: list[str]) -> list[str]:
@@ -833,15 +1242,16 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
         lines.append("# A project planned with GSD reads skills/move-from-gsd/SKILL.md first.")
         return lines
     if missing:
-        lines.append("# Shipped, with no counterpart found here (add an entry to take one):")
+        lines.append("# Shipped, with no counterpart found here (add an entry to take one, or list it under declined):")
         lines += [f"#   {source}" for source in missing]
     return lines
 
 
 def cmd_survey(args) -> int:
-    project, source_root = args.project.resolve(), args.source.resolve()
+    project = args.project.resolve()
     if not project.is_dir():
         raise SyncError(f"{project} is not a directory")
+    source_root = open_source(args, args.source.resolve())
     result = survey(source_root, project)
     print("\n".join(starter_config(source_root, project, result) if args.toml
                     else survey_text(source_root, project, result)))
@@ -958,6 +1368,8 @@ def row_note(row: dict) -> str:
 
 def cmd_compare(args) -> int:
     project, source_root = args.project.resolve(), args.source.resolve()
+    if (project / CONFIG).is_file():
+        source_root = open_source(args, source_root)
     if not (project / CONFIG).is_file():
         raise SyncError(f"{project / CONFIG} not found: compare reads the entries it lists. Write it first: "
                         f"`sync.py survey --project {args.project} --toml` prints a starter for a project with its own "
@@ -1067,14 +1479,26 @@ def main(argv=None) -> int:
     apply.add_argument("--adopt", action="store_true", help="overwrite existing files that are not managed yet")
     apply.add_argument("--force", action="store_true", help="overwrite managed files changed in the project")
     apply.add_argument("--dry-run", action="store_true")
+    apply.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     apply.set_defaults(run=cmd_apply)
-    check = sub.add_parser("check", help="compare the project's managed files with its receipt")
+    check = sub.add_parser("check", help="compare the project's managed files with its receipt, then with dev-tools")
     check.add_argument("--project", type=Path, required=True)
+    check.add_argument("--source", type=Path, default=None,
+                       help="dev-tools checkout to compare with (default: this one, when sync.py is in one)")
+    check.add_argument("--receipt-only", action="store_true",
+                       help="compare with the receipt only; read no dev-tools source")
+    check.add_argument("--strict", action="store_true",
+                       help="exit 5 when the project is not current, a unit is reported, or nothing was compared")
+    check.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     check.set_defaults(run=cmd_check)
     survey_ = sub.add_parser("survey", help="find the project's own copies of what dev-tools ships")
     survey_.add_argument("--project", type=Path, required=True)
     survey_.add_argument("--source", type=Path, default=SOURCE_ROOT, help="dev-tools checkout (default: this one)")
     survey_.add_argument("--toml", action="store_true", help=f"print a starter {CONFIG} instead of the report")
+    survey_.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     survey_.set_defaults(run=cmd_survey)
     compare = sub.add_parser("compare", help="show what an apply would replace, and what the project would lose")
     compare.add_argument("--project", type=Path, required=True)
@@ -1085,13 +1509,19 @@ def main(argv=None) -> int:
                          help="with paths: print the lines only the shipped file has (what arrives)")
     compare.add_argument("--record", action="store_true",
                          help="print one table row per file with lines of its own, for the migration record")
+    compare.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     compare.set_defaults(run=cmd_compare)
     args = parser.parse_args(argv)
+    args.cleanups = []
     try:
         return args.run(args)
     except SyncError as error:
         print(f"error: {error}", file=sys.stderr)
         return error.code
+    finally:
+        for cleanup in args.cleanups:
+            cleanup()
 
 
 if __name__ == "__main__":

@@ -1,0 +1,38 @@
+{
+  "base": null,
+  "claims": [
+    "A local change to any path the project's config takes, inside or outside skills, agents, devtools and examples, keeps a behind checkout delivered as it is, with a warning.",
+    "A dev-tools source that is not a folder is a configuration error: check reports it as not compared (exit 0, or 5 with --strict) and apply exits 2.",
+    "No other output or exit of apply, check, survey or compare changed with these fixes."
+  ],
+  "created": "2026-11-23T21:36:31.108135+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-47-r2/diff.patch",
+      "sha256": "ebda09c180be204f9bfa93dde27b966b1cadd464aa6d2552eabe32eb35470fe2"
+    },
+    {
+      "path": ".planning/reviews/pr-47-r1/FINDINGS.md",
+      "sha256": "bef9fea26011073b01ffe47e058a1bdd9985cad33505bc172360aea92d8898ab"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/005-pr-47-r1.md",
+      "sha256": "8186ddb43f81b9560e655d874588325755b68a83d60760dabe56a2f9b1523dac"
+    }
+  ],
+  "head": "fc7bd2883ddc3fa743ad5ed360db5fa9c805c4e0",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "a8d6f42ffb2929d38afd8512e0f07d3f27f2f966",
+    "head": "fc7bd2883ddc3fa743ad5ed360db5fa9c805c4e0",
+    "number": 47,
+    "title": "sync.py names what a project has not taken, says when it is behind, and reads the latest dev-tools",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/47"
+  },
+  "question": "Do the fixes of the pull request's review round 1 do what its ledger says, and what do they break that worked before them?",
+  "subject": "pr",
+  "version": 1
+}

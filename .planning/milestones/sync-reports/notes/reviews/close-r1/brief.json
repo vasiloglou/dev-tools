@@ -1,0 +1,75 @@
+{
+  "base": null,
+  "claims": [
+    "C1: the observed case is a test with its own fixture, and the records show apply --dry-run exit 0 naming review-pr, check exit 0 with the count, check --strict exit 5.",
+    "C2: no test of tests/test_sync.py as on main at 811b4a3 was edited, and each exits as there.",
+    "C3: check --receipt-only prints the lines check printed on main, reads no source and starts no git process.",
+    "C4: a checkout behind its upstream delivers the upstream's files and stays unchanged; own work is delivered as it is with a warning; a failed fetch is a warning with exit 0.",
+    "C6: the README, docs/adopt.html, the examples and the adopt skill describe what the code does, and each changed capture is real output.",
+    "The records' boundaries name every limit a reader needs: what was not reviewed, not run, or not covered."
+  ],
+  "created": "2026-11-23T20:44:59.743583+00:00",
+  "deleted": [],
+  "dirty": true,
+  "files": [
+    {
+      "path": ".planning/milestones/sync-reports/notes/sync-reports-plan.md",
+      "sha256": "8dc8f11e9aa1df8e9aa909cff1fbab17f57afb09eea67e4e4c4d41fcedd532fb"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/001-plan.md",
+      "sha256": "e6fc8c03f5e86b35af37fb6fe587afb90bcb2e44ec727399e8a5592eafdb5375"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/002-phase-1.md",
+      "sha256": "481261f9099b2fb27bc838f3bbaabf654e57059421fe3ed04edb34b5438cc42f"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/003-phase-2.md",
+      "sha256": "b8cd5012a85b25d8c155a70fa8aefabc58702e21b88e54e2b65da30533a08f1a"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-1-spec.md",
+      "sha256": "778a2dcb124adee54e08847fdeed55bbea1bc7ae121de80ab656843f97dad41f"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-2-spec.md",
+      "sha256": "5672de6274c77e8a0b2194f0b74e22c96a880a92ac27d1e7257c249ecda4a77a"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "56759e3a89f25fea1f72bf41eef46577baee0636e7ca82c05599a5acebd872d0"
+    },
+    {
+      "path": "tests/test_sync.py",
+      "sha256": "668c3b0d1ad71400c011cf6a67d15623633cdcfe46ba66e741e6222f57d285a8"
+    },
+    {
+      "path": "README.md",
+      "sha256": "db3ed84d9df6e4f55082d868dfcab297228c21c2ad22d4cd0aad7cd32acb5208"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "077343d19932a2bce664d4d06cda22e493343ea956801090656d31415629485f"
+    },
+    {
+      "path": "skills/adopt-devtools/SKILL.md",
+      "sha256": "8c735a4db21040d31ab223d78ad47592b8ce3aa0321835cc460e995b50edba09"
+    },
+    {
+      "path": "examples/milestone-project.devtools.toml",
+      "sha256": "7221089d737f9e94711e1da7eed26a1140d4e5e50d41b139e376f5351945a2e3"
+    },
+    {
+      "path": "examples/phase-project.devtools.toml",
+      "sha256": "71caa4a90c9d365c5a9e77dde8267fa6a74a962ca9c085bc82074b58647b8769"
+    }
+  ],
+  "head": "ff97d1050a345dee1db304e37235b0d6aefc6039",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does the milestone's evidence establish each completion predicate C1 to C7 of the plan, and what does a project that syncs from this branch see that the records do not say?",
+  "subject": "close",
+  "version": 1
+}

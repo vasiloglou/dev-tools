@@ -26,6 +26,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - allowlist: phase.codex_gate
 - apply sync: sync.copies
 - archive gsd files: migrate.from_gsd
+- as-is: sync.copies
 - build plugins: plugins.build
 - bump and rebuild plugins: subsystem.release
 - bump version: plugins.release
@@ -40,6 +41,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - check plans: phase.state
 - check plans of a phase: components.rules
 - check plugins stale: plugins.build
+- check strict: sync.copies
 - claims to test: review.rounds
 - claude fallback: phase.coder_pool
 - claude reviewer: review.rounds
@@ -68,6 +70,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - count extra dirs: components.index
 - coverage: components.index
 - credential files left out: review.rounds
+- declined units: sync.copies
 - deferred ledger: phase.state
 - delete files no longer shipped: sync.copies
 - deselect tests: phase.test_selection
@@ -89,6 +92,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - exclude files: sync.copies
 - external libraries: components.index
 - facts for rules: components.index
+- fetch latest dev-tools: sync.copies
 - file mode drift: sync.copies
 - file modes: plugins.build
 - fill tokens: sync.copies
@@ -100,6 +104,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - gemini coder: phase.coder_pool
 - generate index: components.index
 - generate plugins folder: plugins.build
+- git archive: sync.copies
 - git ignores delivered files: sync.copies
 - git numstat: phase.codex_gate
 - github release: plugins.release
@@ -148,12 +153,15 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - migration check: phase.state
 - minor version: plugins.release
 - move from gsd: migrate.from_gsd
+- named by a delivered file: sync.copies
 - near misses: components.rules
 - new caller of deprecated component: components.index
+- new units since last sync: sync.copies
 - new violation since base: components.rules
 - next phase: phase.state
 - normative document ownership: phase.state
 - normative_for frontmatter: phase.state
+- not current: sync.copies
 - outside allowlist: phase.codex_gate
 - parallel tracks: phase.coder_pool
 - parked phases: migrate.from_gsd
@@ -178,6 +186,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - post review to pull request: review.rounds
 - pr review: review.rounds
 - private module rule: components.rules
+- project behind dev-tools: sync.copies
 - pull ignored files: handoff.notes
 - push release tag: plugins.release
 - pytest phase option: phase.test_selection
@@ -185,6 +194,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - raise version: plugins.release
 - rebuild plugins: plugins.build
 - receipt: sync.copies
+- receipt only: sync.copies
 - regenerate plugins: plugins.build
 - release flow: subsystem.release
 - release notes: plugins.release
@@ -244,7 +254,9 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - unassigned baseline: components.index
 - unassigned modules: components.index
 - unfinished phase: migrate.from_gsd
+- units not taken: sync.copies
 - untracked files: phase.codex_gate
+- upstream commit: sync.copies
 - validate catalog: components.index
 - what would be lost: handoff.notes
 - which areas may import which: components.rules
@@ -279,15 +291,15 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## Taking the skills into a project
 
 ### sync.copies
-- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift, survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
-- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has
+- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; it fetches the dev-tools checkout's upstream and reads the upstream's files when the checkout is only behind (resolve_source; --as-is reads it as it is); both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
+- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only, fetch latest dev-tools, upstream commit, as-is, git archive
 - status: canonical
 - modules: devtools/sync.py
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_sync.py
 - duplicates: devtools/from_gsd.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed, 5 check --strict with something to report (milestone sync-reports). unit_report returns the rows and report_lines prints them; the receipt's shipped list is what makes a unit new. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
 
 ### migrate.from_gsd
 - does: Move a project's planning folder from GSD to the dev-tools phase workflow: survey says what a move would do and what to settle; convert archives GSD's files, rewrites STATE, ROADMAP and REQUIREMENTS, adds the missing planning files without overwriting any, and records the move in CONVERSION.md (from_gsd.py)

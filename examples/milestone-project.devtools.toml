@@ -11,6 +11,15 @@
 # `.claude/skills/*`, add `!.claude/skills/<name>/` for each folder below; a rule that
 # excludes `.claude/skills/` itself must become `.claude/skills/*` first, since git does not
 # look inside an excluded folder. `git check-ignore -v <file>` names the rule.
+#
+# `declined` lists what dev-tools ships and this project leaves out on purpose. `apply` and
+# `check` name a shipped unit the project does not take when a synced file names it, and a
+# unit added to dev-tools since the last sync; a path here ends both for that unit, and a
+# folder covers every unit under it. A workflow folder the project takes nothing from (here,
+# skills/phase) is never named, so it needs no line. This example leaves out the component
+# index, which three of these skills mention; phase-project.devtools.toml has the entries
+# that take it.
+declined = ["skills/components"]
 
 [[sync]]
 source = "skills/milestone/start-milestone"

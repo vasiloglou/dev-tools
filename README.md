@@ -80,7 +80,24 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
 - `apply` copies the files and records each one in `.devtools-receipt.json`. It writes
   nothing unless every file can be written: a file the project edited by hand needs
   `--force`, and an existing file it does not manage yet needs `--adopt`.
-- `check` compares the managed files with the receipt. It needs only the project.
+- `check` compares the managed files with the receipt, then, run from a dev-tools
+  checkout (or given `--source`), with dev-tools: it says whether an apply would change
+  files, and from which commit the project was synced. `check --receipt-only` does the
+  first part alone and needs only the project, for a CI job with no dev-tools checkout.
+- Both name a shipped unit the config does not take when a synced file names it (a skill
+  that cites `review-pr`, say, when `review-pr` is not synced), and a unit that is new
+  in dev-tools since the last sync, until the next `apply`. A workflow the project takes nothing from is not
+  named. To stop hearing of a unit, list it in `.devtools.toml`:
+  `declined = ["skills/milestone/review-pr"]`; a folder covers every unit under it.
+- The sync reads the latest dev-tools. Before it reads the checkout, `apply` (and
+  `check`, `survey`, `compare`) runs `git fetch` for the checkout's upstream; a checkout
+  that is only behind it delivers the upstream's files and says so, and the checkout
+  itself is not changed. A checkout with commits or uncommitted changes of its own is
+  delivered as it is, with a warning, and so is a tag or a detached `HEAD`, which is how a
+  project pins a version. `--as-is` skips the fetch and reads the checkout as it is.
+- Exits: `check` exits 1 when a synced file differs from the receipt. `check --strict`
+  also exits 5 when the project is not current, a unit is named or new, or the comparison
+  with dev-tools could not be made, for a CI job that should fail on any of them.
 
 Rules that belong to one project go in a file that project owns,
 `references/project.md` beside the synced skill. The sync never touches it.

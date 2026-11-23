@@ -1,0 +1,72 @@
+{
+  "base": "c85728d",
+  "claims": [
+    "P1.1: on the observed case, apply --dry-run exits 0 and names skills/milestone/review-pr with the file that names it; check exits 0 and says how many files an apply would change; check --strict exits 5.",
+    "P1.2 and P1.3: a declined unit, and a unit under a workflow folder the config takes nothing from, appear in no report of apply or check.",
+    "P1.4 and P1.5: a unit added since the receipt is reported as new until the next apply, and a receipt without shipped gets a one-time list that the next apply ends.",
+    "P1.6 and S0.1: check --receipt-only prints what check printed on main and starts no process, and a caller that passes no new option gets every line and exit it got on main, with new lines only after the summary line.",
+    "P1.7: a declined value that is not a list of relative paths, or that covers a taken unit, exits 2 and writes nothing.",
+    "The named rule reports a unit only when a delivered file names it alone in backticks or as the folder after ../, and a name a taken unit has is never reported.",
+    "Every capture changed in docs/adopt.html is output a real run of the current code prints."
+  ],
+  "created": "2026-11-23T20:08:42.174021+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/diff.patch",
+      "sha256": "0250dceb8ab9c29b2be278c1e66214f939b73c0078939af0ee0a40616f215a7e"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "53528dfe833f8cf820e64df525ebc2236bb7dd086f51bc17cf4623eb4a2213a5"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "148c4e83c705be772732ff2c181e3060b7c3a8229e82f41322586560ca2051a5"
+    },
+    {
+      "path": "README.md",
+      "sha256": "e33eb8757f2af0504d9de842ed20a5dae7e86d46428753272224f034e5444b69"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "5c8894bd9e93c56f99278a3010c0eafdbc5e50e514234142d0e25dda07244c2e"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "bd655711702f2e01e205c8da00691c30232ecf24d0c0851504ff94fdb6f1472a"
+    },
+    {
+      "path": "examples/milestone-project.devtools.toml",
+      "sha256": "7221089d737f9e94711e1da7eed26a1140d4e5e50d41b139e376f5351945a2e3"
+    },
+    {
+      "path": "examples/phase-project.devtools.toml",
+      "sha256": "71caa4a90c9d365c5a9e77dde8267fa6a74a962ca9c085bc82074b58647b8769"
+    },
+    {
+      "path": "skills/adopt-devtools/SKILL.md",
+      "sha256": "a3ca78aff2ec9615aa0dac40e7b6ab3c8835e2edc29aa5b20e58f7dcd201a111"
+    },
+    {
+      "path": "tests/test_sync.py",
+      "sha256": "fdc5fade34f64575ab2b6b64def2784d640dfa3d497d91a2f9aee0ebb0155181"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-1-spec.md",
+      "sha256": "c27d0bc0aa51d879ebbc6d8fefd1d0d31c7249c1a28a90dc4734dcb34dc048a2"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/sync-reports-plan.md",
+      "sha256": "cb58b4996b218d241290fbb89a02941327b3ef2c399220b9025401248362b967"
+    }
+  ],
+  "head": "e49b05295569ebdc3934a8b47f44cc776f35860c",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Where does the phase 1 code, its tests or its pages not do what the phase 1 spec says, or do something a project that syncs would not expect?",
+  "subject": "phase",
+  "version": 1
+}

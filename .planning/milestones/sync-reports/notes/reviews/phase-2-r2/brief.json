@@ -1,0 +1,64 @@
+{
+  "base": "acc9ee3",
+  "claims": [
+    "read_commit writes every blob of the commit with mode 0644 or 0755 as the tree records it, ignoring export-ignore, tar.umask and any other local git setting.",
+    "No temporary folder outlives resolve_source unless it is returned with its cleanup.",
+    "A behind checkout with any tracked or untracked change under skills, agents, devtools or examples is delivered as it is, whatever git status is configured to show."
+  ],
+  "created": "2026-11-23T20:32:48.301344+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r2/diff.patch",
+      "sha256": "78e031cd49adfc454acb4701cb050759ab80ea25dc1182212d6fbd6bb7ff6569"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "a6d3c83ff71cf097683b65c19239b1b191206560cbe1d3662285c3216eb69901"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-2-spec.md",
+      "sha256": "1fc1da308928ec041c95d37c82d5c05ca22c64f184f31ddfded7c1a2698f7f2d"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/BRIEF.md",
+      "sha256": "d0fc386ddc1769ceb5e38fa0e228b41392283558cd0c96c7bfbbad937faf37af"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/FINDINGS.md",
+      "sha256": "7370d96610c1448571ccf3767860583ca2de7e52e6005c344fb023ccfffcbade"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/brief.json",
+      "sha256": "e95b45e1c5fb8a0d41ba5c858658da85f422a8d6bf4355838f064c1b53dee855"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/diff.patch",
+      "sha256": "34fcd3a61c3a14c1e241758de3a11b969da3b864941b5020b1679ff4961fea8d"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/review.md",
+      "sha256": "9cc2bd90e1d25b144b1c945ae88dd975130e4ed361dd6d754687ad6d22f8de7a"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/run.json",
+      "sha256": "62c9fd0e29eadf3d34357697c29884bd6ca319d1d2c2913397ea2416682e17c8"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "2d68dbc9b2c4a38c42b4a6b14f476f8dfaf322882827da2dfdf486398495e3d1"
+    },
+    {
+      "path": "tests/test_sync.py",
+      "sha256": "945eb81ad376773bd2deb627a89e0edf6bb9f572db0f9a04d10e4a7fc1e1ea54"
+    }
+  ],
+  "head": "f65f66a6e2a3e5a98099ad576c2b9bd41989c10e",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Do the repairs of phase 2 review round 1 do what its ledger says, and where do they break a case that worked before them?",
+  "subject": "phase",
+  "version": 1
+}
