@@ -69,6 +69,7 @@ A coder has no Skill tool and no session context: inline or point to everything.
    - never touch `pyproject.toml`, `uv.lock` or extras: codex runs offline, the supervisor makes those changes;
    - never edit `tests/acceptance/pNN_*/` or `NN-TESTLOCK.json`;
    - no `TODO`, `FIXME`, `NotImplementedError` or stubs (PG14);
+   - solve the class of input, not the examples in the tests: read structured text (JSON, YAML, TOML, source code, paths, command lines) with its parser or an existing reader; keep a regular expression for a flat token whose whole grammar it states (an identifier, a version number); add no branch on one literal name, file or message to turn a test green;
    - the project's hard rules (`references/project.md`);
    - do not commit.
 6. **Report back:** the exact output of `verify` and the `turns_green` run.
@@ -161,7 +162,11 @@ can resolve, use `phase-code-reviewer` once on the relevant diff. Reuse valid
 test results; reproduce only the uncertain behavior with a focused test.
 
 Only actual correctness/acceptance failures need fixes. Style, size and speculative
-hardening are logged briefly. A reviewer must not create another full-suite,
+hardening are logged briefly. Code that breaks §2.1's hard rule on the class of
+input is a correctness failure once the reviewer shows one legal input the
+tests lack and the wrong result; the fix is the parser, the reader or the
+general rule, with that input as its focused test, never a wider pattern.
+Without such an input it is style. A reviewer must not create another full-suite,
 replay, oracle-validation or evidence-review round.
 
 ### 2.6 Commit

@@ -197,7 +197,7 @@ Counts: 1 finding, 1 blocking, 0 hardening,
   <div class="feature flip">
     <div>
       <h3>The same review every time</h3>
-      <p>A helper script, <code>review_tool.py</code>, ships with the skills. It writes the brief: the question without the author's answer, each file to read with its fingerprint, and a rule against opening credential files. It then starts the reviewer in the other tool (Codex, read-only, when Claude Code does the work; Claude Code in plan mode when Codex does) in the background, and keeps its answer word for word.</p>
+      <p>A helper script, <code>review_tool.py</code>, ships with the skills. It writes the brief: the question without the author's answer, each file to read with its fingerprint, and a rule against opening credential files. For a phase's diff or a pull request the brief also tells the reviewer to look for code that fits its tests and not the general case (a regular expression over text a parser already reads, a branch on one literal name) and to show each case with an input the tests lack. It then starts the reviewer in the other tool (Codex, read-only, when Claude Code does the work; Claude Code in plan mode when Codex does) in the background, and keeps its answer word for word.</p>
       <p>Each finding goes in a ledger: reproduced or not, its class, what was done, and the commit that holds the repair. <strong>A repaired file counts as unreviewed until a later round reads its new bytes</strong>, and the helper's <code>status</code> says which files those are. For a pull request (ask for one with <code>review-pr</code>) it reviews the diff at the PR's head, and posts the result as a comment only when you approve.</p>
     </div>
     <div>
