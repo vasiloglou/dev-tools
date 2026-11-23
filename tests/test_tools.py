@@ -892,11 +892,13 @@ def layered(project, cli_imports_sizes=True):
     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
 
 
-def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None):
+def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None,
+             synth_exit=0, synth_stderr=""):
     """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it.
     `check --help` names the flags of a GND newer than 0.3.0 when `newer`; with `--baseline-model` it keeps the
     base edition and prints `comparison`. With `discovery`, `gnd discover` has the guarded-join family and
-    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest."""
+    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest, unless `synth_exit` is not 0:
+    then it writes `synth_stderr` to standard error and exits with that code, leaving no manifest."""
     folder = project.parent / "fake-gnd"
     folder.mkdir(exist_ok=True)
     script = folder / "gnd"
@@ -911,6 +913,9 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
         "    if sys.argv[1] == 'discover':\n"
         "        Path(sys.argv[sys.argv.index('--report') + 1]).write_text((here / 'discovery.json').read_text())\n"
         "    else:\n"
+        "        refusal = int((here / 'synth-exit.txt').read_text())\n"
+        "        if refusal:\n"
+        "            sys.stderr.write((here / 'synth-stderr.txt').read_text()); sys.exit(refusal)\n"
         "        out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir()\n"
         "        (out / 'guarded-cases.json').write_text((here / 'cases.json').read_text())\n"
         "    sys.exit(0)\n"
@@ -930,6 +935,8 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
     (folder / "comparison.json").write_text(json.dumps(comparison or {}))
     (folder / "discovery.json").write_text(json.dumps(discovery or {}))
     (folder / "cases.json").write_text(json.dumps(cases or {}))
+    (folder / "synth-exit.txt").write_text(str(synth_exit))
+    (folder / "synth-stderr.txt").write_text(synth_stderr)
     (folder / "base-model.json").unlink(missing_ok=True)
     (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
     (folder / "exit.txt").write_text(str(exit_code))
@@ -1335,6 +1342,65 @@ def offered(command, flag):
                                                      capture_output=True, text=True).stdout
 
 
+SYNTH_EXTRA = "needs the optional 'synth' extra"
+
+
+def without_synth_extra(out: str) -> bool:
+    """Whether `rules_check.py test` reported that GND built no cases for want of its synth extra."""
+    return any(line.startswith("note: gnd synth --guarded-cases built no cases (exit 5): ") and SYNTH_EXTRA in line
+               for line in out.splitlines())
+
+
+def skip_without_synth_extra(out: str) -> None:
+    """Skip the running test when GND lists --guarded-cases and cannot run it: the flag is in `gnd synth --help`
+    with or without the extra, so `offered` cannot tell. Any other failure of `gnd synth` skips nothing."""
+    if without_synth_extra(out):
+        pytest.skip("this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'")
+
+
+EXTRA_MISSING = "ERROR: the synthetic-value generator needs the optional 'synth' extra.\n"  # what GND 0.4.0 prints
+
+
+def rules_without_examples(project):
+    """The starter rules with their examples taken out: the stand-in for gnd judges nothing, so `test` is left
+    with what `gnd synth` says."""
+    layered(project)
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    for rule in rules["rules"]:
+        rule.pop("examples")
+    path.write_text(json.dumps(rules))
+
+
+def test_a_gnd_without_its_synth_extra_is_a_note_and_the_guard_skips(project):
+    # A GND installed without [synth] lists --guarded-cases and refuses only when the command runs.
+    rules_without_examples(project)
+    fake_gnd(project, cases={}, synth_exit=5, synth_stderr=EXTRA_MISSING)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("note: gnd synth --guarded-cases built no cases (exit 5): ERROR: the synthetic-value generator needs "
+            "the optional 'synth' extra.\n") in out
+    assert without_synth_extra(out)
+    with pytest.raises(pytest.skip.Exception, match="lacks its synth extra"):
+        skip_without_synth_extra(out)
+
+
+@pytest.mark.parametrize("synth_exit, synth_stderr, cases", [
+    (3, EXTRA_MISSING, {}),                                          # the extra's sentence, another exit
+    (5, "ERROR: no solver\n", {}),                                   # exit 5, another reason
+    (3, "ERROR: model validation failed: $.constraints[5]\n", {}),   # a model GND refuses
+    (0, "", {"schema_version": "gnd-guarded-cases/1", "rules": []}),  # the cases were built
+])
+def test_the_guard_skips_for_the_missing_extra_only(project, synth_exit, synth_stderr, cases):
+    rules_without_examples(project)
+    fake_gnd(project, cases=cases, synth_exit=synth_exit, synth_stderr=synth_stderr)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("built no cases (exit %d)" % synth_exit in out) == bool(synth_exit), out
+    assert not without_synth_extra(out)
+    assert skip_without_synth_extra(out) is None
+
+
 @pytest.mark.skipif(not offered("discover", "--joined-relation") or not offered("synth", "--guarded-cases"),
                     reason="needs a GND newer than 0.3.0 (gnd discover guarded-join, gnd synth --guarded-cases)")
 def test_suggestions_and_generated_cases_with_newer_gnd(project):
@@ -1364,6 +1430,7 @@ def test_suggestions_and_generated_cases_with_newer_gnd(project):
                            "consequent": {"atom": {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}}})
     path.write_text(json.dumps(rules))
     code, out = tool(project, "test", script=RULES)
+    skip_without_synth_extra(out)
     assert code == 1 and "wrong: cannot_fail can never fail" in out, out
     assert out.endswith("7 rule(s), 12 example(s); 1 wrong; 1 rule(s) without examples\n"), out
 

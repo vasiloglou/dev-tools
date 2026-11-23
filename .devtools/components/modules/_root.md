@@ -23,54 +23,54 @@ Move a project's planning folder from GSD to the dev-tools phase workflow.
 
 | Symbol | Kind | Line | Summary |
 | --- | --- | --- | --- |
-| `Stop` | class(Exception) | 71 | The project cannot be converted as it stands; the message says what to do. |
-| `norm(value) -> str` | function | 75 | (no docstring) |
-| `key(nn) -> tuple` | function | 80 | (no docstring) |
-| `shown(nn) -> str` | function | 85 | The id as a roadmap heading writes it: 7, 7.1. |
-| `read(path) -> str` | function | 91 | (no docstring) |
-| `frontmatter(text) -> dict` | function | 95 | (no docstring) |
-| `plain(text) -> str` | function | 107 | (no docstring) |
-| `slugify(text) -> str` | function | 112 | (no docstring) |
-| `cell(text) -> str` | function | 116 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
-| `sections(text, level) -> dict` | function | 121 | {heading: body} for the headings of one level, in order. |
-| `parked(text, section) -> str` | function | 136 | The word by which a line says its phase is put off, or ''. |
-| `phase_numbers(text) -> list` | function | 147 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
-| `dependencies(text) -> tuple` | function | 163 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
-| `same_phase(one, other) -> bool` | function | 179 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
-| `runs(found) -> list` | function | 188 | Split phases in file order into numbering runs: a run ends where a number comes back |
-| `one_run(groups) -> dict` | function | 201 | Every run read as one: the owner said the repeated numbers are the same phases. |
-| `read_roadmap(text) -> tuple` | function | 212 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
-| `read_folders(planning) -> tuple` | function | 261 | (no docstring) |
-| `left_by_gsd(folder) -> str` | function | 287 | What GSD had done on a phase it did not finish, in words. |
-| `read_requirements(planning) -> dict` | function | 298 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
-| `out_of_scope(text) -> list` | function | 330 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
-| `named_ids(text, defined) -> list` | function | 344 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
-| `row_cells(line) -> list` | function | 366 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
-| `read_decisions(section) -> list` | function | 386 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
-| `read_project(planning, fallback) -> dict` | function | 409 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
-| `git(project, *args) -> str` | function | 428 | (no docstring) |
-| `tool_folders(project) -> list` | function | 436 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
-| `gsd_entries(text) -> tuple` | function | 450 | (calls, permissions) in a settings file: the strings that name GSD outside its |
-| `hook_files(project) -> list` | function | 473 | Settings files that still name GSD: its hooks and status line are wired there, and the |
-| `other_plans(project) -> list` | function | 489 | Other planning tools whose files are in the project. The move does not read them. |
-| `gsd_pointer(state, text) -> str` | function | 499 | The phase GSD's STATE.md names as the current one, or ''. |
-| `installed(project) -> list` | function | 506 | GSD's own files inside the project, one entry per tool folder that has any. |
-| `default_branch(project) -> tuple` | function | 531 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
-| `plan_ignored(project, planning_dir)` | function | 547 | True when git would ignore a file the move writes; None outside a git work tree. |
-| `read_workstreams(root) -> dict` | function | 559 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
-| `code_summary(project, planning_dir)` | function | 577 | What the project is written in, from the files git tracks; None outside a git work tree. |
-| `map_ids(names) -> dict` | function | 598 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
-| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 621 | (no docstring) |
-| `roadmap_text(model) -> str` | function | 932 | (no docstring) |
-| `requirements_text(model) -> str` | function | 986 | (no docstring) |
-| `state_text(model, base, release, today) -> str` | function | 1027 | (no docstring) |
-| `decisions_text(model, owner, today) -> str` | function | 1064 | (no docstring) |
-| `manifesto_text(model, template) -> str` | function | 1086 | (no docstring) |
-| `readme_text(model, template) -> str` | function | 1098 | (no docstring) |
-| `record_text(model, written, kept, merged, today) -> str` | function | 1115 | (no docstring) |
-| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1165 | (no docstring) |
-| `survey_lines(model) -> list` | function | 1254 | (no docstring) |
-| `main(argv) -> int` | function | 1351 | (no docstring) |
+| `Stop` | class(Exception) | 73 | The project cannot be converted as it stands; the message says what to do. |
+| `norm(value) -> str` | function | 77 | (no docstring) |
+| `key(nn) -> tuple` | function | 82 | (no docstring) |
+| `shown(nn) -> str` | function | 87 | The id as a roadmap heading writes it: 7, 7.1. |
+| `read(path) -> str` | function | 93 | (no docstring) |
+| `frontmatter(text) -> dict` | function | 97 | (no docstring) |
+| `plain(text) -> str` | function | 109 | (no docstring) |
+| `slugify(text) -> str` | function | 114 | (no docstring) |
+| `cell(text) -> str` | function | 118 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
+| `sections(text, level) -> dict` | function | 123 | {heading: body} for the headings of one level, in order. |
+| `parked(text, section) -> str` | function | 138 | The word by which a line says its phase is put off, or ''. |
+| `phase_numbers(text) -> list` | function | 149 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
+| `dependencies(text) -> tuple` | function | 165 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
+| `same_phase(one, other) -> bool` | function | 181 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
+| `runs(found) -> list` | function | 190 | Split phases in file order into numbering runs: a run ends where a number comes back |
+| `one_run(groups) -> dict` | function | 203 | Every run read as one: the owner said the repeated numbers are the same phases. |
+| `read_roadmap(text) -> tuple` | function | 214 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
+| `read_folders(planning) -> tuple` | function | 263 | (no docstring) |
+| `left_by_gsd(folder) -> str` | function | 289 | What GSD had done on a phase it did not finish, in words. |
+| `read_requirements(planning) -> dict` | function | 300 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
+| `out_of_scope(text) -> list` | function | 332 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
+| `named_ids(text, defined) -> list` | function | 346 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
+| `row_cells(line) -> list` | function | 368 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
+| `read_decisions(section) -> list` | function | 388 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
+| `read_project(planning, fallback) -> dict` | function | 411 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
+| `git(project, *args) -> str` | function | 430 | (no docstring) |
+| `tool_folders(project) -> list` | function | 438 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
+| `gsd_entries(text) -> tuple` | function | 452 | (calls, permissions) in a settings file: the strings that name GSD outside its |
+| `hook_files(project) -> list` | function | 475 | Settings files that still name GSD: its hooks and status line are wired there, and the |
+| `other_plans(project) -> list` | function | 491 | Other planning tools whose files are in the project. The move does not read them. |
+| `gsd_pointer(state, text) -> str` | function | 496 | The phase GSD's STATE.md names as the current one, or ''. |
+| `installed(project) -> list` | function | 503 | GSD's own files inside the project, one entry per tool folder that has any. |
+| `default_branch(project) -> tuple` | function | 528 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
+| `plan_ignored(project, planning_dir)` | function | 544 | True when git would ignore a file the move writes; None outside a git work tree. |
+| `read_workstreams(root) -> dict` | function | 556 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
+| `code_summary(project, planning_dir)` | function | 574 | What the project is written in, from the files git tracks; None outside a git work tree. |
+| `map_ids(names) -> dict` | function | 595 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
+| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 618 | (no docstring) |
+| `roadmap_text(model) -> str` | function | 929 | (no docstring) |
+| `requirements_text(model) -> str` | function | 983 | (no docstring) |
+| `state_text(model, base, release, today) -> str` | function | 1024 | (no docstring) |
+| `decisions_text(model, owner, today) -> str` | function | 1061 | (no docstring) |
+| `manifesto_text(model, template) -> str` | function | 1083 | (no docstring) |
+| `readme_text(model, template) -> str` | function | 1095 | (no docstring) |
+| `record_text(model, written, kept, merged, today) -> str` | function | 1112 | (no docstring) |
+| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1162 | (no docstring) |
+| `survey_lines(model) -> list` | function | 1251 | (no docstring) |
+| `main(argv) -> int` | function | 1348 | (no docstring) |
 
 ## devtools.release_plugins — `devtools/release_plugins.py`
 Components: plugins.release

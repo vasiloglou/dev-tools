@@ -791,3 +791,21 @@ def test_a_plan_of_another_tool_is_named_and_not_sent_to_setup(tmp_path):
     assert "Spec Kit keeps a plan here (.specify/)" in out and "phase_tool.py setup" not in out
     write(tmp_path / "bare", ".planning/notes.txt", "x")
     assert "starts with 'phase_tool.py setup'" in run("survey", "--project", str(tmp_path / "bare"))[1]
+
+
+def test_one_list_of_other_planning_tools_serves_both_scripts(project, monkeypatch):
+    # from_gsd.py holds no list of its own: it reads the one in the sync.py it loads.
+    monkeypatch.setattr(gsd.sync, "OTHER_PLANS", [(".newtool", "New Tool")])
+    (project / ".newtool").mkdir()
+    (project / ".specify").mkdir()
+    assert gsd.other_plans(project) == [{"tool": "New Tool", "sign": ".newtool/"}]
+    assert gsd.sync.other_plans(project) == [(".newtool/", "New Tool")]
+
+
+def test_other_plans_keeps_its_rows_and_their_order(project):
+    for folder in (".taskmaster", "openspec", "specs/a", ".specify"):
+        (project / folder).mkdir(parents=True)
+    (project / "specs/a/spec.md").write_text("# Spec\n")
+    assert gsd.other_plans(project) == [{"tool": "Spec Kit", "sign": ".specify/"},
+                                        {"tool": "OpenSpec", "sign": "openspec/"},
+                                        {"tool": "Task Master", "sign": ".taskmaster/"}]

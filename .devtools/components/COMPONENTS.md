@@ -298,7 +298,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_sync.py
-- duplicates: devtools/from_gsd.py
+- distinct_from: migrate.from_gsd
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed, 5 check --strict with something to report (milestone sync-reports). unit_report returns the rows and report_lines prints them; the receipt's shipped list is what makes a unit new. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
 
 ### migrate.from_gsd
@@ -310,7 +310,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - tests: tests/test_from_gsd.py
 - distinct_from: plugins.release, plugins.build
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins. Loads sync.py by path for its list of other planning tools (OTHER_PLANS, other_plans); the index cannot see that load.
 
 ## The component index
 
@@ -400,7 +400,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - modules: skills/phase/pytest/phase_selection.py
 - uses: (none)
 - used_by: (none)
-- notes: No test in tests/ runs it (REVIEW.md).
+- tests: tests/test_tools.py, tests/test_phase_selection.py
+- notes: tests/test_tools.py runs it as the sync delivers it (test_plain_pytest_leaves_out_phases_that_are_not_complete); tests/test_phase_selection.py holds its other branches.
 
 ## Where one script runs another
 

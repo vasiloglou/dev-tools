@@ -385,4 +385,59 @@ names it for this phase, so it runs.
 
 ## Implementation findings, recorded as they were found
 
-(None yet.)
+All on 2026-11-23, at the phase's base `dd0e7a1` unless said.
+
+- **I1. T1 and T2 cannot use the starter rules as they are.** The stand-in for `gnd`
+  prints one prepared report and judges nothing, so with the starter rules' examples in
+  place `rules_check.py test` calls every failing example `wrong` and exits 1, whatever
+  `synth` does. The spec's T1 and T2 expected exit 0. The tests take the examples out of
+  the rules first (`rules_without_examples`), as the existing test of generated cases
+  does (`tests/test_tools.py`, the `rule.pop("examples")` loop). The spec's expectation
+  was wrong about the fixture, not about the guard; section 8's rows are otherwise as
+  written.
+- **I2. The by-hand command of D4 did not test what it claimed.** `uvx --from
+  get-nick-done==0.4.0 gnd` reuses the environment of the GND that `uv tool install`
+  put on this machine, extra included: 22 tests passed and none was skipped, and
+  `find_spec("faker")` was true there. With `uvx --isolated` the extra is absent
+  (`faker` not found). The gate was rerun as
+  `GND_COMMAND="uvx -q --isolated --from get-nick-done==0.4.0 gnd"`. The first run would
+  have been read as "the guard never fires" by anyone who had not checked the control.
+- **I3. Issue 31 is reproduced.** With that isolated GND, in a scratch worktree at
+  `dd0e7a1`: `test_suggestions_and_generated_cases_with_newer_gnd` exits 1,
+  `1 failed`, with the note `gnd synth --guarded-cases built no cases (exit 5): ERROR:
+  the synthetic-value generator needs the optional 'synth' extra. Install it with
+  \`pip install get-nick-done[synth]\`, or \`uv sync --extra synth\` in a checkout.`
+  On the changed tree the same command prints `SKIPPED [1] tests/test_tools.py:1358:
+  this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'` and
+  `1 skipped`. The plan's Q2 is answered: GND's sentence is as the issue quotes it, with
+  an install hint after it, and the guard matches it.
+- **I4. The plugin has no defect the new tests can show.** `tests/test_phase_selection.py`
+  (9 functions, 15 cases) passed on the unchanged plugin on its first complete run, so D3
+  does not apply and no plugin file changes. B8, B10 to B12 and B14 to B18, which the
+  spec listed as not tried, behave as the docstring says.
+- **I5. Seen to fail (S0.3).**
+  - T1, T2 and the edited T3, before the guard and the fake's refusal existed: 6 failed,
+    5 with `TypeError: fake_gnd() got an unexpected keyword argument 'synth_exit'` and 1
+    with `NameError: name 'skip_without_synth_extra' is not defined`.
+  - G1, before `from_gsd.py` changed: `AttributeError: module 'from_gsd' has no
+    attribute 'sync'`. G2 passed, as a pin does.
+  - The plugin's tests, against ten scratch copies of the plugin with one line changed
+    each (`PHASE_SELECTION_PLUGIN`), where the spec planned five. Failed cases of 15:
+
+    | Break | Failed | Among them |
+    |---|---|---|
+    | open phases kept in a plain run | 8 | S1, S3, S5, S6, S7, S8, S9 |
+    | `--phase` ignored | 6 | S2 (all three), S3 |
+    | named paths ignored | 4 | S4 (all four) |
+    | the "inside the acceptance folder" filter dropped | 11 | S5, S1, S2 |
+    | no phase ever complete | 6 | S1, S3, S9 |
+    | the `.1` of an inserted phase lost | 2 | S3, S9 |
+    | `phase_planning_dir` ignored | 1 | S7 |
+    | `--phase` not normalised | 4 | S2 with `2` |
+    | `phase_acceptance_dir` ignored | 1 | S7 |
+    | no plugin at all | 12 | S8 and most others |
+
+    No break left every case passing. The copies were not committed.
+- **I6. `review` after the index edits** prints 0 for "Components with no tests listed"
+  and for "The same public name in two or three components", as the spec's section 6.4
+  expected: `distinct_from` settles what `duplicates` did.
