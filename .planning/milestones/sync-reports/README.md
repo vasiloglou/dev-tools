@@ -14,10 +14,11 @@ upstream delivers the upstream's files.
 - **Phases:**
   1. The sync names what a project has not taken, and `check` can say it is behind.
   2. The sync reads the latest dev-tools.
-  3. Close.
+  3. Close: closed 2026-11-23 by delegated approval (auto=true).
 - **Execution:** `process-milestone sync-reports auto=true`, from 2026-11-23, by the
   owner's lane ruling. Pushing, the pull request, merging, tagging and releasing need the
   owner.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md): the unit
   report, `declined`, `check` against a source and `--strict`;
-  [003-phase-2.md](003-phase-2.md): the sync reads the latest dev-tools.
+  [003-phase-2.md](003-phase-2.md): the sync reads the latest dev-tools;
+  [004-close.md](004-close.md): the close, the question sweep and the residuals.

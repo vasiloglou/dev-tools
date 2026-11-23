@@ -5,7 +5,9 @@ it lacks a unit its own synced files name, that dev-tools has added a unit since
 sync, and that it is behind dev-tools. An `apply` run from a dev-tools checkout that is only
 behind its upstream delivers the upstream's files, not the old ones.
 
-**Status.** Approved, 2026-11-23, by delegated approval (auto=true): `001-plan.md`.
+**Status.** Closed, 2026-11-23, by delegated approval (auto=true): `004-close.md`, after
+the close review (`notes/reviews/close-r1`); repaired at the close where `003-phase-2.md`
+refuted it. Approved 2026-11-23 by delegated approval (auto=true): `001-plan.md`.
 Written with `start-milestone` (the installed dvt-milestone 0.1.3; the scripts run are
 the built copies under `plugins/`, at 0.1.5).
 - **One owner ruling so far (o).** 2026-11-23, in this session, to "Should `apply` fetch and
