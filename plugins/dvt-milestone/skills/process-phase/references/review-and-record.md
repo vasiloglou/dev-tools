@@ -22,6 +22,13 @@ the phase claims to have met, and an explicit instruction to try to **refute**
 them. A prompt that asks "review this" gets a summary; a prompt that asks "find
 where this claim is false" gets findings.
 
+One instruction is carried whatever the phase claims: to look for **code fitted
+to its examples**, the failure class of that name in
+[`standing-rules.md`](standing-rules.md), and to show each case with a legal
+input the tests and fixtures lack. The review helper writes it into every
+`phase` and `pr` brief; a project's own instrument carries the same
+instruction.
+
 ### The rules that make a review evidence
 
 - **Reproduce before believing.** Every finding is reproduced against the code
@@ -29,6 +36,15 @@ where this claim is false" gets findings.
 - **Every fix carries a regression test proven to fail pre-fix.** Not "a test
   covering the area" — the specific test, run against the pre-fix code, observed
   red. Without that step a fix has no evidence it fixed anything.
+- **A finding of fitted code is its input.** Reproduce it by running the input
+  the finding names against the reviewed bytes; that input is then the fix's
+  regression test, and the fix is the one the class's home prescribes
+  ([`standing-rules.md`](standing-rules.md), "Code fitted to its examples"),
+  not a wider pattern. Class it by the table in `review-convergence.md` like any
+  other finding: an input the change claims to handle and gets wrong is that
+  table's wrong answer (`blocking`); a legal input nothing sends yet is its
+  reader untotal over bytes nobody sends (`hardening`). A finding that names no
+  input has nothing to reproduce and is style.
 - **Retain the findings verbatim**: the round's `review.md`, beside its brief
   and its findings ledger (`notes/reviews/phase-N-r1/` with the helper; a
   project with its own instrument may keep `notes/phase-N-<reviewer>-review.md`).

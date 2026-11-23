@@ -58,6 +58,13 @@ on either side is dropped whole, and a credential renamed to an innocent name is
 not listed under its new name either. A PR that
 moves while its brief is written is refused: the diff must be the head's.
 
+**A `phase` or `pr` brief carries one standing check, whatever the question:**
+the reviewer looks for code fitted to its examples (`standing-rules.md`, "Code
+fitted to its examples"), builds a legal input the tests and fixtures lack, runs
+it, and reports a finding only with that input and the wrong result. It needs no
+`--claim`. A `plan`, `spec` or `close` brief does not carry it: those subjects
+are prose.
+
 ## Running the reviewer
 
 ```bash

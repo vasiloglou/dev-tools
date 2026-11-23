@@ -68,6 +68,41 @@ is unreachable with the chosen fixtures is half-covered — and reachability is 
 property of the fixture, so closing the gap can mean editing the **fixtures**,
 not adding cases.
 
+### Code fitted to its examples
+
+Code that handles the examples in its tests and fixtures and not the class of
+input it is given: it exits 0 on every committed case and returns a wrong
+answer on the first legal input that differs from them. This section is the
+rule's one home; the review brief and the other references cite it.
+
+- **Solve the class of input, not the examples at hand.** Structured text is
+  read with its parser or with a reader the project already has: YAML, JSON and
+  TOML through their loaders, source code through the language's own parser,
+  paths and command lines through the standard library's path and shell-word
+  readers. Text the project renders itself is handed over as data, not matched
+  back out of the rendered form.
+- **A regular expression is for a flat token whose whole grammar it states**:
+  an identifier, a version number, a hex digest. There it is the right tool,
+  and its presence is not a finding. It is not for nested, quoted, escaped or
+  multi-line structure.
+- **A fix repairs the rule that failed.** It never names the failing input by
+  literal, file or shape.
+- **What a review looks for** in the code a change adds: a pattern, split,
+  slice or index over structured text that a parser or an existing reader
+  already reads; a pattern over the project's own rendered output; a pattern
+  that matches every committed example and fails on a legal input with other
+  whitespace, quoting, casing, nesting, Unicode or a line break; a branch on
+  one literal name, file or message added to make one case pass; a second
+  matcher for something an existing helper already does.
+- **A finding names the input**: a legal member of the class, what the code
+  returned and what it should have returned. "This pattern looks fragile" names
+  no consequence and is style (`review-convergence.md`). Reproducing the
+  finding is running that input, and the regression test for its fix is that
+  input.
+- **The fix replaces the matcher** with the parser, the reader or the general
+  rule. A wider pattern that also matches the reviewer's input is the same
+  defect with one more example.
+
 ### The repair round is itself a hazard
 
 A repair pass over a reviewed artifact introduces defects of its own. Any

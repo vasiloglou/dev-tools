@@ -167,6 +167,43 @@ def test_a_phase_brief_carries_the_diff_and_new_files_but_no_credential(project)
     assert "hunter2" not in brief
 
 
+FITTED_CHECK = "## A standing check: code fitted to its examples"
+
+
+def test_a_diff_brief_tells_the_reviewer_to_look_for_code_fitted_to_its_examples(project):
+    base = subprocess.run(["git", "-C", str(project), "rev-parse", "HEAD"], capture_output=True,
+                          text=True).stdout.strip()
+    (project / "src/app.py").write_text("def total():\n    return 2\n")
+    assert review(project, "brief", "reviews/p1-r1", "--subject", "phase", "--base", base,
+                  "--question", "Does phase 1 meet its criteria?")[0] == 0
+    assert review(project, "brief", "reviews/pr7", "--subject", "pr", "--pr", "7",
+                  "--question", "Does this PR do what its description says?")[0] == 0
+    for name in ("reviews/p1-r1", "reviews/pr7"):
+        brief = (project / name / "BRIEF.md").read_text()
+        # One line, so that where the brief wraps its lines is not part of the test.
+        check = " ".join(brief[brief.index(FITTED_CHECK):brief.index("## Rules")].split())
+        # What to look for, that a pattern over a flat token is not a finding, and that a
+        # finding needs an input the tests lack together with the wrong result.
+        assert "a parser or an existing reader in this repository already reads" in check
+        assert "A regular expression is not a finding in itself" in check
+        assert "build a legal input that the tests and fixtures lack" in check
+        assert "what the code returned and what it should have returned" in check
+        assert "A suspicion with no breaking input is style" in check
+        # After what to read and before the rules, so it is not read as one of the author's claims.
+        assert brief.index("## What to read") < brief.index(FITTED_CHECK)
+
+
+def test_a_brief_with_no_diff_subject_carries_no_check_for_fitted_code(project):
+    assert plan_brief(project)[0] == 0
+    for subject in ("spec", "close"):
+        assert review(project, "brief", "reviews/%s-r1" % subject, "--subject", subject,
+                      "--question", "q", "--file", "notes/plan.md")[0] == 0
+    for name in ("plan-r1", "spec-r1", "close-r1"):
+        brief = (project / "reviews" / name / "BRIEF.md").read_text()
+        assert "fitted to its examples" not in brief and "regular expression" not in brief
+        assert "## Rules" in brief
+
+
 def test_run_starts_codex_read_only_with_stdin_closed_and_keeps_the_review(project):
     plan_brief(project)
     code, out = review(project, "run", "reviews/plan-r1", "--wait", typed="the owner's answer\n")
