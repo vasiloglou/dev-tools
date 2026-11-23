@@ -225,6 +225,11 @@ evidence never becomes evidence about changed bytes.
   **branch**, not per class: a finding class whose second half is unreachable
   with the chosen fixtures is half-covered, and closing it may mean editing the
   fixtures themselves rather than adding cases.
+- **Solve the class of input, not the examples in the tests.** A matcher that
+  holds for the committed fixtures only is the failure class "Code fitted to
+  its examples" in [`references/standing-rules.md`](references/standing-rules.md),
+  which says what to use instead and where a regular expression is the right
+  tool. Step 4's reviewer is told to look for it.
 - In a project with a component index, the index changes in the same commit as
   the code: follow the `components` skill's Update rules for every module the
   phase adds, moves or retires, and regenerate.

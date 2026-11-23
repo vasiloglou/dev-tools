@@ -66,6 +66,11 @@ findings ledger" has the columns).
   show <head>:<path>`, or a checkout the owner agreed to) and record what
   happened. A reviewer's plausible reading is not a defect
   (`../process-phase/references/review-and-record.md`).
+- **A finding of code fitted to its examples** (the standing check every `pr`
+  brief carries) is reproduced by running the input it names at the PR's head.
+  One that names no input is style. How it is classed and what counts as its
+  fix are in `../process-phase/references/review-and-record.md`, "The rules
+  that make a review evidence".
 - **Triage before fixing anything:** each finding is `blocking`, `hardening` or
   `completeness`, by the table in
   `../process-phase/references/review-convergence.md`, "Relevance is not

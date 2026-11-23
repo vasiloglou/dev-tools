@@ -18,6 +18,8 @@ One review round is one folder, DIR, which ``brief`` creates and nothing rewrite
   against REF as ``diff.patch`` and every changed or new file; ``--pr N`` adds the PR's
   diff at its head SHA, read with ``gh``. A file that looks like a credential file is
   refused when named, and left out (with a note) when a diff would have brought it in.
+  The brief of a ``phase`` or ``pr`` subject also tells the reviewer to look for code fitted
+  to its examples (references/standing-rules.md), whatever the question.
 - ``FINDINGS.md`` is the findings ledger, filled in by whoever dispositions the review:
   reproduced or not, class, disposition, and for a fixed finding the commit or tag that
   holds the repaired bytes.
@@ -101,6 +103,29 @@ SUBJECTS = {
     "close": "the milestone close",
     "pr": "a pull request",
 }
+# The subjects whose brief is a diff of code. Their brief carries FITTED_CHECK, whatever the
+# question; the rule it serves is in references/standing-rules.md, "Code fitted to its examples".
+DIFF_SUBJECTS = ("phase", "pr")
+FITTED_CHECK = [
+    "## A standing check: code fitted to its examples", "",
+    "Whatever the question above, also look in the code this change adds or changes for a",
+    "solution that handles the examples in its tests and fixtures, and not the whole class of",
+    "input it is given:", "",
+    "- a regular expression, string split, slice or index over structured text (JSON, YAML,",
+    "  TOML, source code, paths, command lines) that a parser or an existing reader in this",
+    "  repository already reads;",
+    "- a pattern over output this project renders itself (a report, a table, a log line), where",
+    "  the code could have been handed the data instead;",
+    "- a pattern fitted to the fixtures: it matches every committed example and fails on a",
+    "  legal input with other whitespace, quoting, casing, nesting, Unicode or a line break;",
+    "- a branch on one literal name, file or message, added to make one case pass;",
+    "- a second matcher for something an existing helper already does.", "",
+    "A regular expression is not a finding in itself: one that states the whole grammar of a",
+    "flat token (an identifier, a version number, a hex digest) is the right tool. For each",
+    "suspect, build a legal input that the tests and fixtures lack and run the code on it.",
+    "Report a finding only with that input: what the code returned and what it should have",
+    "returned. A suspicion with no breaking input is style: label it so. In your list of what",
+    "you checked, name each matcher you tried and the input you tried it with.", ""]
 PROMPT = "Read {dir}/BRIEF.md and follow it."
 CLASSES = ("blocking", "hardening", "completeness")
 DISPOSITIONS = ("fixed", "deferred", "rejected", "open")
@@ -403,8 +428,10 @@ def brief_text(root: Path, out: Path, brief: dict) -> str:
               "your answer: you are not reading the bytes this brief names.", "",
               "| File | SHA-256 |", "|---|---|"]
     lines += ["| `{}` | `{}` |".format(f["path"], f["sha256"]) for f in brief["files"]]
-    lines += ["", "You may read anything else in the repository that helps you answer.", "",
-              "## Rules", "",
+    lines += ["", "You may read anything else in the repository that helps you answer.", ""]
+    if brief["subject"] in DIFF_SUBJECTS:
+        lines += FITTED_CHECK
+    lines += ["## Rules", "",
               "- Read only. Do not edit, create, stage, commit, push or post anything.",
               "- Do not open `.env` files, keys, tokens, `auth.json` or any other credential file, and do",
               "  not print environment variables. If you need one, name it and go on without it.",

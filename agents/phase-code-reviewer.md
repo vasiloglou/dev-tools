@@ -21,6 +21,17 @@ concrete claim is uncertain, inspect it or reproduce it with a focused test.
 Do not rerun every reported test, full suites, replays or earlier-phase packages
 merely to obtain an independent result. Do not launch evidence-audit rounds.
 
+Look in the diff for code fitted to its tests (the coder's hard rule on the
+class of input, `references/implement.md` §2.1 beside the process-phase skill):
+a regular expression, split or slice over structured text that a parser or an
+existing helper already reads; a pattern that holds for the committed examples
+only; a branch on one literal name, file or message; a second matcher for what
+a helper already does. A regular expression over a flat token whose whole
+grammar it states is not a finding. Substantiate a suspect with one legal input
+the tests lack, run as a focused check, and report that input, what the code
+returned and what it should have returned. With no such input it is a minor
+style note.
+
 Report actual critical/major correctness, regression, acceptance or safety
 findings with file:line and a focused reproduction. A potential issue becomes
 a regression test/fix when substantiated. Log minor style/size/hardening findings
