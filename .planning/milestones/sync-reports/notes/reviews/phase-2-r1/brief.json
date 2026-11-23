@@ -1,0 +1,100 @@
+{
+  "base": "e49b052",
+  "claims": [
+    "P2.1: a checkout only behind its upstream delivers the upstream's files, the receipt records the upstream commit, and the checkout's HEAD, branch and git status are unchanged.",
+    "P2.2: a checkout behind with commits or uncommitted changes of its own under skills, agents, devtools or examples is delivered as it is, and the warning is printed before anything is written.",
+    "P2.3 and P2.3b: level, ahead only, detached, no upstream, not a checkout, and an upstream configured with no ref each deliver the checkout, with no new line except the one warning for the missing upstream.",
+    "P2.4 and P2.5: a fetch that fails or times out is a warning with exit 0; --as-is starts no git fetch.",
+    "P2.6 and P2.7: compare reads the same files as apply; a source folder inside another repository is never fetched.",
+    "S0.2: no command this phase adds changes the dev-tools checkout except git fetch, and no temporary folder is left behind.",
+    "The phase 1 repairs (2120090) do what the phase-1-r1 ledger says, and standard output and exit codes of apply and check are as phase 1 left them."
+  ],
+  "created": "2026-11-23T20:24:50.754848+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-2-r1/diff.patch",
+      "sha256": "34fcd3a61c3a14c1e241758de3a11b969da3b864941b5020b1679ff4961fea8d"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "ef998ad19c7fba7b97c4a32e04088decd201618909bd2d679dd8344158dacd2f"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "ca5a9930c796aae12f87f1e4138a9668014a6c72838fb37bfb094394066f2da6"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/002-phase-1.md",
+      "sha256": "481261f9099b2fb27bc838f3bbaabf654e57059421fe3ed04edb34b5438cc42f"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/README.md",
+      "sha256": "196f8c6c3385a73e9cdb827853650974eb0e84e76f282c782b9adac5f10c8d5e"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-1-spec.md",
+      "sha256": "778a2dcb124adee54e08847fdeed55bbea1bc7ae121de80ab656843f97dad41f"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/phase-2-spec.md",
+      "sha256": "859c8b41486945b764ddfdc16120cd82548ecd5a9300580f1e7c3277f5e406c0"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/BRIEF.md",
+      "sha256": "15e25faae48491b3c1accddc937363594c3c444cf65737f5e89d1be1d0148355"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/FINDINGS.md",
+      "sha256": "01f6aae49ba7804db9430a2b49cba2d28eb7aa93f8e66f8af1a541a58743f29f"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/brief.json",
+      "sha256": "a071f432433d01892c6b47bfe4155efea508048c7ccdaa9fbe23e7b1e7cace22"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/diff.patch",
+      "sha256": "0250dceb8ab9c29b2be278c1e66214f939b73c0078939af0ee0a40616f215a7e"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/review.md",
+      "sha256": "0d0aa0b73f57e97c878d0ef4d7c6c871003a6a6cd7f3313a0480951fc991386a"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/reviews/phase-1-r1/run.json",
+      "sha256": "134fa9b4d65ad8fbaead63b44e9faabac32da696cf5253ab5cf70129d3426eaf"
+    },
+    {
+      "path": "README.md",
+      "sha256": "db3ed84d9df6e4f55082d868dfcab297228c21c2ad22d4cd0aad7cd32acb5208"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "6801d9da145223ef2f5c6c83288ffe6d265deacaa8a2ffa5e848a460f9e67e48"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "077343d19932a2bce664d4d06cda22e493343ea956801090656d31415629485f"
+    },
+    {
+      "path": "skills/adopt-devtools/SKILL.md",
+      "sha256": "8c735a4db21040d31ab223d78ad47592b8ce3aa0321835cc460e995b50edba09"
+    },
+    {
+      "path": "tests/test_sync.py",
+      "sha256": "dd5a42819a7ffac0dab8ca637d097edc8db65a7bda439cd5b9b50d83ff70af7e"
+    },
+    {
+      "path": ".planning/milestones/sync-reports/notes/sync-reports-plan.md",
+      "sha256": "cb58b4996b218d241290fbb89a02941327b3ef2c399220b9025401248362b967"
+    }
+  ],
+  "head": "acc9ee38e47e79583c71ac885a2d979503f33eb5",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Where does this code, its tests or its pages not do what the phase 2 spec and the phase 1 repairs say, or do something to a dev-tools checkout or a synced project that its user would not expect?",
+  "subject": "phase",
+  "version": 1
+}
