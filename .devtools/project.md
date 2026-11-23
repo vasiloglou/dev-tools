@@ -59,7 +59,7 @@ Run from the repository root, with Python 3.11 or newer.
 | The plugins match the skills | `python3 devtools/build_plugins.py --check` |
 | Whether a release is due | `python3 devtools/release_plugins.py status` |
 | The component index is current (when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
-| The index against what a change touched (before a pull request) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base main` |
+| The index against what a change touched (before a pull request, after `git fetch origin`) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main` |
 
 There is no lint command and no CI: the tests run on the machine that makes the change.
 

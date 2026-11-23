@@ -288,3 +288,27 @@ to a copy and have no files of their own.
   index is stale (D2).
 - **Unreviewed.** No review round reads this spec before the code. The phase's diff
   review reads both.
+
+## 13. Implementation findings
+
+- **IF1, 2026-11-23: the base of the `changed` gate. Delegated amendment (auto=true) to
+  section 6.** Section 6's second gate row, kept above, names `changed --base main`, as
+  the plan does. Run as written at `076c91d`, it printed
+  `changed against main (b685e82): 171 file(s) differ; 0 to fix, 0 warning(s), 0 to reread`
+  and exited 0. In this checkout the local branch `main` is at `b685e82`, of 2026-11-15:
+  a worktree does not move it, and nothing here pulls it. The command takes the merge
+  base with what it is given, so an old `main` makes it judge every file changed since,
+  not this change. That is more than was asked, never less, but its `reread:` lines would
+  then name other people's changes. The row in `.devtools/project.md` therefore reads
+  `changed --base origin/main`, after `git fetch origin`. Run at `076c91d`, that printed
+  `changed against origin/main (827e766): 9 file(s) differ; 0 to fix, 0 warning(s), 0 to reread`
+  and exited 0. The plan's wording is repaired at the close.
+- **IF2, 2026-11-23: what T2 is for, measured.** With `tests` left out of the copy, T2
+  and T4 fail and T3, T5, T6 and T7 still pass: each of those four finds its own line
+  among the lines an incomplete copy adds. T2 is what notices the copy.
+- **IF3, 2026-11-23: each case was seen failing.** With the judgment's parts removed one
+  at a time (a pytest plugin kept outside the repository replaced `problems`):
+  - without the exit line, T7 failed;
+  - without the script's own lines, T3, T5, T6 and T7 failed;
+  - without the baseline line, T4 failed;
+  - with nothing returned, T3 to T7 failed and T1 and T2 passed.
