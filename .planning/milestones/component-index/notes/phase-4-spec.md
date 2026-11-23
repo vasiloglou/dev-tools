@@ -312,3 +312,15 @@ to a copy and have no files of their own.
   - without the script's own lines, T3, T5, T6 and T7 failed;
   - without the baseline line, T4 failed;
   - with nothing returned, T3 to T7 failed and T1 and T2 passed.
+- **IF4 (phase-4-r1 F1), 2026-11-23: the copy is made without git.** Section 6 says the
+  fixture "runs `git init -q` there"; that wording is kept above. `git init` reads the
+  user's git settings, so a setting git refuses made all six copy-based tests error with a
+  current index (reproduced with the review's command: exit 1, `fatal: bad config line 3`).
+  The script finds a project by a `.git` entry and runs no git command for `--check`,
+  `write` or `stats`, so the fixture now makes that folder itself. A new test, T8
+  (`test_the_copy_and_the_check_run_without_git`), builds the copy and judges it with no
+  `git` on `PATH`. It failed before the change (`FileNotFoundError: … 'git'`) and passes
+  after it. The file has 8 tests.
+- **IF5 (phase-4-r1 F2), 2026-11-23.** The milestone's `README.md` was not yet updated at
+  the reviewed commit, though section 6 lists it. It is updated in the commit that holds
+  IF4's change, and gains the record's link with the record.

@@ -46,14 +46,18 @@ def problems(root: Path) -> list[str]:
     return found
 
 
-@pytest.fixture
-def checkout(tmp_path) -> Path:
-    """A copy of what the check reads, as a git checkout of its own."""
-    root = tmp_path / "checkout"
+def copy_of_the_checkout(folder: Path) -> Path:
+    """A copy of what the check reads, as a checkout of its own."""
+    root = folder / "checkout"
     for part in COPIED:
         shutil.copytree(ROOT / part, root / part, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
-    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+    (root / ".git").mkdir()  # all the script looks for to find the project; no git command runs
     return root
+
+
+@pytest.fixture
+def checkout(tmp_path) -> Path:
+    return copy_of_the_checkout(tmp_path)
 
 
 def add_module(root: Path) -> str:
@@ -70,6 +74,11 @@ def test_the_index_is_current():
 
 def test_a_copy_of_the_checkout_is_current(checkout):
     assert problems(checkout) == []
+
+
+def test_the_copy_and_the_check_run_without_git(tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path))  # no git on it: a user's git settings cannot reach these tests
+    assert problems(copy_of_the_checkout(tmp_path)) == []
 
 
 def test_a_module_no_entry_lists_is_named(checkout):

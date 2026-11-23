@@ -9,8 +9,10 @@ note did not list is missing.
   2026-11-21 by delegated approval (auto=true): [001-plan.md](001-plan.md).
 - **Plan review:** three rounds (Codex), `notes/reviews/plan-r1` to `plan-r3`, 12 findings
   in all, each reproduced and fixed. The stop rule fired after r3.
-- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md) and
-  [notes/phase-2-spec.md](notes/phase-2-spec.md). Phases 3 and 4 are outlines.
+- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md),
+  [notes/phase-2-spec.md](notes/phase-2-spec.md),
+  [notes/phase-3-spec.md](notes/phase-3-spec.md) and
+  [notes/phase-4-spec.md](notes/phase-4-spec.md).
 - **Phases:**
   1. `takeover` checks every ignored path the note was written with (issue 28), released
      as plugin 0.1.4.
@@ -20,9 +22,9 @@ note did not list is missing.
   5. Close.
 - **Execution:** `process-milestone component-index auto`, from 2026-11-21. Merges, release
   tags and anything posted to GitHub still need the owner each time.
-- **Branches:** phase 1 is vasiloglou/dev-tools#29 (`claude/component-index-phase-1`).
-  Phase 2 is vasiloglou/dev-tools#30, stacked on it (plan amendment a3). Phase 3 is
-  stacked on phase 2, on `claude/component-index-phase-3`.
+- **Branches:** phases 1, 2 and 3 are vasiloglou/dev-tools#29, #30 and #32, merged into
+  `main` in that order on 2026-11-23, after `main`'s vasiloglou/dev-tools#34 was merged
+  into each. Phase 4 is on `claude/component-index-phase-4`, cut from `main` at `827e766`.
 - **Index:** [`.devtools/components/`](../../../.devtools/components/COMPONENTS.md), built in
   phase 3.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md),
