@@ -1065,3 +1065,62 @@ def test_a_hand_edited_file_is_drift_and_not_a_sign_the_project_is_behind(workfl
     code, out, _ = out_of(capsys, *check_source(mproject, workflows))
     assert (code, out) == (1, ".claude/skills/start-milestone/SKILL.md: differs from the receipt\n"
                               "12 managed file(s), 1 problem(s)\n")
+
+
+# Regression tests for phase 1 review round 1 (notes/reviews/phase-1-r1).
+
+@pytest.mark.parametrize("config", ["sync = 42\n", '[[sync]]\nsource = 42\ndest = "x"\n', 'after_apply = "make"\n',
+                                    "sync = [1]\n"])
+def test_a_config_of_the_wrong_shape_is_a_configuration_error(source, project, capsys, config):
+    # r1 F1: check keeps the receipt verdict and warns; apply exits 2.
+    assert apply(source, project) == 0
+    (project / ".devtools.toml").write_text(config)
+    capsys.readouterr()
+    code, out, err = out_of(capsys, *check_source(project, source))
+    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
+    assert err.startswith("warning: not compared with dev-tools: ")
+    assert out_of(capsys, *check_source(project, source, "--strict"))[0] == 5
+    assert out_of(capsys, "apply", "--project", project, "--source", source)[0] == 2
+
+
+def test_a_check_with_no_git_keeps_the_receipt_verdict(source, project, capsys, monkeypatch):
+    # r1 F2
+    assert apply(source, project) == 0
+    capsys.readouterr()
+    real = subprocess.run
+
+    def no_git(argv, *args, **kwargs):
+        if argv[0] == "git":
+            raise FileNotFoundError("git")
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", no_git)
+    code, out, _ = out_of(capsys, *check_source(project, source))
+    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
+    assert out_of(capsys, *check_source(project, source, "--strict"))[0] == 0
+
+
+def test_a_file_already_as_shipped_is_not_counted_as_behind(source, project, capsys):
+    # r1 F3: apply would keep it, so check does not call the project behind.
+    assert apply(source, project) == 0
+    (source / "skills/demo/new.md").write_text("new\n")
+    (project / ".claude/skills/demo/new.md").write_text("new\n")
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(project, source, "--strict"))
+    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
+
+
+def test_a_receipt_with_no_files_still_hears_of_new_units(source, tmp_path, capsys):
+    # r1 F4
+    project = tmp_path / "empty"
+    project.mkdir()
+    (project / ".devtools.toml").write_text("sync = []\n")
+    assert apply(source, project) == 0
+    write(source / "skills/extra/SKILL.md", "Something new.\n")
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(project, source, "--strict"))
+    assert code == 5 and out.splitlines()[1:3] == [NEW, "  skills/extra"]
+    receipt = json.loads((project / ".devtools-receipt.json").read_text())
+    del receipt["shipped"]
+    (project / ".devtools-receipt.json").write_text(json.dumps(receipt))
+    code, out, _ = out_of(capsys, *check_source(project, source))
+    assert UNLISTED in out

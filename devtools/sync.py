@@ -121,6 +121,15 @@ def read_config(project: Path) -> dict:
     unknown = sorted(set(config) - {"sync", "after_apply", "declined"})
     if unknown:
         raise SyncError(f"{config_path}: unknown top-level keys: {unknown}")
+    entries = config.get("sync", [])
+    if not isinstance(entries, list) or not all(isinstance(entry, dict) for entry in entries):
+        raise SyncError(f"{config_path}: sync must be a list of [[sync]] tables")
+    for entry in entries:
+        if not all(isinstance(entry.get(key, ""), str) for key in ("source", "dest", "replaces")):
+            raise SyncError(f"{config_path}: source, dest and replaces in [[sync]] must be strings")
+    commands = config.get("after_apply", [])
+    if not isinstance(commands, list) or not all(isinstance(command, str) for command in commands):
+        raise SyncError(f"{config_path}: after_apply must be a list of commands")
     return config
 
 
@@ -192,7 +201,10 @@ def read_json(path: Path) -> dict:
 def source_identity(source_root: Path, config: dict | None = None) -> dict:
     """The dev-tools commit, and whether what the config takes from it has uncommitted changes."""
     def git(*args: str) -> str:
-        done = subprocess.run(["git", "-C", str(source_root), *args], capture_output=True, text=True)
+        try:
+            done = subprocess.run(["git", "-C", str(source_root), *args], capture_output=True, text=True)
+        except OSError:  # no git on this machine: the commit is unknown
+            return ""
         return done.stdout.strip() if done.returncode == 0 else ""
     taken = [entry["source"] for entry in (config or {}).get("sync", []) if "source" in entry]
     return {"commit": git("rev-parse", "HEAD") or None, "dirty": bool(git("status", "--porcelain", "--", *taken))}
@@ -385,7 +397,7 @@ def cmd_check(args) -> int:
             config = read_config(project)
             wanted = desired_files(source_root, config, project)
             report = unit_report(source_root, config, wanted, receipt)
-            behind = pending(wanted, receipt, source_identity(source_root, config))
+            behind = pending(project, wanted, receipt, source_identity(source_root, config))
         except SyncError as error:
             print(f"warning: not compared with dev-tools: {error}", file=sys.stderr)
             noted = True
@@ -529,24 +541,28 @@ def unit_report(source_root: Path, config: dict, wanted: dict[str, dict], receip
         by = [dest for dest, text in texts.items() if any(names_in(text, name) for name in names)]
         if by:
             report["named"].append({"unit": source, "by": by})
-        elif receipt.get("files") and "shipped" in receipt:
+        elif "files" in receipt and "shipped" in receipt:
             if source not in receipt["shipped"]:
                 report["new"].append(source)
-        elif receipt.get("files"):
+        elif "files" in receipt:
             report["unlisted"].append(source)
     return report
 
 
-def pending(wanted: dict[str, dict], receipt: dict, source: dict) -> dict | None:
-    """What an apply would deliver that the last one did not: the files to create, update and
-    delete, counted from the receipt against the source, so a file edited in the project counts
-    only as drift. None when there are none; else the counts and both commits."""
+def pending(project: Path, wanted: dict[str, dict], receipt: dict, source: dict) -> dict | None:
+    """The files an apply would create, update and delete because the source differs from what the
+    receipt records: a file edited in the project is drift, not this, and a file already as shipped
+    is kept. None when there are none; else the counts and both commits."""
     delivered = receipt.get("files", {})
-    counts = {"create": sum(1 for dest in wanted if dest not in delivered),
-              "update": sum(1 for dest, item in wanted.items() if dest in delivered and (
-                  delivered[dest].get("sha256") != digest(item["data"])
-                  or delivered[dest].get("mode") != oct(item["mode"]))),
-              "delete": sum(1 for dest in delivered if dest not in wanted)}
+
+    def moved(dest: str) -> bool:
+        if dest not in wanted or dest not in delivered:
+            return True
+        item = wanted[dest]
+        return delivered[dest].get("sha256") != digest(item["data"]) or delivered[dest].get("mode") != oct(item["mode"])
+    actions, _ = plan(project, wanted)
+    counts = {do: sum(1 for action in actions if action["do"] == do and moved(action["dest"]))
+              for do in ("create", "update", "delete")}
     if not any(counts.values()):
         return None
     return {"from": receipt.get("source", {}).get("commit"), "to": source.get("commit"), **counts}

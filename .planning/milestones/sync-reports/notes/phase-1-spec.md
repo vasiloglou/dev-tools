@@ -383,3 +383,31 @@ about 330; the pages, the examples and the skill about 70. Measured at record ti
 ## 11. Approval instrument
 
 This prose. There is no fixture corpus.
+
+## Implementation findings, recorded as they were found
+
+1. **"Not current" counted a hand-edited file** (2026-11-23, while checking the site's
+   captures). `pending` as written in section 6 counts `plan`'s actions, and `plan` calls
+   a file edited in the project an `update` (needing `--force`), so a project with drift
+   and an unchanged source read as behind. Amended (o, delegated): an action counts only
+   where the source differs from what the receipt records. Test T25. The prior wording
+   of section 6, kept: "Counts `plan`'s actions; `keep` and `forget` are not counted."
+2. **The commit wording.** Section 6 wrote `(synced from dev-tools c9648dd; this source
+   is 811b4a3)` and an unknown commit as `an unknown commit`, which reads "synced from
+   dev-tools an unknown commit". Amended (o, delegated): `synced from dev-tools at
+   <commit>; this source is at <commit>`. S1 ruled the wording replaceable at no cost to
+   an exit.
+3. **`default_source` takes the folder as an argument** (`default_source(root=SOURCE_ROOT)`),
+   so T16 can call it on an empty folder. Section 6 showed it with no argument.
+4. **The site's first-sync frame now shows a unit report.** Run with the config the page
+   shows, the phase workflow's `process-phase` names `dev-handoff`, `dev-takeover`,
+   `phase-tests` and `agents`, none of which that config takes. The frame was retaken
+   from that run; the hand-edit frame was retaken from a project that declines the four.
+5. **The adopt walk-through frames of `docs/adopt.html`** (the `compare`, `apply --adopt`,
+   `check` and `survey` run on the demo project `shelf`) cannot be retaken: the demo
+   project is not in the repository, and those frames were already older than the
+   current output (`dev-tools ships 8 unit(s)`). Left as they are; an open question for
+   the close.
+6. **Review round 1** (`notes/reviews/phase-1-r1`): five findings, four reproduced as
+   failing tests and fixed (a config of the wrong shape, a machine with no git, a file
+   already as shipped counted as behind, a receipt with no files), one a caption.

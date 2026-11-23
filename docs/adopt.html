@@ -156,7 +156,7 @@ to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, 
 <span class="bad">refused: .claude/skills/process-phase/references/verify.md (needs --force)</span>
 <span class="bad">nothing written; 1 file(s) refused</span>
 <span class="dim">exit code 3</span></pre></div>
-      <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it.</p>
+      <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it. By now this project lists under <code>declined</code> the four pieces its first sync named, so nothing else is reported.</p>
       <div class="term"><div class="bar"><i></i><i></i><i></i><b>a project synced from an older dev-tools</b><em>captured</em></div>
 <pre><span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
 <span class="ok">60 managed file(s), 0 problem(s)</span>
