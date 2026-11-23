@@ -140,7 +140,7 @@ to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, 
 <section><div class="wrap">
   <div class="section-head">
     <h2>Updates that respect your changes</h2>
-    <p>When the shared skills improve, run the sync again. Files you have not touched are updated. A file you edited by hand is reported, and the whole update stops until you decide.</p>
+    <p>When the shared skills improve, run the sync again. It fetches dev-tools first, so it delivers the latest version even when your dev-tools checkout has not been updated, and it leaves that checkout as it is. Files you have not touched are updated. A file you edited by hand is reported, and the whole update stops until you decide.</p>
   </div>
   <div class="two">
     <div>
@@ -179,6 +179,7 @@ to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, 
         <tr><td>You added files beside the synced ones</td><td>Leaves them alone</td></tr>
         <tr><td>A file was removed upstream</td><td>Removes your copy only if you had not changed it</td></tr>
         <tr><td>Something must be rebuilt after an update</td><td>Runs the commands you listed, only when a file actually changed</td></tr>
+        <tr><td>Your dev-tools checkout is behind its upstream</td><td>Fetches, and delivers the upstream's files without changing the checkout. A checkout with changes of its own, or a pinned tag, is delivered as it is; <code>--as-is</code> skips the fetch</td></tr>
         <tr><td>Dev-tools has moved on since your sync</td><td>The check says how many files an update would change, and from which version you synced</td></tr>
         <tr><td>Your synced files mention a shared piece you do not take</td><td>Names it, with the file that mentions it, on every update and check</td></tr>
         <tr><td>A shared piece is new since your last sync</td><td>Names it once, on the next update or check</td></tr>

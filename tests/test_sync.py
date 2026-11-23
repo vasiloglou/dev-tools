@@ -1124,3 +1124,262 @@ def test_a_receipt_with_no_files_still_hears_of_new_units(source, tmp_path, caps
     (project / ".devtools-receipt.json").write_text(json.dumps(receipt))
     code, out, _ = out_of(capsys, *check_source(project, source))
     assert UNLISTED in out
+
+
+# --------------------------------------------------------------------------- the latest dev-tools
+# Milestone sync-reports, phase 2: a checkout only behind its upstream delivers the upstream's files.
+
+NOTE = "note: dev-tools here is 1 commit(s) behind origin/"
+OWN = "warning: dev-tools here is 1 commit(s) behind origin/"
+
+
+@pytest.fixture(autouse=True)
+def own_checkout_as_is(monkeypatch):
+    """The repository's own checkout is read as it is in the suite, and never fetched."""
+    real_run = subprocess.run
+
+    def guarded(argv, *args, **kwargs):
+        if list(argv[:4]) == ["git", "-C", str(sync.SOURCE_ROOT), "fetch"]:
+            raise AssertionError("a test started git fetch in the repository's own checkout")
+        return real_run(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", guarded)
+    real_resolve = getattr(sync, "resolve_source", None)
+    if real_resolve is not None:
+        def resolve(path, *, as_is):
+            return real_resolve(path, as_is=as_is or Path(path).resolve() == sync.SOURCE_ROOT)
+        monkeypatch.setattr(sync, "resolve_source", resolve)
+
+
+@pytest.fixture
+def behind(tmp_path):
+    """An upstream with two commits and a clone that has seen only the first."""
+    upstream = tmp_path / "upstream"
+    write(upstream / "skills/demo/SKILL.md", "first version\n")
+    git(upstream, "init", "-q", "-b", "main")
+    first = commit(upstream, "first")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(upstream), str(clone)], check=True)
+    write(upstream / "skills/demo/SKILL.md", "second version\n")
+    second = commit(upstream, "second")
+    project = tmp_path / "behind-project"
+    project.mkdir()
+    (project / ".devtools.toml").write_text('[[sync]]\nsource = "skills/demo"\ndest = ".claude/skills/demo"\n')
+    return {"upstream": upstream, "clone": clone, "project": project, "first": first, "second": second}
+
+
+def delivered(b):
+    return (b["project"] / ".claude/skills/demo/SKILL.md").read_text()
+
+
+def checkout_state(root):
+    return (git(root, "rev-parse", "HEAD"), git(root, "symbolic-ref", "-q", "HEAD"), git(root, "status", "--porcelain"))
+
+
+def test_a_checkout_only_behind_delivers_its_upstream_and_is_not_changed(behind, capsys):
+    # P2.1, T1
+    before = checkout_state(behind["clone"])
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "second version\n"
+    assert NOTE + "main: delivering origin/main at " + behind["second"][:7] in err
+    receipt = json.loads((behind["project"] / ".devtools-receipt.json").read_text())
+    assert receipt["source"]["commit"] == behind["second"]
+    assert checkout_state(behind["clone"]) == before
+
+
+@pytest.mark.parametrize("own", ["commit", "uncommitted"])
+def test_a_checkout_with_work_of_its_own_is_delivered_as_it_is(behind, capsys, own):
+    # P2.2, T2, T3
+    write(behind["clone"] / "skills/demo/SKILL.md", "the clone's own version\n")
+    if own == "commit":
+        commit(behind["clone"], "own")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "the clone's own version\n"
+    assert OWN + "main and has work of its own" in err
+
+
+def test_the_own_work_warning_comes_before_a_refusal(behind, capsys):
+    # P2.2, T4
+    commit_text = "the clone's own version\n"
+    write(behind["clone"] / "skills/demo/SKILL.md", commit_text)
+    commit(behind["clone"], "own")
+    write(behind["project"] / ".claude/skills/demo/SKILL.md", "the project's own file\n")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 3 and OWN + "main and has work of its own" in err
+
+
+@pytest.mark.parametrize("state", ["level", "ahead", "detached", "no-upstream", "folder"])
+def test_other_states_deliver_the_checkout_and_say_nothing_new(behind, capsys, state, tmp_path):
+    # P2.3, T5
+    clone = behind["clone"]
+    if state == "level":
+        git(clone, "pull", "-q")
+    elif state == "ahead":
+        git(clone, "pull", "-q")
+        write(clone / "skills/demo/SKILL.md", "ahead\n")
+        commit(clone, "ahead")
+    elif state == "detached":
+        git(clone, "checkout", "-q", "--detach")
+    elif state == "no-upstream":
+        git(clone, "checkout", "-q", "-b", "local-only")
+    elif state == "folder":
+        import shutil
+        copy = tmp_path / "plain"
+        shutil.copytree(clone / "skills", copy / "skills")
+        clone = copy
+    expected = (clone / "skills/demo/SKILL.md").read_text()
+    code, out, err = out_of(capsys, "apply", "--project", behind["project"], "--source", clone, "--dry-run")
+    assert code == 0 and "note:" not in err and "warning: dev-tools here" not in err
+    assert out == out_of(capsys, "apply", "--project", behind["project"], "--source", clone, "--dry-run", "--as-is")[1]
+    assert out_of(capsys, "apply", "--project", behind["project"], "--source", clone)[0] == 0
+    assert delivered(behind) == expected
+
+
+def test_an_upstream_that_is_gone_is_a_warning(behind, capsys):
+    # P2.3b, T6 (plan r1 F5)
+    git(behind["clone"], "config", "branch.main.merge", "refs/heads/gone")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "first version\n"
+    assert "warning: this dev-tools branch's upstream, origin/gone, was not found" in err
+
+
+def test_a_fetch_that_fails_decides_from_the_refs_already_fetched(behind, capsys, tmp_path):
+    # P2.4, T7
+    git(behind["clone"], "fetch", "-q")
+    git(behind["clone"], "remote", "set-url", "origin", str(tmp_path / "no-such-repository"))
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "second version\n"
+    assert "warning: could not fetch origin (" in err
+
+
+def test_a_fetch_that_times_out_is_a_warning(behind, capsys, monkeypatch):
+    # P2.4, T8
+    real = sync.subprocess.run
+
+    def slow(argv, *args, **kwargs):
+        if "fetch" in argv:
+            raise subprocess.TimeoutExpired(argv, 60)
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", slow)
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and "warning: could not fetch origin (" in err and delivered(behind) == "first version\n"
+
+
+def test_as_is_starts_no_fetch(behind, capsys, monkeypatch):
+    # P2.5, T9
+    calls = []
+    real = sync.subprocess.run
+
+    def record(argv, *args, **kwargs):
+        calls.append(list(argv))
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", record)
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"], "--as-is")
+    assert code == 0 and delivered(behind) == "first version\n" and "note:" not in err
+    assert not any("fetch" in call for call in calls)
+    git(behind["clone"], "fetch", "-q")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"], "--as-is",
+                          "--dry-run")
+    assert (f"warning: dev-tools here is 1 commit(s) behind origin/main; delivering the checkout as it is (--as-is)"
+            in err)
+
+
+def test_compare_reads_what_apply_would(behind, capsys):
+    # P2.6, T10
+    assert apply(behind["clone"], behind["project"], "--as-is") == 0
+    capsys.readouterr()
+    _, dry, _ = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"], "--dry-run")
+    _, compared, _ = out_of(capsys, "compare", "--project", behind["project"], "--source", behind["clone"],
+                            ".claude/skills/demo/SKILL.md", "--added")
+    assert "update: .claude/skills/demo/SKILL.md" in dry
+    assert "second version" in compared
+
+
+def test_a_source_inside_another_repository_is_not_fetched(behind, capsys, monkeypatch, tmp_path):
+    # P2.7, T11
+    outer = tmp_path / "outer"
+    write(outer / "holder/skills/demo/SKILL.md", "inside another repository\n")
+    git(outer, "init", "-q")
+    commit(outer, "first")
+    calls = []
+    real = sync.subprocess.run
+    monkeypatch.setattr(sync.subprocess, "run", lambda argv, *a, **k: calls.append(list(argv)) or real(argv, *a, **k))
+    assert apply(outer / "holder", behind["project"]) == 0
+    assert delivered(behind) == "inside another repository\n"
+    assert not any("fetch" in call for call in calls)
+    assert sync.resolve_source(outer / "holder", as_is=False)["state"] == "folder"
+
+
+def test_a_tool_older_than_the_files_it_reads_says_so(behind, capsys):
+    # T12
+    write(behind["upstream"] / "devtools/sync.py", "# another sync.py\n")
+    commit(behind["upstream"], "tool")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and "note: the sync.py that runs differs from the one at origin/main" in err
+
+
+def test_the_examples_never_fetch_the_repository(tmp_path, capsys):
+    # T13: the autouse fixture raises if one does.
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples/milestone-project.devtools.toml").read_text())
+    assert run("apply", "--project", project) == 0
+
+
+def test_check_compares_with_the_upstream(behind, capsys):
+    # T14
+    assert apply(behind["clone"], behind["project"], "--as-is") == 0
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(behind["project"], behind["clone"]))
+    assert code == 0 and out.splitlines()[1] == (
+        f"not current: an apply would update 1 file(s) (synced from dev-tools at {behind['first'][:7]}; "
+        f"this source is at {behind['second'][:7]})")
+
+
+def test_resolve_source_names_each_state(behind, tmp_path):
+    # T15
+    resolved = sync.resolve_source(behind["clone"], as_is=False)
+    root = resolved["root"]
+    assert resolved["state"] == "upstream" and resolved["commit"] == behind["second"]
+    assert (root / "skills/demo/SKILL.md").read_text() == "second version\n"
+    resolved["cleanup"]()
+    assert not root.exists()
+    git(behind["clone"], "config", "branch.main.merge", "refs/heads/gone")
+    assert sync.resolve_source(behind["clone"], as_is=False)["state"] == "upstream-missing"
+    git(behind["clone"], "config", "branch.main.merge", "refs/heads/main")
+    write(behind["clone"] / "skills/demo/SKILL.md", "own\n")
+    commit(behind["clone"], "own")
+    assert sync.resolve_source(behind["clone"], as_is=False)["state"] == "own-work"
+    git(behind["clone"], "checkout", "-q", "--detach")
+    assert sync.resolve_source(behind["clone"], as_is=False)["state"] == "detached"
+    git(behind["clone"], "checkout", "-q", "-b", "local-only")
+    assert sync.resolve_source(behind["clone"], as_is=False)["state"] == "no-upstream"
+    assert sync.resolve_source(tmp_path / "upstream" / "skills", as_is=False)["state"] == "folder"
+
+
+def test_as_is_on_a_checkout_known_to_be_behind_is_its_own_state(behind):
+    # T15, the as-is row
+    git(behind["clone"], "fetch", "-q")
+    resolved = sync.resolve_source(behind["clone"], as_is=True)
+    assert resolved["state"] == "as-is" and resolved["root"] == behind["clone"].resolve()
+
+
+def test_an_upstream_that_cannot_be_read_leaves_the_checkout_as_it_is(behind, capsys, monkeypatch):
+    # T16: git archive fails
+    real = sync.subprocess.run
+
+    def no_archive(argv, *args, **kwargs):
+        if "archive" in argv:
+            raise subprocess.CalledProcessError(128, argv)
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", no_archive)
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "first version\n"
+    assert "warning: could not read origin/main at " in err
+
+
+def test_the_upstream_follows_the_remote_s_fetch_refspec(behind, capsys):
+    # T17 (self-review): a remote whose refspec maps branches elsewhere than refs/remotes/<remote>/.
+    git(behind["clone"], "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/mirror/*")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and delivered(behind) == "second version\n"
+    assert f"delivering mirror/main at {behind['second'][:7]}" in err

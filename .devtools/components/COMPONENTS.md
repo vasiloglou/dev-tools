@@ -26,6 +26,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - allowlist: phase.codex_gate
 - apply sync: sync.copies
 - archive gsd files: migrate.from_gsd
+- as-is: sync.copies
 - build plugins: plugins.build
 - bump and rebuild plugins: subsystem.release
 - bump version: plugins.release
@@ -91,6 +92,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - exclude files: sync.copies
 - external libraries: components.index
 - facts for rules: components.index
+- fetch latest dev-tools: sync.copies
 - file mode drift: sync.copies
 - file modes: plugins.build
 - fill tokens: sync.copies
@@ -102,6 +104,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - gemini coder: phase.coder_pool
 - generate index: components.index
 - generate plugins folder: plugins.build
+- git archive: sync.copies
 - git ignores delivered files: sync.copies
 - git numstat: phase.codex_gate
 - github release: plugins.release
@@ -253,6 +256,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - unfinished phase: migrate.from_gsd
 - units not taken: sync.copies
 - untracked files: phase.codex_gate
+- upstream commit: sync.copies
 - validate catalog: components.index
 - what would be lost: handoff.notes
 - which areas may import which: components.rules
@@ -287,8 +291,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## Taking the skills into a project
 
 ### sync.copies
-- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
-- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only
+- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; it fetches the dev-tools checkout's upstream and reads the upstream's files when the checkout is only behind (resolve_source; --as-is reads it as it is); both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
+- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only, fetch latest dev-tools, upstream commit, as-is, git archive
 - status: canonical
 - modules: devtools/sync.py
 - uses: (none)

@@ -95,7 +95,10 @@ GSD follows `move-from-gsd` instead.
 1. **The source.** `git -C <dev-tools> status --porcelain -- skills agents devtools`
    is empty and you know its commit (`git -C <dev-tools> rev-parse --short HEAD`). The
    sync also warns when the files it delivers have uncommitted changes; a migration
-   from such a checkout cannot say what it delivered, so stop and ask.
+   from such a checkout cannot say what it delivered, so stop and ask. When the
+   checkout is behind its upstream, the sync fetches and delivers the upstream's commit
+   instead, and its `note:` line names that commit: the record names the one the
+   receipt holds.
 2. **What passes today**, so that step 8 can tell a new failure from an old one. Keep
    the output of each:
    - the process tool's check, where the workflow has one (`phase_tool.py check --all`);

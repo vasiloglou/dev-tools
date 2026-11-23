@@ -89,6 +89,12 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
   new in dev-tools since the last sync. A workflow the project takes nothing from is not
   named. To stop hearing of a unit, list it in `.devtools.toml`:
   `declined = ["skills/milestone/review-pr"]`; a folder covers every unit under it.
+- The sync reads the latest dev-tools. Before it reads the checkout, `apply` (and
+  `check`, `survey`, `compare`) runs `git fetch` for the checkout's upstream; a checkout
+  that is only behind it delivers the upstream's files and says so, and the checkout
+  itself is not changed. A checkout with commits or uncommitted changes of its own is
+  delivered as it is, with a warning, and so is a tag or a detached `HEAD`, which is how a
+  project pins a version. `--as-is` skips the fetch and reads the checkout as it is.
 - Exits: `check` exits 1 when a synced file differs from the receipt. `check --strict`
   also exits 5 when the project is not current, a unit is named or new, or the comparison
   with dev-tools could not be made, for a CI job that should fail on any of them.

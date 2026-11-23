@@ -207,3 +207,14 @@ Estimate: `devtools/sync.py` about 120 lines; tests about 220; pages about 15.
 ## 11. Approval instrument
 
 This prose.
+
+## Implementation findings, recorded as they were found
+
+1. **The upstream's name was built by hand** (2026-11-23, self-review before the review
+   round). `refs/remotes/<remote>/<branch>` is wrong for a remote whose fetch refspec
+   maps branches elsewhere: such a clone kept comparing with the stale ref the clone
+   wrote. Now `<branch>@{upstream}` is asked of git, for the commit and for the name.
+   New test T17, red before the change.
+2. **The retaken frames of phase 1 print the same under phase 2**: re-run from this
+   checkout, whose branch has no upstream (state `no-upstream`), the first-sync and
+   hand-edit frames' output was byte for byte the same (`diff` exited 0).

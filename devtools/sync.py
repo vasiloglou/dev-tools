@@ -49,13 +49,16 @@ import argparse
 import ast
 import difflib
 import hashlib
+import io
 import json
 import os
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 from pathlib import Path, PurePosixPath
 
@@ -304,13 +307,122 @@ def warn_if_ignored(project: Path, config: dict, wanted: dict[str, dict]) -> Non
                   file=sys.stderr)
 
 
+# --------------------------------------------------------------------------- which commit of dev-tools is read
+
+DIRTY_PATHS = ("skills", "agents", "devtools", "examples")  # what the sync reads and runs
+FETCH_SECONDS = 60
+
+
+def resolve_source(path: Path, *, as_is: bool) -> dict:
+    """Which files a run reads for the dev-tools source at ``path``.
+
+    A checkout that is only behind its upstream is read at the upstream's commit, from a temporary
+    folder; every other source is read as it is. Starts ``git fetch`` unless ``as_is``, and changes
+    nothing else in the checkout. Returns {"root", "commit", "state", "lines", "cleanup"}; ``lines``
+    go to standard error. The states, in the order they are decided: folder, detached, no-upstream,
+    upstream-missing, current, as-is, own-work, upstream (or upstream-unreadable).
+    """
+    path = path.resolve()
+
+    def git(*args: str, timeout: int | None = None, env: dict | None = None):
+        try:
+            return subprocess.run(["git", "-C", str(path), *args], capture_output=True, text=True,
+                                  timeout=timeout, env=env)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return error
+
+    def out(*args: str) -> str:
+        done = git(*args)
+        return done.stdout.strip() if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
+
+    def result(state: str, commit: str | None, lines: list[str] | None = None, root: Path | None = None,
+               cleanup=lambda: None) -> dict:
+        return {"root": root or path, "commit": commit, "state": state, "lines": lines or [], "cleanup": cleanup}
+
+    top = out("rev-parse", "--show-toplevel")
+    if not top or Path(top).resolve() != path:
+        return result("folder", None)
+    head = out("rev-parse", "HEAD") or None
+    branch = out("symbolic-ref", "-q", "--short", "HEAD")
+    if not branch:
+        return result("detached", head)
+    remote, merge = out("config", "--get", f"branch.{branch}.remote"), out("config", "--get", f"branch.{branch}.merge")
+    if not merge:
+        return result("no-upstream", head)
+    lines = []
+    if remote and remote != "." and not as_is:
+        done = git("fetch", "--quiet", remote, timeout=FETCH_SECONDS, env={**os.environ, "GIT_TERMINAL_PROMPT": "0"})
+        if not isinstance(done, subprocess.CompletedProcess) or done.returncode != 0:
+            reason = (str(done) if not isinstance(done, subprocess.CompletedProcess)
+                      else (done.stderr.strip().splitlines() or [f"exit {done.returncode}"])[0])
+            lines.append(f"warning: could not fetch {remote} ({reason}); deciding from the refs already fetched")
+    # git maps the branch's upstream through the remote's fetch refspec; a name built by hand would not.
+    name = (out("rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}")
+            or (f"{remote}/" if remote not in ("", ".") else "") + merge.removeprefix("refs/heads/"))
+    upstream = out("rev-parse", "--verify", "--quiet", f"{branch}@{{upstream}}^{{commit}}")
+    if not upstream:
+        return result("upstream-missing", head, lines + [
+            f"warning: this dev-tools branch's upstream, {name}, was not found; delivering the checkout as it is"])
+    counts = out("rev-list", "--left-right", "--count", f"HEAD...{upstream}").split()
+    ahead, behind = (int(counts[0]), int(counts[1])) if len(counts) == 2 else (0, 0)
+    if behind == 0:
+        return result("current", head, lines)
+    if as_is:
+        return result("as-is", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name}; delivering the checkout as it is (--as-is)"])
+    uncommitted = [line for line in out("status", "--porcelain", "--", *DIRTY_PATHS).splitlines() if line.strip()]
+    if ahead or uncommitted:
+        return result("own-work", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name} and has work of its own ({ahead} commit(s) "
+            f"ahead, {len(uncommitted)} uncommitted path(s)); delivering the checkout as it is"])
+    folder = Path(tempfile.mkdtemp(prefix="devtools-upstream-"))
+    cleanup = lambda: shutil.rmtree(folder, ignore_errors=True)
+    try:
+        archive = subprocess.run(["git", "-C", str(path), "archive", "--format=tar", upstream],
+                                 capture_output=True, check=True)
+        with tarfile.open(fileobj=io.BytesIO(archive.stdout), mode="r:") as tar:
+            if hasattr(tarfile, "data_filter"):
+                tar.extractall(folder, filter="data")
+            else:
+                tar.extractall(folder)
+    except (OSError, subprocess.CalledProcessError, tarfile.TarError) as error:
+        cleanup()
+        return result("upstream-unreadable", head, lines + [
+            f"warning: could not read {name} at {upstream[:7]} ({error}); delivering the checkout as it is"])
+    lines.append(f"note: dev-tools here is {behind} commit(s) behind {name}: delivering {name} at {upstream[:7]}; "
+                 f"the checkout is not changed (git pull in {path} updates it)")
+    tool = folder / "devtools/sync.py"
+    if tool.is_file() and tool.read_bytes() != Path(__file__).read_bytes():
+        lines.append(f"note: the sync.py that runs differs from the one at {name}; git pull in {path} updates it")
+    return result("upstream", upstream, lines, folder, cleanup)
+
+
+def open_source(args, path: Path) -> Path:
+    """Resolve the source a command reads, print what was decided, and remember how to clean up."""
+    resolved = resolve_source(path, as_is=getattr(args, "as_is", False))
+    for line in resolved["lines"]:
+        print(line, file=sys.stderr)
+    args.cleanups.append(resolved["cleanup"])
+    args.resolved = resolved
+    return resolved["root"]
+
+
+def identity(args, source_root: Path, config: dict) -> dict:
+    """The receipt's source: the upstream commit read, or what the checkout says of itself."""
+    resolved = getattr(args, "resolved", None)
+    if resolved and resolved["state"] == "upstream":
+        return {"commit": resolved["commit"], "dirty": False}
+    return source_identity(source_root, config)
+
+
 def cmd_apply(args) -> int:
     project = args.project.resolve()
     config = read_config(project)
-    wanted = desired_files(args.source.resolve(), config, project)
+    source_root = open_source(args, args.source.resolve())
+    wanted = desired_files(source_root, config, project)
     receipt_before = read_json(project / RECEIPT)
-    report = unit_report(args.source.resolve(), config, wanted, receipt_before)
-    warn_if_dirty(args.source.resolve(), config)
+    report = unit_report(source_root, config, wanted, receipt_before)
+    warn_if_dirty(source_root, config)
     actions, _ = plan(project, wanted)
     allowed = {"force"} if args.force else set()
     allowed |= {"adopt"} if args.adopt else set()
@@ -341,10 +453,10 @@ def cmd_apply(args) -> int:
         elif action["do"] == "delete":
             path.unlink()
     receipt = {
-        "source": source_identity(args.source.resolve(), config),
+        "source": identity(args, source_root, config),
         "files": {dest: {"sha256": digest(item["data"]), "mode": oct(item["mode"]), "origin": item["origin"]}
                   for dest, item in sorted(wanted.items())},
-        "shipped": sorted(unit["source"] for unit in shipped_units(args.source.resolve())),
+        "shipped": sorted(unit["source"] for unit in shipped_units(source_root)),
     }
     write_atomic(project / RECEIPT, (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8"), 0o644)
     (project / JOURNAL).unlink()
@@ -392,12 +504,12 @@ def cmd_check(args) -> int:
     source_root = None if args.receipt_only else (args.source or default_source())
     noted = source_root is None  # with no source, nothing was compared
     if source_root is not None:
-        source_root = source_root.resolve()
+        source_root = open_source(args, source_root.resolve())
         try:
             config = read_config(project)
             wanted = desired_files(source_root, config, project)
             report = unit_report(source_root, config, wanted, receipt)
-            behind = pending(project, wanted, receipt, source_identity(source_root, config))
+            behind = pending(project, wanted, receipt, identity(args, source_root, config))
         except SyncError as error:
             print(f"warning: not compared with dev-tools: {error}", file=sys.stderr)
             noted = True
@@ -1071,9 +1183,10 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
 
 
 def cmd_survey(args) -> int:
-    project, source_root = args.project.resolve(), args.source.resolve()
+    project = args.project.resolve()
     if not project.is_dir():
         raise SyncError(f"{project} is not a directory")
+    source_root = open_source(args, args.source.resolve())
     result = survey(source_root, project)
     print("\n".join(starter_config(source_root, project, result) if args.toml
                     else survey_text(source_root, project, result)))
@@ -1190,6 +1303,8 @@ def row_note(row: dict) -> str:
 
 def cmd_compare(args) -> int:
     project, source_root = args.project.resolve(), args.source.resolve()
+    if (project / CONFIG).is_file():
+        source_root = open_source(args, source_root)
     if not (project / CONFIG).is_file():
         raise SyncError(f"{project / CONFIG} not found: compare reads the entries it lists. Write it first: "
                         f"`sync.py survey --project {args.project} --toml` prints a starter for a project with its own "
@@ -1299,6 +1414,8 @@ def main(argv=None) -> int:
     apply.add_argument("--adopt", action="store_true", help="overwrite existing files that are not managed yet")
     apply.add_argument("--force", action="store_true", help="overwrite managed files changed in the project")
     apply.add_argument("--dry-run", action="store_true")
+    apply.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     apply.set_defaults(run=cmd_apply)
     check = sub.add_parser("check", help="compare the project's managed files with its receipt, then with dev-tools")
     check.add_argument("--project", type=Path, required=True)
@@ -1308,11 +1425,15 @@ def main(argv=None) -> int:
                        help="compare with the receipt only; read no dev-tools source")
     check.add_argument("--strict", action="store_true",
                        help="exit 5 when the project is not current, a unit is reported, or nothing was compared")
+    check.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     check.set_defaults(run=cmd_check)
     survey_ = sub.add_parser("survey", help="find the project's own copies of what dev-tools ships")
     survey_.add_argument("--project", type=Path, required=True)
     survey_.add_argument("--source", type=Path, default=SOURCE_ROOT, help="dev-tools checkout (default: this one)")
     survey_.add_argument("--toml", action="store_true", help=f"print a starter {CONFIG} instead of the report")
+    survey_.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     survey_.set_defaults(run=cmd_survey)
     compare = sub.add_parser("compare", help="show what an apply would replace, and what the project would lose")
     compare.add_argument("--project", type=Path, required=True)
@@ -1323,13 +1444,19 @@ def main(argv=None) -> int:
                          help="with paths: print the lines only the shipped file has (what arrives)")
     compare.add_argument("--record", action="store_true",
                          help="print one table row per file with lines of its own, for the migration record")
+    compare.add_argument("--as-is", action="store_true",
+                        help="read the dev-tools checkout as it is: no git fetch, and not its upstream's files")
     compare.set_defaults(run=cmd_compare)
     args = parser.parse_args(argv)
+    args.cleanups = []
     try:
         return args.run(args)
     except SyncError as error:
         print(f"error: {error}", file=sys.stderr)
         return error.code
+    finally:
+        for cleanup in args.cleanups:
+            cleanup()
 
 
 if __name__ == "__main__":
