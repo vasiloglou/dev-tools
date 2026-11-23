@@ -1,0 +1,84 @@
+{
+  "base": "1a5f14c",
+  "claims": [
+    "A note written with 25 or fewer ignored paths is byte-for-byte the note main writes.",
+    "takeover reports ready only if every ignored path the note was written with, other than a key file, exists in the checkout, wherever it sits in the list and whatever characters it holds.",
+    "A note from 0.1.3 or older whose list was cut, and any ignored-rest line that is damaged, short, long or not a list of path and kind items, gives ready false.",
+    "A missing key file, listed or after the 25th, is reported in missing_keys and does not block.",
+    "The JSON report always carries unlisted_ignored, and the text report prints its line only when it is above 0.",
+    "Each of the tests T1 to T11 fails without the change to handoff.py, except T5, which pins unchanged behaviour.",
+    "plugins/ is rebuilt from skills/ at 0.1.4 and nothing under plugins/ was edited by hand."
+  ],
+  "created": "2026-11-21T19:35:51.229783+00:00",
+  "deleted": [],
+  "dirty": true,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r1/diff.patch",
+      "sha256": "f732528b2037cb53a3ec99be06595dbafd567ddadb6332db83c228f37d32fa76"
+    },
+    {
+      "path": "devtools/PLUGIN_VERSION",
+      "sha256": "8a3dad16d348c163566a456fcf650d85d7aeeda5e53d01ee1fa8dc15212915a7"
+    },
+    {
+      "path": "docs/handoff.html",
+      "sha256": "33880b4fac821bf766c802d81ef25158470d36747b192f02fa410981db24b6a7"
+    },
+    {
+      "path": "plugins/dvt-milestone/.claude-plugin/plugin.json",
+      "sha256": "492ae4c62c4fe4706eeec04e118af8c2d4ea264235122aa15443c8e4c7294599"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/references/handoff.md",
+      "sha256": "2cc54f1e8f3f1d626baeeb1c4818878cac82a079f3897f560b3fa6ce68abcb9b"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "d0d3ac3fa6d25d0d2b7bfcdc434a11bac5b259a837e6d486b914a524851b499b"
+    },
+    {
+      "path": "plugins/dvt-phase/.claude-plugin/plugin.json",
+      "sha256": "f3a7e2a54161de4145830a96c41ec780a6bce3fa8cd8f33c1a5f6351a62e03b1"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/references/handoff.md",
+      "sha256": "2cc54f1e8f3f1d626baeeb1c4818878cac82a079f3897f560b3fa6ce68abcb9b"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "d0d3ac3fa6d25d0d2b7bfcdc434a11bac5b259a837e6d486b914a524851b499b"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "81ce6d44aa595922f59d8b6d4f5151978d6538b2cd0f64ba5f06bd65c481a4b3"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "d0d3ac3fa6d25d0d2b7bfcdc434a11bac5b259a837e6d486b914a524851b499b"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "f1d5759606a7805fff389272e2f44896212e4eb94342c3944272f4d4d009bd11"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-1-spec.md",
+      "sha256": "6b292fbfd2b3fc758faa5b49bbacd36e16200e3244343d275daf9ee9055f433b"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "42ac8f116b426ad9589c6f9224b99a188d34ae03e75f2a1cceac6d84bf0b460c"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "1a5f14c534dff093063d8529eecca582f4d2ce40",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this diff do what notes/phase-1-spec.md requires of it, and where can its claims below be shown false, by an input, a note or a checkout state?",
+  "subject": "phase",
+  "version": 1
+}

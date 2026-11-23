@@ -180,11 +180,18 @@ needs, and key files. It reports only whether a key file exists and never reads
 one.
 
 `takeover` says ready when the checkout holds the commit the note was written
-at, no ignored path the note lists is missing, the note has a next step, and
-nothing it marks `[MISSING]` is left: a tool or an environment path the settings
-name, and the git remote unless the note is for the same machine (level 1 or
-2). The base branch, the assistants on PATH and key files are reported as not
-needed to continue.
+at, no ignored path the note was written with is missing (the ones it lists, and
+those after the 25th, which it keeps in one line at the end of the snapshot), the
+note has a next step, and nothing it marks `[MISSING]` is left: a tool or an
+environment path the settings name, and the git remote unless the note is for
+the same machine (level 1 or 2). A note from before 0.1.4 that cut its list at
+25, a listed path the report cannot read (one holding a line break) or one that
+names no file inside the checkout (empty, absolute, or with a `.` or `..` part),
+a snapshot without its ignored-files section, and a rest line whose "and N smaller
+paths" line is gone count under "ignored paths the
+note did not list", and the note is not ready until those paths are checked by
+hand. The base branch, the assistants on PATH and key files are
+reported as not needed to continue.
 
 What does not come with the clone:
 

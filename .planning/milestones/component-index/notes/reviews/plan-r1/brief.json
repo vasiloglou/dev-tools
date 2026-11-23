@@ -1,0 +1,76 @@
+{
+  "base": null,
+  "claims": [
+    "The baseline in plan section 3 describes what components_index.py and handoff.py do at c9648dd.",
+    "Phase 1's design leaves the note of any hand-off with 25 or fewer ignored paths exactly as main writes it.",
+    "Phase 1's design makes takeover report not ready whenever an ignored path the note was written with is absent, for new and older notes.",
+    "Phase 2's design, with count_extra_dirs absent or false, leaves every output and exit of components_index.py unchanged.",
+    "Phase 2's list of sites covers every place that decides whether a module has a component.",
+    "No phase needs an input that only a later phase produces, and every completion predicate C1 to C6 has a gate or ruling that can fail it.",
+    "Every gate command in plan section 9 can run as written from the repository root."
+  ],
+  "created": "2026-11-21T18:58:37.441718+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "19c45d8039c2504b45c351b91091c22c957d17c252974c363c03f59c7a6893b6"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-1-spec.md",
+      "sha256": "ef2aab9d8a03b69fbf0c4789bfb3f7c02a1d4e9148d284b51678999d35d8f0b2"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-2-spec.md",
+      "sha256": "d2ddffd3a1c384a5b75aafcbaef33304a60094f6bc4ac37539cc9b68716f6378"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    },
+    {
+      "path": ".planning/PROJECT.md",
+      "sha256": "d6b274e2937a8e44fa652ba46e4fdf1260460a8fb1a2a28dd37d67eea591df08"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "d79796d25b4a68e2145bcc01fab07eb058361bbf77c737ebfb99d9abb20a5c20"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "13105bfbee8587baf491e757c47e2f6da7b1594bb99bb89b006773577fe95793"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "8cf8cb2bccc255a0318d1aa922ecc062bcdd89cd02a5bd6b772322ca27f2cc18"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "8b74ccda535b97bcc4fdcf1b911dc246d6a7a18c6033ef555456076d25efb263"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "fd4a0ee50d5bded553a17d1ba3320515a442c94390eca97f11b4caf0b9fa3327"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "59f1d71ecee62cdbc8ee8a6244b78e28c606f036e53605d177a2f4505b6cb364"
+    },
+    {
+      "path": "docs/handoff.html",
+      "sha256": "7e35d850d584c7b2d7887f1ccf8868479fd300dddd2953c90628605e56a66c4f"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "bc4081fcfa9bf43433c83f2198f523e43fabcaf6406566db915cd7de7f00631c"
+    }
+  ],
+  "head": "c9648dd177f40ed2100e0e63bee585be5c7a77d5",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Can each phase of this milestone plan be implemented and tested as written, against the code it cites at main c9648dd, and do the plan and its two draft phase specs agree with each other, with the code, and with the project's rules in .devtools/project.md?",
+  "subject": "plan",
+  "version": 1
+}

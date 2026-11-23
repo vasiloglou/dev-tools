@@ -1,0 +1,91 @@
+{
+  "base": null,
+  "claims": [
+    "Phase 1's design leaves the note of any hand-off with 25 or fewer ignored paths exactly as main writes it.",
+    "Phase 1's design makes takeover report not ready whenever an ignored path the note was written with, other than a key file, is absent, for new and older notes, whatever characters the path holds.",
+    "Phase 2's design, with count_extra_dirs absent or false, leaves every output and exit of components_index.py unchanged, ordering included.",
+    "Each test in the two specs, run against the fixture it names, can produce the exit and output the spec expects.",
+    "No phase needs an input that only a later phase produces, and every completion predicate C1 to C6 has a gate or ruling that can fail it.",
+    "Every gate command in plan section 9 can run as written from the repository root."
+  ],
+  "created": "2026-11-21T19:26:17.908336+00:00",
+  "deleted": [],
+  "dirty": true,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
+      "sha256": "62eeb77b6ba0d9e97af650624c66d3da652c8e4f2e0221c1dfe3f7ce57fd5832"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-1-spec.md",
+      "sha256": "06833ec7ca4a3873da5b62ed3089d3f9f8d7d66e0df022d1bf607c33c8e5729b"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-2-spec.md",
+      "sha256": "59a272208b1e6e919e9cd2570e864ea078e51fb7911eb246050d3c7a15f0bd79"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/plan-r2/review.md",
+      "sha256": "dbca17f44cea1c5096c26a0179a6179bca9177a58e0b1c7a7adf4615be765725"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/plan-r2/FINDINGS.md",
+      "sha256": "d728d6b1360f8f0d4dc78449f854abadfd443d844ebafe262a5f91c64ae1e990"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    },
+    {
+      "path": ".planning/PROJECT.md",
+      "sha256": "d6b274e2937a8e44fa652ba46e4fdf1260460a8fb1a2a28dd37d67eea591df08"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "d79796d25b4a68e2145bcc01fab07eb058361bbf77c737ebfb99d9abb20a5c20"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "5b0d7f0ad8bc998c48ee905c533a5dfe728bbb1dc7fb318e1f7e7ab1456c085a"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "13105bfbee8587baf491e757c47e2f6da7b1594bb99bb89b006773577fe95793"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "8cf8cb2bccc255a0318d1aa922ecc062bcdd89cd02a5bd6b772322ca27f2cc18"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "8b74ccda535b97bcc4fdcf1b911dc246d6a7a18c6033ef555456076d25efb263"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "fd4a0ee50d5bded553a17d1ba3320515a442c94390eca97f11b4caf0b9fa3327"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "59f1d71ecee62cdbc8ee8a6244b78e28c606f036e53605d177a2f4505b6cb364"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "685595c1bf5a83732d138ae58264c3e955d96336c6904d5ad4392c21e865160d"
+    },
+    {
+      "path": "docs/handoff.html",
+      "sha256": "7e35d850d584c7b2d7887f1ccf8868479fd300dddd2953c90628605e56a66c4f"
+    },
+    {
+      "path": "docs/adopt.html",
+      "sha256": "bc4081fcfa9bf43433c83f2198f523e43fabcaf6406566db915cd7de7f00631c"
+    }
+  ],
+  "head": "bfc5be1b2fe0f3e477e1430da282944e4f6f6023",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Can each phase of this milestone plan be implemented and tested as written, against the code it cites at main c9648dd, and do the plan and its two draft phase specs agree with each other, with the code, and with the project's rules in .devtools/project.md? Sites marked (r1 Fn) and (r2 Fn) were changed after earlier rounds (notes/reviews/plan-r1, plan-r2); judge them as you judge the rest.",
+  "subject": "plan",
+  "version": 1
+}

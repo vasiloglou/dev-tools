@@ -1,0 +1,88 @@
+{
+  "base": "24b2d83",
+  "claims": [
+    "takeover reports ready only if every ignored path the note was written with, other than a key file, exists in the checkout, whatever characters the path holds, including every character str.splitlines() breaks a line at.",
+    "A bullet or ignored-rest path that is empty, absolute, or has an empty, '.' or '..' part withholds ready and is never checked as a path.",
+    "No text in the snapshot (a commit subject, a tracked or uncommitted file name) can end the snapshot before its ignored-files section or hide that section, so as to make a note with a missing ignored path read as ready.",
+    "takeover never raises on a path the file system refuses to look up, on any Python the scripts support.",
+    "write and check find the snapshot's end where takeover does, and a second write keeps the note's filled sections and leaves exactly one snapshot.",
+    "Every note main writes for a checkout with ordinary paths reads as it did at 24b2d83: the same ready, missing and unlisted results.",
+    "plugins/ is rebuilt from skills/ and nothing under plugins/ was edited by hand."
+  ],
+  "created": "2026-11-22T09:42:14.222360+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r4/diff.patch",
+      "sha256": "5290f8f5bad0312908a67255b3ebb4a5ab93f8d214408f0dd568787ff6619965"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/BRIEF.md",
+      "sha256": "d21cf1e9daaba5e8ddd727f681084f1b2c73c6ce949a10429ca862967ad72775"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/FINDINGS.md",
+      "sha256": "6a560e53be153c5111fa3f2db12c09076d6ef78a4f5e616b1c727ccdf4b6a09c"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/brief.json",
+      "sha256": "865bdb12cae1ff9766433068425b0eb1488e4a738892fc9a088eaf8eae66d23f"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/diff.patch",
+      "sha256": "ca730330b4c9b3edc9f29c41b5c67158588ca68ce244f7f49209d4c78a42855e"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/review.md",
+      "sha256": "ba874a6a20b1cefe5f6f3a59cdf44fef1844a3d4de73e0addf1a87079378258b"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/reviews/phase-1-r3/run.json",
+      "sha256": "3c47909c9c808ae5dcc0b9b155b2f3ff104a4e9bc42d5e681eacc30f073fe4e2"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/references/handoff.md",
+      "sha256": "3ab0aa28718fe1a11e388c20a38b7b214f885502865583328600557e3f72aee9"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "74de4ada6271fc728c3929a7bce68dc3f3de11a1d460c76bbaa6b534d2162285"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/references/handoff.md",
+      "sha256": "3ab0aa28718fe1a11e388c20a38b7b214f885502865583328600557e3f72aee9"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "74de4ada6271fc728c3929a7bce68dc3f3de11a1d460c76bbaa6b534d2162285"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "28024500a082ff229f4cb1a97e7f5a03bc6205692a1115aa62453b477cf04780"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "74de4ada6271fc728c3929a7bce68dc3f3de11a1d460c76bbaa6b534d2162285"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "2cf051c9f5dc3a89187319f6d0c81cfbcd72a4f382a72a52ae538503bdb8613d"
+    },
+    {
+      "path": ".planning/milestones/component-index/notes/phase-1-spec.md",
+      "sha256": "77f589b5f47729bcb47626ba93591c111fc305866c699fad838963969f409a9f"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "e2f5561d5449bd9136880b6fa1bf696322bc70bdd98d583bdaa2a15a2ce25a7a"
+    }
+  ],
+  "head": "d58436228c0359b586c24a5fa840a35490ac7ef4",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Round 4. Do the repairs of round 3 (notes/reviews/phase-1-r3/FINDINGS.md, repaired at e2b2762) hold, and where can the claims below be shown false, by a note, an input, a file name or a checkout state?",
+  "subject": "phase",
+  "version": 1
+}

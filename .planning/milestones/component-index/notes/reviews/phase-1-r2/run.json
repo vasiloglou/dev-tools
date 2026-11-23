@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "codex",
+    "exec",
+    "--ephemeral",
+    "-c",
+    "model_reasoning_effort=\"high\"",
+    "--sandbox",
+    "read-only",
+    "--color",
+    "never",
+    "--skip-git-repo-check",
+    "--add-dir",
+    "{dir}",
+    "-o",
+    "{dir}/review.md",
+    "Read {dir}/BRIEF.md and follow it."
+  ],
+  "brief_sha256": "d0f50d879392cbf653f072c064ae6133a377ef259cb82e4093120c948ebabc02",
+  "effort": "high",
+  "exit": 0,
+  "finished": "2026-11-21T19:42:47+00:00",
+  "model": "codex default",
+  "pid": 20661,
+  "review_sha256": "bf4dda998098135f924c8ce835a684b1eb2ac633160c8f5b071f54c1b236fcea",
+  "reviewer": "codex",
+  "sanitized_sha256": "cc5044b05a9c187b3dbcd12af8955a5fc55408ecff436badcb0772f77d03bdc5",
+  "started": "2026-11-21T19:40:29+00:00",
+  "state": "done",
+  "stdout": "review.log",
+  "timeout_minutes": 60
+}
