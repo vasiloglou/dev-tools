@@ -2,9 +2,8 @@
 
 ## 1. Status
 
-**Awaiting owner review.** The owner approved the milestone plan at the plan gate on
-2026-11-23 (o). That approval does not cover this spec: its decisions D1 to D5 are open,
-and no code is written before they are ruled.
+Owner-decided (2026-11-23), by delegated approval (auto=true); recorded below, under
+"Owner gate". The plan gate is recorded (`001-plan.md`). Implementation may begin.
 
 ## 2. Provenance
 
@@ -18,7 +17,8 @@ and no code is written before they are ruled.
   and F5. Both were reproduced and are repaired here, marked `(r1 F4)` and `(r1 F5)`.
   **The current bytes are not the bytes that round read, and carry no review opinion.**
 
-Tags used when the spec is amended: `(o)` an owner ruling, `(rN)` review round N.
+Tags used when the spec is amended: `(o)` an owner ruling, `(d)` a delegated ruling
+(auto=true), `(rN)` review round N.
 
 ## 3. Obligations
 
@@ -249,15 +249,15 @@ definitions, not by widening the entry.
 
 ## 7. Decisions
 
-Every row is open.
+Ruled 2026-11-23 by delegated approval (auto=true), each as proposed (d). See "Owner gate".
 
 | # | Question | Readings and their cost | Proposed |
 |---|---|---|---|
-| D1 | How the guard learns GND cannot build cases | **From the note in what `rules_check.py test` printed, inside the test:** no model to build in the test file, the `suggest` half always runs, and the note's wording is pinned by T1. A change of GND's sentence makes the test fail again, loudly. **By running `gnd synth` once at collection**, as the issue's example says: the test file needs a model GND accepts (a second copy of what `rules_check.model` builds), every collection pays for a GND run, and the whole test is skipped | From the note |
-| D2 | Where the one list lives | **In `sync.py`, loaded by `from_gsd.py`:** `sync.py` stays one file; `from_gsd.py` depends on the file beside it, which it already does for the templates. **In a third file both load:** `sync.py` is no longer one file. **In `from_gsd.py`, loaded by `sync.py`:** the script every project runs depends on the one few do | In `sync.py` |
-| D3 | If S1 to S9 show a defect in `phase_selection.py` | **Fix it here when the fix is within one function**, with the failing case as its test; that changes a plugin file, so the milestone's bump (plan D4) moves to this phase. **Record it and draft an issue:** the phase changes no product file, and the test that found it is committed marked as an expected failure | Fix it here |
-| D4 | Whether issue 31's failure is reproduced with a real GND | **One by-hand run** with a GND installed without the extra (`GND_COMMAND="uvx --from get-nick-done==0.4.0 gnd"`, which fetches the package from PyPI): the record shows the skip on the real refusal. **The fake only:** nothing is fetched, and the sentence GND prints stays an inherited claim from the issue | One by-hand run |
-| D5 | What issue 42 still needs, now that a test of the plugin is known to exist (r1 F5) | **The entry lists the existing test, and a new file holds the other branches** (S1 to S9): about 130 lines of tests, and every branch of the plugin has a case that names the tests kept. **Extend the existing test in `tests/test_tools.py`:** one place, but each case pays for the `project` fixture's full sync, and that file is 1894 lines already. **List the existing test in the entry and add nothing:** a few lines; B6 to B8 and B10 to B18 stay without a case, and the issue is answered more than fixed | The entry and a new file |
+| D1 | How the guard learns GND cannot build cases | **From the note in what `rules_check.py test` printed, inside the test:** no model to build in the test file, the `suggest` half always runs, and the note's wording is pinned by T1. A change of GND's sentence makes the test fail again, loudly. **By running `gnd synth` once at collection**, as the issue's example says: the test file needs a model GND accepts (a second copy of what `rules_check.model` builds), every collection pays for a GND run, and the whole test is skipped | Ruled: from the note (d) |
+| D2 | Where the one list lives | **In `sync.py`, loaded by `from_gsd.py`:** `sync.py` stays one file; `from_gsd.py` depends on the file beside it, which it already does for the templates. **In a third file both load:** `sync.py` is no longer one file. **In `from_gsd.py`, loaded by `sync.py`:** the script every project runs depends on the one few do | Ruled: in `sync.py` (d) |
+| D3 | If S1 to S9 show a defect in `phase_selection.py` | **Fix it here when the fix is within one function**, with the failing case as its test; that changes a plugin file, so the milestone's bump (plan D4) moves to this phase. **Record it and draft an issue:** the phase changes no product file, and the test that found it is committed marked as an expected failure | Ruled: fix it here (d) |
+| D4 | Whether issue 31's failure is reproduced with a real GND | **One by-hand run** with a GND installed without the extra (`GND_COMMAND="uvx --from get-nick-done==0.4.0 gnd"`, which fetches the package from PyPI): the record shows the skip on the real refusal. **The fake only:** nothing is fetched, and the sentence GND prints stays an inherited claim from the issue | Ruled: one by-hand run (d) |
+| D5 | What issue 42 still needs, now that a test of the plugin is known to exist (r1 F5) | **The entry lists the existing test, and a new file holds the other branches** (S1 to S9): about 130 lines of tests, and every branch of the plugin has a case that names the tests kept. **Extend the existing test in `tests/test_tools.py`:** one place, but each case pays for the `project` fixture's full sync, and that file is 1894 lines already. **List the existing test in the entry and add nothing:** a few lines; B6 to B8 and B10 to B18 stay without a case, and the issue is answered more than fixed | Ruled: the entry and a new file (d) |
 
 ## 8. Tests
 
@@ -337,4 +337,52 @@ index entries. The measurement goes in the record.
 
 ## 11. Approval instrument
 
-This prose. There is no fixture corpus.
+This prose. There is no fixture corpus: the phase adds no serialized format, no exit
+code and no validation predicate, so the corpus-first default of `review-convergence.md`
+does not apply.
+
+## Owner gate
+
+    ruling: delegated (auto=true) approved
+    artifact: .planning/milestones/issue-sweep/notes/phase-1-spec.md
+    sha256: in the phase record, 002-phase-1.md (a file cannot hold its own digest)
+    date: 2026-11-23
+    authorization: the owner's "process-milestone issue-sweep auto", given in the
+      session that wrote the plan, after the plan gate; for the milestone issue-sweep
+      only
+    scope: this spec and its amendments; the phase's commits over the files it names
+    not covered: pushing, the pull request, merging, tagging, releasing, and anything
+      posted to GitHub
+    instrument: this prose
+    decisions: D1 to D5, each as proposed
+    spec review: none. The plan review read this spec (r1); its two findings are
+      repaired above. An optional review of a spec is omitted unless a concrete
+      uncertainty needs one, and the uncertainties here are facts a test settles.
+    phase review: review_tool.py, --subject phase, reviewer Codex; at most two rounds
+      (r1, r2), declared here before either has run
+
+This is an agent's ruling under the owner's delegation. It is not the owner's own
+reading of the spec.
+
+**Implementability sweep**, before the ruling. For each requirement, can some
+implementation meet it as written?
+
+| Requirement | Answer |
+|---|---|
+| The guard reads the note of `rules_check.py test` (6.1) | Yes: `generated` returns that note whenever no manifest is written (`rules_check.py:818`), with GND's exit and its first 300 characters |
+| A fake `gnd` that lists the flag and exits 5 (T1) | Yes: `fake_gnd` lists `--guarded-cases` when `cases` is not `None`, and its `synth` branch can exit before it writes the manifest |
+| S1 to S9 expect what the plugin collects | Yes for S1, S2, S3 (first half), S4 (the file) and S5: run by hand on 2026-11-23 (plan, section 3). S3's second half was corrected by r1 F4. The rest are facts for the tests to settle; an expectation the plugin does not meet is a finding under D3, not a reason to bend the test |
+| `from_gsd.py` loads `sync.py` by path (6.3) | Yes: the tests already load both that way, and `sync.py` runs nothing when loaded |
+| G1 fails before the change and passes after | Yes: `from_gsd` has no attribute `sync` today |
+| The by-hand gate of D4 | Depends on PyPI being reachable. If it is not, the gate is recorded as not run and Q2 of the plan stays open |
+| `review` prints 0 for both groups after 6.4 | Simulated by the plan reviewer (r1, "checked and found true"); the gate G-review decides |
+
+**Verification selection.** Plan-mandated: the five gates of section 8 and the by-hand
+run. Direct: the three test files the phase edits or adds. Impact closure:
+`tests/test_sync.py` (it shares `sync.py`'s list) and `tests/test_own_index.py` (the
+index). The full suite is the repository's only broad lane and the plan's section 9
+names it for this phase, so it runs.
+
+## Implementation findings, recorded as they were found
+
+(None yet.)
