@@ -1553,3 +1553,37 @@ def test_a_source_that_is_not_a_folder_is_not_compared(source, tmp_path, capsys)
     assert err.startswith("warning: not compared with dev-tools: ")
     assert out_of(capsys, *check_source(project, missing, "--strict"))[0] == 5
     assert out_of(capsys, "apply", "--project", project, "--source", missing)[0] == 2
+
+
+def test_a_source_name_git_would_read_as_a_pattern_does_not_hide_own_work(tmp_path):
+    # pr-47-r2 F1: config paths are literal, and a dirty query that fails is not "clean".
+    upstream = tmp_path / "up"
+    write(upstream / "skills/demo/SKILL.md", "first\n")
+    write(upstream / ":(unknown)one.py", "ONE = 1\n")
+    git(upstream, "init", "-q", "-b", "main")
+    commit(upstream, "first")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(upstream), str(clone)], check=True)
+    write(upstream / "skills/demo/SKILL.md", "second\n")
+    commit(upstream, "second")
+    write(clone / "skills/demo/SKILL.md", "mine\n")
+    resolved = sync.resolve_source(clone, as_is=False, sources=("skills/demo", ":(unknown)one.py"))
+    resolved["cleanup"]()
+    assert resolved["state"] == "own-work"
+    write(clone / "skills/demo/SKILL.md", "first\n")
+    resolved = sync.resolve_source(clone, as_is=False, sources=("skills/demo", ":(unknown)one.py"))
+    resolved["cleanup"]()
+    assert resolved["state"] == "upstream"
+
+
+def test_a_dirty_check_that_fails_keeps_the_checkout(behind, monkeypatch):
+    # pr-47-r2 F1, the second half
+    real = sync.subprocess.run
+
+    def failing_status(argv, *args, **kwargs):
+        if "status" in argv:
+            return subprocess.CompletedProcess(argv, 128, "", "fatal: broken\n")
+        return real(argv, *args, **kwargs)
+    monkeypatch.setattr(sync.subprocess, "run", failing_status)
+    resolved = sync.resolve_source(behind["clone"], as_is=False)
+    assert resolved["state"] == "own-work" and "could not tell" in resolved["lines"][-1]

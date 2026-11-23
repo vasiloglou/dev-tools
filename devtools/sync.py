@@ -382,11 +382,20 @@ def resolve_source(path: Path, *, as_is: bool, sources: tuple[str, ...] = ()) ->
         return result("as-is", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name}; delivering the checkout as it is (--as-is)"])
     # Asked so that no setting hides work: modes are compared, untracked files are listed, and a
-    # file git was told to stop looking at (assume-unchanged, skip-worktree) counts as changed.
-    uncommitted = [line for line in out("-c", "core.fileMode=true", "status", "--porcelain", "--untracked-files=all",
-                                        "--", *DIRTY_PATHS, *sources).splitlines() if line.strip()]
-    uncommitted += [line for line in out("ls-files", "-v", "--", *DIRTY_PATHS, *sources).splitlines()
-                    if line[:1].islower() or line[:1] == "S"]
+    # file git was told to stop looking at (assume-unchanged, skip-worktree) counts as changed. The
+    # paths are literal (a config's source may hold pattern characters), and a query that fails
+    # counts as work of one's own: the checkout is then delivered as it is.
+    paths = ("--", *DIRTY_PATHS, *sources)
+    status = git("--literal-pathspecs", "-c", "core.fileMode=true", "status", "--porcelain", "--untracked-files=all",
+                 *paths)
+    flags = git("--literal-pathspecs", "ls-files", "-v", *paths)
+    failed = [done for done in (status, flags) if not isinstance(done, subprocess.CompletedProcess) or done.returncode]
+    if failed:
+        return result("own-work", head, lines + [
+            f"warning: dev-tools here is {behind} commit(s) behind {name}, and git could not tell whether it has work "
+            f"of its own; delivering the checkout as it is"])
+    uncommitted = [line for line in status.stdout.splitlines() if line.strip()]
+    uncommitted += [line for line in flags.stdout.splitlines() if line[:1].islower() or line[:1] == "S"]
     if ahead or uncommitted:
         return result("own-work", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name} and has work of its own ({ahead} commit(s) "
