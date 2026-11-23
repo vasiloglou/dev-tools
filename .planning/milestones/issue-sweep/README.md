@@ -8,8 +8,9 @@ the fix. Issues 39 and 40 are left for milestones of their own.
 - **Plan review:** one round (Codex), `notes/reviews/plan-r1`, 5 findings, each reproduced
   and repaired. The repaired bytes are unreviewed.
 - **The issues as read:** [notes/issues-2026-11-23.md](notes/issues-2026-11-23.md).
-- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md). Phases 2 and 3 are
-  outlines in the plan until the phase before each is recorded.
+- **Phase specs:** [notes/phase-1-spec.md](notes/phase-1-spec.md),
+  [notes/phase-2-spec.md](notes/phase-2-spec.md). Phase 3 is an outline in the plan until
+  phase 2 is recorded.
 - **Phases:**
   1. The suite tests what it claims, and one list of other planning tools (issues 31, 42,
      41).
@@ -23,6 +24,6 @@ the fix. Issues 39 and 40 are left for milestones of their own.
 - **Execution:** `process-milestone issue-sweep auto`, from 2026-11-23: each spec's owner
   gate and the close ruling are delegated approvals (auto=true). Pushing, the pull
   request, merging, tagging and anything posted to GitHub need the owner.
-- **Next action:** phase 2's spec and its delegated gate.
+- **Next action:** phase 2, under its spec, approved by delegated approval on 2026-11-23.
 - **Records:** [001-plan.md](001-plan.md): the plan gate; [002-phase-1.md](002-phase-1.md):
   the GND guard, the plugin's tests, one list of other planning tools.
