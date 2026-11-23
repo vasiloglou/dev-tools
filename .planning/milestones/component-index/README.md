@@ -30,4 +30,6 @@ note did not list is missing.
 - **Records:** [001-plan.md](001-plan.md), [002-phase-1.md](002-phase-1.md),
   [003-phase-2.md](003-phase-2.md), [004-phase-3.md](004-phase-3.md),
   [005-phase-3-reread.md](005-phase-3-reread.md): every entry read in full, and the
-  third review rounds of phases 1 and 2.
+  third review rounds of phases 1 and 2;
+  [006-phase-4.md](006-phase-4.md): the test that keeps the index current, the gate rows
+  and the pages.

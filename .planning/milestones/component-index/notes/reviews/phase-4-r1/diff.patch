@@ -1,0 +1,616 @@
+diff --git a/.devtools/project.md b/.devtools/project.md
+index d1bd10c..1ab77ec 100644
+--- a/.devtools/project.md
++++ b/.devtools/project.md
+@@ -16,10 +16,20 @@ project belongs in the shared skill under `skills/`, not here.
+   2026-11-21 when the project took the workflow. Nothing else is scaffolded: a milestone
+   adds its own folder under `.planning/milestones/`. If `PROJECT.md` is missing, restore
+   it from git; no skill writes it again.
+-- **Component index.** None yet, so a phase skips the three component steps. `docs/` is
+-  the public site, so the default folder `docs/components` is not free to use: the folder
+-  is chosen when the index is built, set as `docs_dir` in
+-  `.devtools/components_index.settings.json`, and named here.
++- **Component index.** In `.devtools/components/`, with its settings in
++  `.devtools/components_index.settings.json`. It has a component for every module of
++  `devtools/` and `skills/`. (`docs/` is the public site, so the default folder
++  `docs/components` was not free to use.)
++  - A phase runs the three component steps with the copy of the script in `plugins/`,
++    from the repository root:
++    `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py`.
++  - Not the copy under `skills/`: it reads its settings from beside itself, inside the
++    product.
++  - Not an installed plugin older than 0.1.5: it refuses the settings file with
++    `unknown setting(s): count_extra_dirs`.
++  - After a change to a module of `devtools/` or `skills/`: rebuild the plugins, run that
++    script's `write`, and commit `.devtools/components/` with the change. The generated
++    pages hold each definition's line number, so most changes to a module move them.
+ - **Workflow skills of its own.** None. `adopt-devtools` and `move-from-gsd` are part of
+   the product; they do not own work in this repository.
+ 
+@@ -48,6 +58,8 @@ Run from the repository root, with Python 3.11 or newer.
+ | One test file (a focused gate) | `uv run --no-project --with pytest python -m pytest tests/<file>.py -q` |
+ | The plugins match the skills | `python3 devtools/build_plugins.py --check` |
+ | Whether a release is due | `python3 devtools/release_plugins.py status` |
++| The component index is current (when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
++| The index against what a change touched (before a pull request, after `git fetch origin`) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main` |
+ 
+ There is no lint command and no CI: the tests run on the machine that makes the change.
+ 
+diff --git a/.planning/milestones/component-index/notes/phase-4-spec.md b/.planning/milestones/component-index/notes/phase-4-spec.md
+new file mode 100644
+index 0000000..ff6ddc9
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/phase-4-spec.md
+@@ -0,0 +1,314 @@
++# Phase 4 spec: keep dev-tools' component index current
++
++## 1. Status
++
++Draft, 2026-11-23, written with `process-phase` (dvt-milestone 0.1.3) on the owner's
++invocation `/dvt-milestone:process-phase 4 auto`. Its gate is a delegated approval
++(auto=true), recorded in section 12. No review has run over these bytes.
++
++Phases 1 to 3 are merged (vasiloglou/dev-tools#29, #30 and #32, on 2026-11-23). This
++phase's branch, `claude/component-index-phase-4`, is cut from `main` at `827e766`.
++
++## 2. Provenance
++
++- **Plan.** `notes/component-index-plan.md` at SHA-256 `3cc5eb49…86a9`: phase 4 in
++  section 4, C3 and C4, the section 9 rows for phase 4, R0.1 to R0.3 in section 0, D1 and
++  D3 in section 10, R6 in section 6, and the section 5 row for
++  `.devtools/project.md`, `AGENTS.md`, `README.md` and `docs/milestone.html`.
++- **Records read.** `004-phase-3.md` (its boundary: "Nothing yet keeps the index current
++  … That is phase 4") and `005-phase-3-reread.md` (Q9 to Q12, all for the close).
++- **Code read.** `plugins/dvt-milestone/skills/components/scripts/components_index.py`:
++  `plugin_root`, `checkout_root`, the settings block, `sources`, `counted_modules`,
++  `cache_path`, `stale_files`, `write_or_check` and `main`. `tests/test_plugins.py`, for
++  how a test here runs a plugin's script.
++- **Runs before the gate** (the implementability sweep; none is a gate result):
++  - In a copy of `.devtools`, `devtools`, `skills`, `tests` and `plugins/dvt-milestone`
++    with `git init`, `--no-cache --check --strict` exited 0 and printed nothing. Without
++    `tests/` in the copy it exited 1: the check also refuses an entry whose `tests:` path
++    is missing.
++  - In such a copy, each of these exited 1: a module path replaced in an entry
++    (`no component: skills/phase/pytest/phase_selection.py …`); a new module
++    (`no component: skills/newthing/scripts/new_tool.py …`); a public function added to
++    `devtools/sync.py` (`stale or missing: .devtools/components/modules/_root.md`); the
++    settings file deleted (`docs/components/COMPONENTS.md is missing …`).
++  - With a new module, `write` and then `stats --write-baseline` exited 0, and
++    `--check --strict` then exited 0 and printed nothing (plan-r1 F6, reproduced).
++  - The built copy's `--no-cache --check --strict`, run under Python 3.11, 3.12, 3.13
++    and 3.14 with `uv run --no-project --python <version>`, printed nothing each time.
++  - The installed 0.1.3 copy, run from this checkout, printed
++    `…/.devtools/components_index.settings.json: unknown setting(s): count_extra_dirs`
++    and exited 1 (plan R6, reproduced).
++
++## 3. Obligations (step 0 harvest)
++
++| # | Obligation | Source | Discharged in |
++|---|---|---|---|
++| O1 | `tests/test_own_index.py` runs the built copy's `--check --strict` from the repository root | Phase 4 deliverables; D3 | Section 6, the test; T1 |
++| O2 | The new test exits 0 on the phase's head | P4.1; section 9 row | G1 |
++| O3 | With one entry's module path removed, the test fails and names the module | P4.2; section 9 row | T3; G2 |
++| O4 | With an `unassigned-baseline.txt` present, the test fails | P4.3; plan-r1 F6; C1 | T4; G3 |
++| O5 | The suite includes a test that fails while the index is stale, and the suite exits 0 | C3 | T5, T6; G5 |
++| O6 | `.devtools/project.md` names the index, its folder and its two gates | C4; phase 4 deliverables | Section 6, `.devtools/project.md` |
++| O7 | `.devtools/project.md` names the plugin version the index needs | Plan R6 | Section 6, `.devtools/project.md` |
++| O8 | One line in `AGENTS.md`: search the index before writing a module or a function | Phase 4 deliverables | Section 6, `AGENTS.md` |
++| O9 | A row naming `.devtools/components/` in `README.md` and `docs/milestone.html#own-use`; a pointer on `docs/components.html` | Phase 4 deliverables; C4; plan section 5 | Section 6, the pages |
++| O10 | `changed --base main` exits 0 on the phase's head | Section 9 row | G4 |
++| O11 | Every gate that uses the index tool runs the built copy from the repository root | R0.3 | Section 8, every command |
++| O12 | Every contributor is affected: the full suite now checks the index | Section 9 row, "Affected consumers" | D2; section 6, `CONTRIBUTING.md` |
++| O13 | "Nothing yet keeps the index current" | `004-phase-3.md`, boundary | Discharged by this phase; the record says so |
++
++Plan section 10 assigns this phase no decision row. Q1, Q2 and Q7 to Q12 are for the
++close sweep and are not touched here.
++
++## 4. The standing rules, bound to this phase
++
++| Rule | Bound here to |
++|---|---|
++| A script change comes with a test | No script under `skills/` or `devtools/` changes. The phase adds a test file; each line its judgment can return has a case that fails without it (section 8) |
++| The plugins are rebuilt, and released under a new version | Does not apply: nothing under `skills/` or `agents/` changes, so there is no bump. G6 checks `plugins/` is still what the build makes |
++| A wording change says what prompted it | No skill wording changes. The changed sentences are the project's own files and the site; each is listed in section 6 with what made it untrue or incomplete |
++| Shared skills stay general | Nothing is written under `skills/`. What is true of dev-tools only goes in `.devtools/project.md` (R0.2) |
++| Both agents read the same file | `AGENTS.md` is read by Codex directly and by Claude Code through `CLAUDE.md`. Its new command is a path in the repository, with no `${CLAUDE_PLUGIN_ROOT}` |
++| Captures on the site are real output | No capture is added or replaced. The pointer on `docs/components.html` is a sentence and a link |
++| The page that describes it is updated too | `README.md`, `CONTRIBUTING.md`, `docs/milestone.html`, `docs/components.html` and `docs/contribute.html`, in this phase's pull request |
++| R0.1 A shipped script stands alone | No import is added between scripts. The test imports no script; it runs one as a subprocess |
++| R0.2 The index is the project's | No file of the index is written outside `.devtools/`. The three pages of `docs/` describe dev-tools' own use as an example a reader can open; no dev-tools path or setting enters a skill |
++| R0.3 The released plugin runs | The test and every gate in section 8 name `plugins/dvt-milestone/skills/components/scripts/components_index.py`, run from the repository root |
++
++## 5. Goal
++
++`uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q` exits 0
++on the phase's head. In a checkout of that head with one entry's module path removed
++from `.devtools/components/COMPONENTS.md`, the same command exits 1 and its output holds
++`no component: <that module>`. In a checkout with
++`.devtools/components/unassigned-baseline.txt` present, it exits 1 and its output names
++that file. The full suite exits 0. `.devtools/project.md` names the index's folder, the
++copy of the script that runs here, the plugin version it needs and two gate rows.
++
++## 6. Design
++
++**Reuse** (the index was searched with the built copy):
++
++| Capability | Searches | Found | Decision |
++|---|---|---|---|
++| Decide whether the catalog matches the code | `search check the component index is current`; `search stale index test fails when a module has no component` | `components.index`: `write_or_check`, behind `--check --strict` | reuse: the test runs that command and adds no checking logic of its own, except the baseline (below) |
++| Refuse a baseline file | the same two searches; `git grep -n unassigned-baseline` | `write_or_check` reads the baseline to excuse the modules it names; nothing refuses the file | new: one `exists()` in the test. The script must go on excusing a baseline for projects that keep one |
++| Run a plugin's script in a copy of a project, in a test | `search run a script from the repository root in a test` (no component: the index does not cover `tests/`); `git grep -n "^def run" tests` | `run` in `test_plugins.py`, `test_handoff.py`, `test_sync.py`, `test_from_gsd.py`: one per test file, each with its own arguments; there is no `conftest.py` | new: a helper of the same shape in the new file. Test files here share no helpers |
++
++**The test** (`tests/test_own_index.py`, about 120 lines).
++
++```python
++ROOT = Path(__file__).resolve().parents[1]
++SCRIPT = "plugins/dvt-milestone/skills/components/scripts/components_index.py"
++INDEX = ".devtools/components"
++BASELINE = INDEX + "/unassigned-baseline.txt"
++COPIED = (".devtools", "devtools", "skills", "tests", "plugins/dvt-milestone")
++
++def index(root: Path, *args: str) -> subprocess.CompletedProcess: ...
++def problems(root: Path) -> list[str]: ...
++```
++
++- `index(root, *args)` runs `[sys.executable, root / SCRIPT, "--no-cache", *args]` with
++  `cwd=root`, capturing its output as text. The script finds the project as the checkout
++  that holds the working directory, and reads that checkout's
++  `.devtools/components_index.settings.json`, because it sits in a plugin's folder.
++  `--no-cache` keeps the test from reading or writing `~/.cache/components-index/`.
++- `problems(root)` is the judgment, and has two parts:
++  1. It runs `index(root, "--check", "--strict")`. On exit 0 this part gives nothing. On
++     any other exit it gives one line, `components_index.py --check --strict exited <N>`,
++     and then every non-blank line the command printed. A non-zero exit therefore always
++     gives at least one line, whatever the script printed.
++  2. If `root / BASELINE` exists, it adds one line naming that path and saying that no
++     baseline is kept here. `--check --strict` excuses every module a baseline names, so
++     only this line shows there is none (C1).
++- `test_the_index_is_current` asserts `problems(ROOT) == []`. Its message lists the
++  lines and says what to run:
++  `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py write`
++  after `python3 devtools/build_plugins.py`, then commit `.devtools/components/`; and for
++  a `no component:` line, add the module to an entry of `COMPONENTS.md` first.
++- A fixture, `checkout`, copies the folders of `COPIED` from `ROOT` into `tmp_path`
++  (without `__pycache__` and `.pytest_cache`) and runs `git init -q` there. The other
++  tests change that copy in one way each and assert on what `problems` returns
++  (section 8).
++
++The test file is not listed under any entry's `tests:` (D4).
++
++**`.devtools/project.md`.**
++
++- "What runs here", the *Component index* item, which says "None yet, so a phase skips
++  the three component steps". New text, in substance:
++  - the index is in `.devtools/components/`, with its settings in
++    `.devtools/components_index.settings.json`, and covers the modules of `devtools/` and
++    `skills/`;
++  - a phase runs the three component steps with the copy of the script in `plugins/`,
++    from the repository root (`python3 plugins/dvt-milestone/skills/components/scripts/components_index.py`);
++  - not the copy under `skills/`, which reads its settings from beside itself; and not an
++    installed plugin older than 0.1.5, which refuses the settings file with
++    `unknown setting(s): count_extra_dirs` (O7; reproduced, section 2);
++  - after a change to a module of `devtools/` or `skills/`: rebuild the plugins, run
++    `write`, and commit `.devtools/components/` with the change.
++- "Gates", two rows:
++
++  | Gate | Command |
++  |---|---|
++  | The component index is current (when a phase closes; the test suite runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
++  | The index against what a change touched (before a pull request) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base main` |
++
++**`AGENTS.md`**, under "Commands": one sentence, "Before writing a module or a function,
++search the component index for what already exists", with the command
++`python3 plugins/dvt-milestone/skills/components/scripts/components_index.py search <words>`.
++
++**`CONTRIBUTING.md`** (D2), in step 3 of "How a change gets in", after the test command:
++one paragraph. A test fails while dev-tools' own component index is stale, which a
++changed script makes it; the failure names the command that regenerates it.
++
++**The pages.**
++
++| File | Change | What made the present text untrue or incomplete |
++|---|---|---|
++| `README.md`, "dev-tools is developed with dev-tools" | A bullet, *Where its component index is*, naming `.devtools/components/`. The intro's "No milestone has run here yet; the first one will leave the first records" is replaced (D3). "What it changes for a contributor. Nothing." becomes one thing: the stale-index test (D2) | The index exists since phase 3; the milestone has left five records; the new test |
++| `README.md`, "What is here" | The `tests/` row and the `.planning/`, `.devtools/project.md` row name the index test and `.devtools/components/` | The same |
++| `docs/milestone.html#own-use` | A table row for `.devtools/components/`. The intro's "No milestone has run there yet …" and the `.planning/milestones/` row's "Empty until the first milestone is planned" are replaced (D3). The list of gate commands gains "whether the component index is current" | The same; and the two new gate rows |
++| `docs/components.html`, the Build feature | One paragraph: dev-tools keeps an index of its own code, written this way, with a link to `.devtools/components/COMPONENTS.md` on `main` | The plan asks for it as an example of a built index |
++| `docs/contribute.html` | Step 3 gains the sentence of `CONTRIBUTING.md`. "Where things live": the `tests/` row and the `.planning/`, `.devtools/` row name the index | It mirrors `CONTRIBUTING.md` |
++
++Every link added points at a path that is on `main` at `827e766`.
++
++**The milestone's `README.md`** gains the phase 4 spec, the merged pull requests and the
++new record.
++
++## 7. Decisions
++
++| # | Question | Readings, and what each costs | Proposed |
++|---|---|---|---|
++| D1 | Where the failing cases of P4.2 and P4.3 live | **(A)** As tests in the same file, each on a copy of the checkout, and once each on the real tree for the record (G2, G3). **(B)** Only the two runs for the record: after this phase nothing could fail if the judgment stopped naming the module or the baseline | (A) |
++| D2 | What a contributor is told about the new test | **(A)** One paragraph in step 3 of `CONTRIBUTING.md` and of `docs/contribute.html`, the `README.md` bullet, and the failure message. **(B)** An eighth rule under "What makes a change easy to accept": those rules are the standing design rules, so the plan's "seven", `.devtools/project.md` and the site's count all change, and every later spec discharges one more. **(C)** The failure message alone: `README.md` then still says a contribution changes nothing | (A) |
++| D3 | The sentences the milestone made untrue (`README.md` and `docs/milestone.html`: "No milestone has run here yet", "Empty until the first milestone is planned") | **(A)** Replace them here, beside the rows this phase adds. **(B)** Leave them to the close: the page then says no milestone has run, one row above the index that milestone built | (A) |
++| D4 | Whether `tests/test_own_index.py` goes under an entry's `tests:` | **(A)** No: it tests the catalog's content, not a script. **(B)** Under `components.index`: the entry would then claim a test that passes or fails with dev-tools' catalog, which no other project's copy of the script has | (A) |
++
++## 8. Tests and gates
++
++`tests/test_own_index.py`. Each test asserts on the lines `problems` returns.
++
++| # | Test | What it changes in the copy | Expected |
++|---|---|---|---|
++| T1 | `test_the_index_is_current` | Nothing; it reads `ROOT` | `problems(ROOT) == []` |
++| T2 | `test_a_copy_of_the_checkout_is_current` | Nothing | `problems(copy) == []`. Without it, T3 to T7 could find a problem only because the copy is incomplete |
++| T3 | `test_a_module_no_entry_lists_is_named` (P4.2) | Removes the path from the first `- modules:` line of `COMPONENTS.md` that names one `.py` file | a line starting `no component: <that path> ` |
++| T4 | `test_a_baseline_is_refused` (P4.3) | Adds a module, runs `write` and `stats --write-baseline` | `index(copy, "--check", "--strict")` exits 0, and `problems(copy)` is exactly the baseline line |
++| T5 | `test_a_new_module_is_named` | Adds `skills/example/scripts/example.py` | a line starting `no component: skills/example/scripts/example.py ` |
++| T6 | `test_a_changed_module_leaves_a_page_stale` | Appends a public function to `devtools/sync.py` | a line starting `stale or missing: .devtools/components/modules/` |
++| T7 | `test_the_check_reads_this_projects_settings` | Deletes `.devtools/components_index.settings.json` | the first line is `components_index.py --check --strict exited 1`, and a line holds `COMPONENTS.md is missing` |
++
++Coverage, per line `problems` can return: the exit line (T7, by equality), the script's
++own lines (T3, T5, T6, T7), the baseline line (T4), and nothing (T1, T2). T4 is the only
++case where the script exits 0 and the judgment still fails; it is the branch plan-r1 F6
++named.
++
++Each of T3 to T7 is run once against a `problems` with the part it covers removed, and
++is seen to fail (the record lists the runs).
++
++**Gates**, run from the repository root, with
++`C=plugins/dvt-milestone/skills/components/scripts/components_index.py`:
++
++- G1: `uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q`
++  exits 0 (P4.1).
++- G2 (P4.2): in a clean checkout of the phase's head, with one entry's module path
++  removed from `COMPONENTS.md`, G1's command exits 1 and prints `no component:` with
++  that module.
++- G3 (P4.3): in a clean checkout of the phase's head, with an
++  `unassigned-baseline.txt` present, G1's command exits 1 and prints that file's path.
++- G4: `python3 $C changed --base main` exits 0. Also, as process-phase's step 6 asks,
++  `python3 $C changed --base 827e766 --strict` exits 0.
++- G5: `uv run --no-project --with pytest python -m pytest tests -q` exits 0 (C3).
++- G6: `python3 devtools/build_plugins.py --check` exits 0.
++- G7: `python3 $C --check --strict` exits 0, and
++  `test ! -e .devtools/components/unassigned-baseline.txt` exits 0 (C1 on this head).
++- G8: G1's command under each of Python 3.11, 3.12, 3.13 and 3.14
++  (`uv run --no-project --python <version> --with pytest …`) exits 0.
++
++**G8 is an experiment, written before it runs.** It measures whether the committed index
++is what the script generates under each interpreter the project supports, on this
++machine. It cannot measure another operating system: a checkout whose line endings git
++rewrites would read as stale, and nothing here tries one. An exit other than 0 under any
++version is a finding about the test's reach, recorded as such, not a reason to drop the
++version.
++
++**Verification-selection ledger.**
++
++| Obligation | Disposition |
++|---|---|
++| Plan section 9, phase 4 rows | run: G1 with G2 and G3; G4 |
++| Direct phase tests | run: G1 (T1 to T7) |
++| Impact closure: the full suite gains a file | run: G5 |
++| `plugins/` unchanged by this phase | run: G6 |
++| C1 still true on this head | run: G7 |
++| Broader historical suites | none exists beyond `tests/` |
++
++## 9. Out of scope for this phase
++
++- Any change to `components_index.py`, the `components` skill or any other script.
++- CI (plan section 7).
++- Rereading the three entries `review` lists as older than their code since
++  vasiloglou/dev-tools#34 (`handoff.notes`, `components.rules`, `review.rounds`). That
++  pull request says it changes no behaviour; whether an entry is reread after such a
++  change is a question for the close.
++- `docs/index.html`'s "Used on itself" line, which stays true.
++- The close: its review, the question sweep and the plan repairs.
++
++## 10. Size
++
++- `tests/test_own_index.py`: about 120 lines.
++- `.devtools/project.md`: about 15 lines changed; `AGENTS.md`: about 6 added;
++  `CONTRIBUTING.md`: about 5 added.
++- `README.md`, `docs/milestone.html`, `docs/components.html`, `docs/contribute.html`:
++  about 20 lines changed in all.
++
++## 11. Approval instrument
++
++This prose, with the case table of section 8 as the corpus: each case states what it
++changes and the line it expects, before the test is written. The phase adds a validation
++predicate (`problems`), for which `review-convergence.md` makes a corpus the default;
++the table is that corpus, kept in the spec because the cases are seven one-line changes
++to a copy and have no files of their own.
++
++## 12. Owner gate: delegated approval (auto=true), 2026-11-23
++
++- **Authorization.** The owner's invocation `/dvt-milestone:process-phase 4 auto` on
++  2026-11-23, within the milestone-wide delegation of 2026-11-21
++  (`/dvt-milestone:process-milestone auto`). It covers this spec's ruling. It does not
++  cover merging, tagging or posting to GitHub.
++- **D1 to D4: as proposed.** These are the agent's rulings under the delegation, not the
++  owner's reading of this spec.
++- **Instrument.** This prose and the section 8 case table (section 11).
++- **Budget.** One review round over the diff (`--subject phase`). A second only if the
++  first has a blocking finding; the stop rule of `review-convergence.md` ends it sooner.
++- **Compatibility.** No shipped file changes, so no project that takes dev-tools sees a
++  difference. A contributor to this repository does: the full suite fails while the
++  index is stale (D2).
++- **Unreviewed.** No review round reads this spec before the code. The phase's diff
++  review reads both.
++
++## 13. Implementation findings
++
++- **IF1, 2026-11-23: the base of the `changed` gate. Delegated amendment (auto=true) to
++  section 6.** Section 6's second gate row, kept above, names `changed --base main`, as
++  the plan does. Run as written at `076c91d`, it printed
++  `changed against main (b685e82): 171 file(s) differ; 0 to fix, 0 warning(s), 0 to reread`
++  and exited 0. In this checkout the local branch `main` is at `b685e82`, of 2026-11-15:
++  a worktree does not move it, and nothing here pulls it. The command takes the merge
++  base with what it is given, so an old `main` makes it judge every file changed since,
++  not this change. That is more than was asked, never less, but its `reread:` lines would
++  then name other people's changes. The row in `.devtools/project.md` therefore reads
++  `changed --base origin/main`, after `git fetch origin`. Run at `076c91d`, that printed
++  `changed against origin/main (827e766): 9 file(s) differ; 0 to fix, 0 warning(s), 0 to reread`
++  and exited 0. The plan's wording is repaired at the close.
++- **IF2, 2026-11-23: what T2 is for, measured.** With `tests` left out of the copy, T2
++  and T4 fail and T3, T5, T6 and T7 still pass: each of those four finds its own line
++  among the lines an incomplete copy adds. T2 is what notices the copy.
++- **IF3, 2026-11-23: each case was seen failing.** With the judgment's parts removed one
++  at a time (a pytest plugin kept outside the repository replaced `problems`):
++  - without the exit line, T7 failed;
++  - without the script's own lines, T3, T5, T6 and T7 failed;
++  - without the baseline line, T4 failed;
++  - with nothing returned, T3 to T7 failed and T1 and T2 passed.
+diff --git a/AGENTS.md b/AGENTS.md
+index a43998b..0eaf40c 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -71,6 +71,13 @@ python3 devtools/build_plugins.py --check
+ After changing a skill or an agent, `python3 devtools/release_plugins.py bump` raises the
+ plugin version and rebuilds `plugins/`; commit both with the change.
+ 
++Before writing a module or a function, search the component index
++(`.devtools/components/`) for what already exists:
++
++```bash
++python3 plugins/dvt-milestone/skills/components/scripts/components_index.py search <words>
++```
++
+ ## Before you finish
+ 
+ - Commit, push, merge, tag or post to GitHub only when the owner asks.
+diff --git a/CONTRIBUTING.md b/CONTRIBUTING.md
+index 6036d3b..6966b96 100644
+--- a/CONTRIBUTING.md
++++ b/CONTRIBUTING.md
+@@ -16,6 +16,11 @@ Nobody else can approve or merge.
+    uv run --no-project --with pytest python -m pytest tests -q
+    ```
+ 
++   One test fails while dev-tools' index of its own code (`.devtools/components/`) is out
++   of date, which a change to a script under `skills/` or `devtools/` usually makes it.
++   The failure names the command that regenerates the index; commit the result with the
++   change.
++
+    In Claude Code, this repository's `.claude/settings.json` turns on the released
+    `dvt-milestone` plugin (`/dvt-milestone:review-pr`, `/dvt-milestone:handle-issue` and the
+    rest). Claude Code offers to add the `dvt` marketplace and install it the first time you
+diff --git a/README.md b/README.md
+index 999d25a..52ef83b 100644
+--- a/README.md
++++ b/README.md
+@@ -225,8 +225,9 @@ a release is due.
+ ## Developed with itself
+ 
+ Since 2026-11-21 this repository is a project that uses dev-tools, as well as the place
+-dev-tools is kept. No milestone has run here yet; the first one will leave the first
+-records.
++dev-tools is kept. Its first milestone, `component-index`, gave the project an index of
++its own code; its plan, specs, review rounds and records are in
++`.planning/milestones/component-index/`.
+ 
+ - **Which workflow.** The milestone workflow, from the released `dvt-milestone` plugin,
+   which `.claude/settings.json` turns on. The released version runs, not the branch: a
+@@ -239,7 +240,13 @@ records.
+   run and kept, the design rules every spec answers, and what needs the owner each time.
+   It is a complete example of the file a project writes for itself when it installs a
+   plugin.
+-- **What it changes for a contributor.** Nothing. A fix is a pull request, as
++- **Where its component index is.** [`.devtools/components/`](.devtools/components/COMPONENTS.md):
++  one entry for each module of `devtools/` and `skills/`, searched before a module or a
++  function is written. `search-cases.md` beside it holds the questions it was tested
++  against.
++- **What it changes for a contributor.** One thing: a test fails while that index is out
++  of date, which a change to a script usually makes it, and the failure names the command
++  that regenerates it. Otherwise a fix is a pull request, as
+   [CONTRIBUTING.md](CONTRIBUTING.md) says, with no milestone and no record.
+ 
+ The site has the same account with the lanes side by side:
+@@ -264,8 +271,8 @@ The site has the same account with the lanes side by side:
+ | `devtools/build_plugins.py`, `devtools/release_plugins.py` | Build `plugins/` from the skills (`--check` reports a stale build), and release a plugin version (`status`, `bump`, `tag`). |
+ | `devtools/from_gsd.py` | Reads a GSD planning folder (`survey`) and rewrites it in the phase workflow's format (`convert`). |
+ | `docs/` | The documentation site (plain HTML, served by GitHub Pages). |
+-| `tests/` | Tests for the sync command, the GSD converter, the plugin build and release, and the scripts a project runs after a sync or from a plugin. |
+-| `.planning/`, `.devtools/project.md`, `AGENTS.md` | dev-tools' own use of the milestone workflow, which it is developed with: its milestones and their records, its rules for the skills, and the words the work uses. Not part of what a project takes. |
++| `tests/` | Tests for the sync command, the GSD converter, the plugin build and release, and the scripts a project runs after a sync or from a plugin. One test fails while dev-tools' own component index is out of date. |
++| `.planning/`, `.devtools/project.md`, `.devtools/components/`, `AGENTS.md` | dev-tools' own use of the milestone workflow, which it is developed with: its milestones and their records, its rules for the skills, the component index of its own code, and the words the work uses. Not part of what a project takes. |
+ 
+ ## Tests
+ 
+diff --git a/docs/components.html b/docs/components.html
+index 1d8bf6a..3df4109 100644
+--- a/docs/components.html
++++ b/docs/components.html
+@@ -107,6 +107,7 @@ no component: src/shelf/export.py (add it to the modules of an entry in docs/com
+       <p>The tool does the mechanical half: it lists every file, class and function straight from the source, and prints a stub for each file with its summary, what it imports and what imports it.</p>
+       <p>The agent does the half that needs reading. It opens the code, groups files into capabilities, and writes each entry in the words someone would search for. A stub left as it came is refused. Whatever cannot be finished in one sitting is recorded in a list that is only allowed to shrink.</p>
+       <p>It ends by using the map: it searches for things a newcomer would ask for, and fixes the entries until they are found.</p>
++      <p>dev-tools keeps an index of its own code, written this way: <a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/components/COMPONENTS.md"><code>.devtools/components/COMPONENTS.md</code></a>, with the questions it was tested against in <code>search-cases.md</code> beside it.</p>
+     </div>
+     <div>
+ <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · the same project with no index</b><em>captured</em></div>
+diff --git a/docs/contribute.html b/docs/contribute.html
+index 8b94af0..ab822e0 100644
+--- a/docs/contribute.html
++++ b/docs/contribute.html
+@@ -46,6 +46,7 @@
+       <h3>Make the change and run the tests</h3>
+       <p>The tests cover the sync command and the scripts a project runs after a sync. They need Python 3.11 or newer.</p>
+ <pre class="code">uv run --no-project --with pytest python -m pytest tests -q</pre>
++      <p>One test fails while dev-tools' index of its own code (<code>.devtools/components/</code>) is out of date, which a change to a script under <code>skills/</code> or <code>devtools/</code> usually makes it. The failure names the command that regenerates the index; commit the result with the change.</p>
+     </li>
+     <li>
+       <h3>Open a pull request against <code>main</code></h3>
+@@ -108,8 +109,8 @@
+     <tr><td><code>plugins/</code></td><td>The Claude Code plugins <code>dvt-phase</code> and <code>dvt-milestone</code>, generated from the skills by <code>devtools/build_plugins.py</code>. After changing a skill or an agent, run <code>python3 devtools/release_plugins.py bump</code>, which raises the plugin version and rebuilds them, and commit the result with the change.</td></tr>
+     <tr><td><code>examples/</code></td><td>A complete project file, and a GitHub Actions job that checks the index.</td></tr>
+     <tr><td><code>docs/</code></td><td>This site.</td></tr>
+-    <tr><td><code>tests/</code></td><td>Tests for the sync command, the plugin build and release, and the scripts.</td></tr>
+-    <tr><td><code>.planning/</code>, <code>.devtools/</code>, <code>AGENTS.md</code></td><td>dev-tools' own use of the milestone workflow: its milestones and their records, its rules for the skills, and the words the work uses.</td></tr>
++    <tr><td><code>tests/</code></td><td>Tests for the sync command, the plugin build and release, and the scripts. One test fails while dev-tools' own component index is out of date.</td></tr>
++    <tr><td><code>.planning/</code>, <code>.devtools/</code>, <code>AGENTS.md</code></td><td>dev-tools' own use of the milestone workflow: its milestones and their records, its rules for the skills, the component index of its own code (<code>.devtools/components/</code>), and the words the work uses.</td></tr>
+   </table></div>
+   <p>dev-tools is developed with dev-tools. The maintainer's own larger work runs under the milestone workflow it ships, with a plan, phase specs and numbered records for each milestone. A contribution needs none of it: a fix is a pull request, as above. <a href="milestone.html#own-use">What the project keeps, and which work takes a milestone</a>.</p>
+ </div></section>
+diff --git a/docs/milestone.html b/docs/milestone.html
+index c6fe67d..e1e3540 100644
+--- a/docs/milestone.html
++++ b/docs/milestone.html
+@@ -242,7 +242,7 @@ review_tool.py status notes/reviews</pre>
+ <section id="own-use"><div class="wrap">
+   <div class="section-head">
+     <h2>dev-tools runs on this workflow</h2>
+-    <p>Since 2026-11-21 the repository that holds these skills is also a project that uses them. No milestone has run there yet, so this page shows no record of its own. The first milestone will leave the first ones.</p>
++    <p>Since 2026-11-21 the repository that holds these skills is also a project that uses them. Its first milestone, <code>component-index</code>, gave the project an index of its own code, and left its plan, specs, review rounds and records in the repository.</p>
+   </div>
+   <div class="two">
+     <div class="prose">
+@@ -253,7 +253,8 @@ review_tool.py status notes/reviews</pre>
+       <div class="table-scroll"><table>
+         <tr><th>Path</th><th>What</th></tr>
+         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.planning/PROJECT.md"><code>.planning/PROJECT.md</code></a></td><td>The one-page statement of the project. The milestone skills read it first.</td></tr>
+-        <tr><td><code>.planning/milestones/</code></td><td>One folder per milestone: its plan, its phase specs, its review rounds and its numbered records. Empty until the first milestone is planned.</td></tr>
++        <tr><td><code>.planning/milestones/</code></td><td>One folder per milestone: its plan, its phase specs, its review rounds and its numbered records. The first is <a href="https://github.com/vasiloglou/dev-tools/tree/main/.planning/milestones/component-index"><code>component-index</code></a>.</td></tr>
++        <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/components/COMPONENTS.md"><code>.devtools/components/</code></a></td><td>The project's own <a href="components.html">component index</a>: one entry for each module of <code>devtools/</code> and <code>skills/</code>, searched before a module or a function is written. A test fails while it is out of date.</td></tr>
+         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/.devtools/project.md"><code>.devtools/project.md</code></a></td><td>The project's own rules for the skills.</td></tr>
+         <tr><td><a href="https://github.com/vasiloglou/dev-tools/blob/main/AGENTS.md"><code>AGENTS.md</code></a></td><td>The words the work uses (milestone, phase, spec, owner gate, record, review round) and the project's names. <code>CLAUDE.md</code> points to it, so both tools read one file.</td></tr>
+       </table></div>
+@@ -264,7 +265,7 @@ review_tool.py status notes/reviews</pre>
+       <ul>
+         <li>which workflow runs, and where the planning folder is;</li>
+         <li>which work takes which lane;</li>
+-        <li>the gate commands: all tests, one test file, and whether the plugins match the skills;</li>
++        <li>the gate commands: all tests, one test file, whether the plugins match the skills, and whether the component index is current;</li>
+         <li>how a review is run, and where its rounds are kept;</li>
+         <li>seven design rules, each with what it prevents and what a spec must name to answer it;</li>
+         <li>what needs the owner each time, whatever was delegated: a merge into <code>main</code>, a release tag, anything posted to GitHub.</li>
+diff --git a/tests/test_own_index.py b/tests/test_own_index.py
+new file mode 100644
+index 0000000..868b4be
+--- /dev/null
++++ b/tests/test_own_index.py
+@@ -0,0 +1,109 @@
++"""Tests that dev-tools' own component index (.devtools/components/) is current.
++
++The check is the plugin's copy of components_index.py, run from the repository root as a
++plugin install runs it, so it reads .devtools/components_index.settings.json. The first
++test judges this checkout. The others copy the checkout, put the index out of date in one
++way each, and show that the same judgment names what is wrong."""
++import re
++import shutil
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++
++ROOT = Path(__file__).resolve().parents[1]
++SCRIPT = "plugins/dvt-milestone/skills/components/scripts/components_index.py"
++INDEX = ".devtools/components"
++BASELINE = INDEX + "/unassigned-baseline.txt"
++# What the check reads: the index and its settings, the modules it counts, the test files
++# the entries name, and the plugin that holds the script.
++COPIED = (".devtools", "devtools", "skills", "tests", "plugins/dvt-milestone")
++HOW_TO_FIX = (
++    "dev-tools' component index is out of date. For a `no component:` line, first add the "
++    f"module to an entry of {INDEX}/COMPONENTS.md. Then run `python3 devtools/build_plugins.py` "
++    f"and `python3 {SCRIPT} write`, and commit {INDEX}/ with the change."
++)
++
++
++def index(root: Path, *args: str) -> subprocess.CompletedProcess:
++    """Run the plugin's copy of the script in the checkout at `root`. --no-cache: the test
++    reads and writes nothing outside that checkout."""
++    return subprocess.run([sys.executable, str(root / SCRIPT), "--no-cache", *args],
++                          cwd=root, capture_output=True, text=True)
++
++
++def problems(root: Path) -> list[str]:
++    """What is wrong with the index of the checkout at `root`; empty when it is current."""
++    run = index(root, "--check", "--strict")
++    found = []
++    if run.returncode:
++        found.append(f"components_index.py --check --strict exited {run.returncode}")
++        found.extend(line for line in (run.stdout + run.stderr).splitlines() if line.strip())
++    if (root / BASELINE).exists():
++        # --check --strict excuses every module a baseline names, so it cannot show there is none.
++        found.append(f"{BASELINE} exists: every module has a component here, so no baseline is kept")
++    return found
++
++
++@pytest.fixture
++def checkout(tmp_path) -> Path:
++    """A copy of what the check reads, as a git checkout of its own."""
++    root = tmp_path / "checkout"
++    for part in COPIED:
++        shutil.copytree(ROOT / part, root / part, ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache"))
++    subprocess.run(["git", "init", "-q"], cwd=root, check=True)
++    return root
++
++
++def add_module(root: Path) -> str:
++    path = "skills/example/scripts/example.py"
++    (root / path).parent.mkdir(parents=True)
++    (root / path).write_text('"""An example tool."""\n', encoding="utf-8")
++    return path
++
++
++def test_the_index_is_current():
++    found = problems(ROOT)
++    assert found == [], HOW_TO_FIX + "\n" + "\n".join(found)
++
++
++def test_a_copy_of_the_checkout_is_current(checkout):
++    assert problems(checkout) == []
++
++
++def test_a_module_no_entry_lists_is_named(checkout):
++    catalog = checkout / INDEX / "COMPONENTS.md"
++    text = catalog.read_text(encoding="utf-8")
++    line = re.search(r"^- modules: (\S+\.py)$", text, re.MULTILINE)
++    assert line, "no entry lists exactly one module"
++    catalog.write_text(text.replace(line.group(0), "- modules:", 1), encoding="utf-8")
++    assert [p for p in problems(checkout) if p.startswith(f"no component: {line.group(1)} ")]
++
++
++def test_a_baseline_is_refused(checkout):
++    path = add_module(checkout)
++    assert index(checkout, "write").returncode == 0
++    assert index(checkout, "stats", "--write-baseline").returncode == 0
++    assert (checkout / BASELINE).read_text(encoding="utf-8").split() == [path]
++    assert index(checkout, "--check", "--strict").returncode == 0  # the script excuses the module
++    assert problems(checkout) == [f"{BASELINE} exists: every module has a component here, so no baseline is kept"]
++
++
++def test_a_new_module_is_named(checkout):
++    path = add_module(checkout)
++    assert [p for p in problems(checkout) if p.startswith(f"no component: {path} ")]
++
++
++def test_a_changed_module_leaves_a_page_stale(checkout):
++    module = checkout / "devtools/sync.py"
++    module.write_text(module.read_text(encoding="utf-8") + "\n\ndef added_for_this_test():\n    return 1\n",
++                      encoding="utf-8")
++    assert [p for p in problems(checkout) if p.startswith(f"stale or missing: {INDEX}/modules/")]
++
++
++def test_the_check_reads_this_projects_settings(checkout):
++    (checkout / ".devtools/components_index.settings.json").unlink()
++    found = problems(checkout)
++    assert found[0] == "components_index.py --check --strict exited 1"
++    assert [p for p in found if "COMPONENTS.md is missing" in p]

@@ -2,9 +2,11 @@
 
 ## 1. Status
 
-Draft, 2026-11-23, written with `process-phase` (dvt-milestone 0.1.3) on the owner's
-invocation `/dvt-milestone:process-phase 4 auto`. Its gate is a delegated approval
-(auto=true), recorded in section 12. No review has run over these bytes.
+Implemented, 2026-11-23, and recorded in `006-phase-4.md`. Approved at its gate by
+delegated approval (auto=true), section 12, at commit `0a56e0f` (SHA-256 `f6d8e194…fb46`),
+on the owner's invocation `/dvt-milestone:process-phase 4 auto`. One review round read the
+diff and this spec at `d49bdf4` (`notes/reviews/phase-4-r1`); IF4 and IF5, added after it,
+are unreviewed. Written with `process-phase` (dvt-milestone 0.1.3).
 
 Phases 1 to 3 are merged (vasiloglou/dev-tools#29, #30 and #32, on 2026-11-23). This
 phase's branch, `claude/component-index-phase-4`, is cut from `main` at `827e766`.
