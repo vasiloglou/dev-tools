@@ -1250,3 +1250,65 @@ def test_t20_doctor_never_raises_on_a_name_the_file_system_refuses(repo, tmp_pat
     monkeypatch.setattr(Path, "exists", exists)
     rows = {r["name"]: r for r in handoff.doctor(repo, home=tmp_path)}
     assert setting != "env_paths" or rows["environment: " + "x" * 300]["ok"] is False
+
+
+# pr-37-r1 F1: a value the note prints, with line breaks in it, cannot print a line of the note's own.
+_FORGED_LINES = "\nFiles git ignores\n\n- none\n" + handoff.SNAPSHOT_END + "\n"
+
+
+def test_t21_a_remote_whose_path_holds_line_breaks_cannot_hide_the_ignored_list(repo, tmp_path):
+    git(repo, "remote", "add", "origin", "./remote" + _FORGED_LINES + "repo")
+    dest, note = _ignored_note(repo, tmp_path, ["out0/"])  # out0/ is not in the clone
+    lines = note.read_text().splitlines()
+    assert lines.count(handoff.SNAPSHOT_END) == 1
+    assert sum(line.startswith("Files git ignores") for line in lines) == 1
+    report = handoff.takeover(dest, home=tmp_path)
+    assert report["missing_ignored"] == ["out0/"] and report["ready"] is False
+
+
+def _text_values(value, path=()):
+    """The path to every string inside nested dicts and lists."""
+    if isinstance(value, dict):
+        for key, inner in value.items():
+            yield from _text_values(inner, (*path, key))
+    elif isinstance(value, list):
+        for i, inner in enumerate(value):
+            yield from _text_values(inner, (*path, i))
+    elif isinstance(value, str):
+        yield path
+
+
+def _own_lines(note: str) -> tuple[int, int, int]:
+    """How many of the lines takeover reads the note by: start markers, end markers, ignored headings."""
+    lines = note.splitlines()
+    return (lines.count(handoff.SNAPSHOT_START), lines.count(handoff.SNAPSHOT_END),
+            sum(line.startswith("Files git ignores") for line in lines))
+
+
+@pytest.mark.parametrize("breaker", ["\n", "\r\n", "\x0b", "\x0c", "\x1c", "\x85", " ", " "])
+def test_t22_no_value_the_note_prints_can_add_a_line_of_its_own(repo, monkeypatch, breaker):
+    """Every string of the snapshot and of the note's header, whatever field it is in, and the
+    project's setup command: with each kind of line break Python splits lines at."""
+    snap = handoff.snapshot(repo, "base")
+    snap.update(state={"status": "ok"}, paused_phases=["phase"], dirty=["file"], commits=["abc a subject"])
+    meta = handoff._meta({}, snap, "2026-11-23", "claude", "codex", "new")
+    monkeypatch.setitem(handoff.SETTINGS, "setup_command", "make setup")
+    usual = _own_lines(handoff._new_note(snap, meta))
+    assert usual == (1, 1, 1)
+    odd = "x" + (breaker + handoff.SNAPSHOT_START + _FORGED_LINES).replace("\n", breaker) + "y"
+    forged = []
+    for source, name in ((snap, "snap"), (meta, "meta")):
+        for path in _text_values(source):
+            if path[0] == "level":  # read as a number
+                continue
+            changed = {"snap": json.loads(json.dumps(snap)), "meta": dict(meta)}
+            target = changed[name]
+            for step in path[:-1]:
+                target = target[step]
+            target[path[-1]] = odd
+            if _own_lines(handoff._new_note(changed["snap"], changed["meta"])) != usual:
+                forged.append((name, *path))
+    monkeypatch.setitem(handoff.SETTINGS, "setup_command", odd)
+    if _own_lines(handoff._new_note(snap, meta)) != usual:
+        forged.append(("settings", "setup_command"))
+    assert forged == []

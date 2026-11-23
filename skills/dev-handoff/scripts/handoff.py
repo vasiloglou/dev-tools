@@ -734,18 +734,20 @@ def _snapshot_text(snap: dict, meta: dict) -> str:
         rest = [{"path": e["path"], "kind": e["kind"]} for e in snap["ignored"][25:]]
         lines.append(f"{REST_START}{json.dumps(rest, separators=(',', ':')).replace('>', chr(92) + 'u003e')} -->")
     lines.append(SNAPSHOT_END)
-    return "\n".join(lines)
+    # Each element is one line of the note. A value printed in one (the remote, the base, a
+    # setup command) may hold a line break, so the line is kept to one here, whatever it holds.
+    return "\n".join(_one_line(line) for line in lines)
 
 
-def _one_line(path: str) -> str:
-    """A path as the snapshot prints it where takeover does not read it back: on one line, with
-    a line break or another control character JSON-escaped, so it cannot forge the snapshot's
-    own lines (its ignored-files heading, its end marker)."""
-    return json.dumps(path)[1:-1] if _CONTROL.search(path) else path
+def _one_line(text: str) -> str:
+    """A path or a whole line as the note prints it where takeover does not read it back: on
+    one line, with a line break or another control character JSON-escaped, so it cannot forge
+    the note's own lines (a snapshot marker, the ignored-files heading)."""
+    return json.dumps(text)[1:-1] if _CONTROL.search(text) else text
 
 
 def _head(meta: dict) -> str:
-    return "\n".join(["---", *(f"{k}: {v}" for k, v in meta.items()), "---", ""])
+    return "\n".join(["---", *(_one_line(f"{k}: {v}") for k, v in meta.items()), "---", ""])
 
 
 def _hint(heading: str, lvl: int) -> str:
@@ -769,9 +771,9 @@ def _new_note(snap: dict, meta: dict, kept: dict | None = None) -> str:
     then = f", then {_files(snap['instructions'][:1])}" if snap["instructions"] else ""
     head = [
         _head(meta),
-        f"# Hand-off: {snap['branch']}",
+        _one_line(f"# Hand-off: {snap['branch']}"),
         "",
-        f"Read this first{then}. Delete this file before the branch merges.",
+        _one_line(f"Read this first{then}. Delete this file before the branch merges."),
         "",
         _snapshot_text(snap, meta),
         "",
