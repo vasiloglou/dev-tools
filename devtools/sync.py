@@ -311,6 +311,11 @@ DIRTY_PATHS = ("skills", "agents", "devtools", "examples")  # what the sync read
 FETCH_SECONDS = 60
 
 
+def git_line(text: str) -> str:
+    """Git's answer without its one line terminator: a path may end in a space or a newline."""
+    return text[:-1] if text.endswith("\n") else text
+
+
 def resolve_source(path: Path, *, as_is: bool) -> dict:
     """Which files a run reads for the dev-tools source at ``path``.
 
@@ -332,7 +337,7 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
     def out(*args: str) -> str:
         """One git answer, without its line terminator only: a path may end in a space."""
         done = git(*args)
-        return done.stdout.rstrip("\n") if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
+        return git_line(done.stdout) if isinstance(done, subprocess.CompletedProcess) and done.returncode == 0 else ""
 
     def result(state: str, commit: str | None, lines: list[str] | None = None, root: Path | None = None,
                cleanup=lambda: None) -> dict:
@@ -369,36 +374,41 @@ def resolve_source(path: Path, *, as_is: bool) -> dict:
     if as_is:
         return result("as-is", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name}; delivering the checkout as it is (--as-is)"])
-    uncommitted = [line for line in out("status", "--porcelain", "--untracked-files=all", "--", *DIRTY_PATHS).splitlines()
-                   if line.strip()]
+    # Asked so that no setting hides work: modes are compared, untracked files are listed, and a
+    # file git was told to stop looking at (assume-unchanged, skip-worktree) counts as changed.
+    uncommitted = [line for line in out("-c", "core.fileMode=true", "status", "--porcelain", "--untracked-files=all",
+                                        "--", *DIRTY_PATHS).splitlines() if line.strip()]
+    uncommitted += [line for line in out("ls-files", "-v", "--", *DIRTY_PATHS).splitlines()
+                    if line[:1].islower() or line[:1] == "S"]
     if ahead or uncommitted:
         return result("own-work", head, lines + [
             f"warning: dev-tools here is {behind} commit(s) behind {name} and has work of its own ({ahead} commit(s) "
             f"ahead, {len(uncommitted)} uncommitted path(s)); delivering the checkout as it is"])
     folder = Path(tempfile.mkdtemp(prefix="devtools-upstream-"))
     cleanup = lambda: shutil.rmtree(folder, ignore_errors=True)
-    try:
-        read_commit(path, upstream, folder)
-    except (OSError, ValueError, SyncError, subprocess.CalledProcessError) as error:
-        cleanup()
-        return result("upstream-unreadable", head, lines + [
-            f"warning: could not read {name} at {upstream[:7]} ({error}); delivering the checkout as it is"])
-    except BaseException:  # an interrupt: the folder is this function's until it returns
+    try:  # the folder is this function's until it is returned with its cleanup
+        try:
+            read_commit(path, upstream, folder)
+        except (OSError, ValueError, SyncError, subprocess.CalledProcessError) as error:
+            cleanup()
+            return result("upstream-unreadable", head, lines + [
+                f"warning: could not read {name} at {upstream[:7]} ({error}); delivering the checkout as it is"])
+        lines.append(f"note: dev-tools here is {behind} commit(s) behind {name}: delivering {name} at {upstream[:7]}; "
+                     f"the checkout is not changed (git pull in {path} updates it)")
+        tool = folder / "devtools/sync.py"
+        if tool.is_file() and tool.read_bytes() != Path(__file__).read_bytes():
+            lines.append(f"note: the sync.py that runs differs from the one at {name}; git pull in {path} updates it")
+        return result("upstream", upstream, lines, folder, cleanup)
+    except BaseException:
         cleanup()
         raise
-    lines.append(f"note: dev-tools here is {behind} commit(s) behind {name}: delivering {name} at {upstream[:7]}; "
-                 f"the checkout is not changed (git pull in {path} updates it)")
-    tool = folder / "devtools/sync.py"
-    if tool.is_file() and tool.read_bytes() != Path(__file__).read_bytes():
-        lines.append(f"note: the sync.py that runs differs from the one at {name}; git pull in {path} updates it")
-    return result("upstream", upstream, lines, folder, cleanup)
 
 
 def read_commit(checkout: Path, commit: str, folder: Path) -> None:
     """Write every file of ``commit`` under ``folder`` with the mode git records for it (0755 or 0644).
 
     Read from the tree itself, not with ``git archive``, which leaves out ``export-ignore`` paths and
-    applies the local ``tar.umask``. A symbolic link is written as one; a submodule is left out.
+    applies the local ``tar.umask``. A symbolic link refuses the read (ValueError); a submodule is left out.
     """
     listing = subprocess.run(["git", "-C", str(checkout), "ls-tree", "-r", "-z", "--full-tree", commit],
                              capture_output=True, check=True).stdout
@@ -421,11 +431,10 @@ def read_commit(checkout: Path, commit: str, folder: Path) -> None:
         offset = header_end + 1 + size + 1
         target = folder / inside(folder, name).relative_to(folder)
         target.parent.mkdir(parents=True, exist_ok=True)
-        if mode == "120000":
-            os.symlink(os.fsdecode(data), target)
-        else:
-            target.write_bytes(data)
-            os.chmod(target, 0o755 if mode == "100755" else 0o644)
+        if mode == "120000":  # its target may lie outside the commit, where this folder cannot follow
+            raise ValueError(f"{name} is a symbolic link")
+        target.write_bytes(data)
+        os.chmod(target, 0o755 if mode == "100755" else 0o644)
 
 
 def open_source(args, path: Path) -> Path:

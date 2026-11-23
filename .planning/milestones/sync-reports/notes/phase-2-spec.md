@@ -226,3 +226,15 @@ This prose.
    ends in a space is kept (F4); an interrupt while reading removes the folder (F5).
    T16 now makes `ls-tree` fail; section 6's "Reading the archive" and the state
    `"upstream-unreadable"` read "the upstream's tree" for "the archive" from here on.
+4. **Review round 2** (`notes/reviews/phase-2-r2`), over the round 1 repairs: four
+   findings, all four attacking those repairs, each reproduced as a failing test and
+   fixed. A commit holding a symbolic link is not read (its target may lie outside the
+   commit), so the checkout is delivered as it is; the temporary folder is protected up
+   to the return; `core.fileMode=false`, assume-unchanged and skip-worktree no longer
+   hide tracked work; only git's one line terminator is removed (`git_line`). The stop
+   rule of `review-convergence.md` fired (4/4 self-inflicted): no round 3.
+
+   | Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
+   |---|---|---|---|---|---|---|
+   | r1 | 1 (Codex) | 5 | 0 / 5 | 2 / 5 | blocking | CHANGES_REQUESTED |
+   | r2 | 1 (Codex) | 4 | 4 / 4 | 1 / 4 | blocking | CHANGES_REQUESTED |

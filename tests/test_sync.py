@@ -1441,3 +1441,60 @@ def test_an_interrupted_read_of_the_upstream_leaves_no_folder(behind, monkeypatc
     with pytest.raises(KeyboardInterrupt):
         sync.resolve_source(behind["clone"], as_is=False)
     assert made and not any(Path(folder).exists() for folder in made)
+
+
+# Regression tests for phase 2 review round 2 (notes/reviews/phase-2-r2).
+
+def test_an_upstream_holding_a_symbolic_link_is_not_read(behind, capsys):
+    # r2 F1: a link's target may be outside the commit; the checkout is delivered as it is.
+    write(behind["clone"].parent / "shared-guide.md", "shared\n")
+    import os as _os
+    _os.symlink("../../../shared-guide.md", behind["upstream"] / "skills/demo/guide.md")
+    commit(behind["upstream"], "link")
+    git(behind["clone"], "pull", "-q")
+    assert apply(behind["clone"], behind["project"], "--as-is") == 0
+    capsys.readouterr()
+    write(behind["upstream"] / "skills/demo/SKILL.md", "third version\n")
+    commit(behind["upstream"], "third")
+    code, _, err = out_of(capsys, "apply", "--project", behind["project"], "--source", behind["clone"])
+    assert code == 0 and "is a symbolic link" in err
+    assert (behind["project"] / ".claude/skills/demo/guide.md").read_text() == "shared\n"
+
+
+def test_an_error_after_the_read_still_removes_the_folder(behind, monkeypatch):
+    # r2 F2
+    made = []
+    real_mkdtemp = sync.tempfile.mkdtemp
+    monkeypatch.setattr(sync.tempfile, "mkdtemp", lambda *a, **k: made.append(real_mkdtemp(*a, **k)) or made[-1])
+    write(behind["upstream"] / "devtools/sync.py", "# another\n")
+    commit(behind["upstream"], "tool")
+    real_read = Path.read_bytes
+
+    def fail_on_tool(self):
+        if self.name == "sync.py":
+            raise KeyboardInterrupt
+        return real_read(self)
+    monkeypatch.setattr(Path, "read_bytes", fail_on_tool)
+    with pytest.raises(KeyboardInterrupt):
+        sync.resolve_source(behind["clone"], as_is=False)
+    assert made and not any(Path(folder).exists() for folder in made)
+
+
+@pytest.mark.parametrize("hide", ["filemode", "assume-unchanged", "skip-worktree"])
+def test_git_settings_do_not_hide_tracked_work(behind, capsys, hide):
+    # r2 F3
+    target = behind["clone"] / "skills/demo/SKILL.md"
+    if hide == "filemode":
+        git(behind["clone"], "config", "core.fileMode", "false")
+        target.chmod(0o755)
+    else:
+        git(behind["clone"], "update-index", f"--{hide}", "skills/demo/SKILL.md")
+        target.write_text("the clone's own version\n")
+    assert sync.resolve_source(behind["clone"], as_is=False)["state"] == "own-work"
+
+
+def test_only_git_s_line_terminator_is_removed():
+    # r2 F4: a path may itself end in a newline.
+    assert sync.git_line("/virtual/source\n\n") == "/virtual/source\n"
+    assert sync.git_line("/virtual/source \n") == "/virtual/source "
+    assert sync.git_line("abc") == "abc"
