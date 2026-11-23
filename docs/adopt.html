@@ -75,20 +75,37 @@ dest   = "scripts/components_index.py"</pre>
       <div class="two">
         <div>
           <p>One command copies the files and writes a receipt that lists every file it manages, with a fingerprint of each. Nothing is written unless everything can be written.</p>
-          <p>A second command checks, at any time, that the copies are still what was delivered. It needs only your project, so it can run in your automated checks.</p>
+          <p>A second command checks, at any time, that the copies are still what was delivered. Run from a dev-tools checkout, it also says whether dev-tools has moved on since your sync. With <code>--receipt-only</code> it needs only your project, so it can run in your automated checks.</p>
+          <p>Both name a shared piece you do not take when one of your synced files mentions it, and once a piece that is new since your last sync. To stop hearing of one, list it under <code>declined</code>.</p>
         </div>
         <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · first sync</b><em>captured</em></div>
 <pre><span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
-<span class="ok">applied: {&quot;create&quot;: 29}</span>
-after_apply: python3 scripts/components_index.py write
+<span class="ok">applied: {&quot;create&quot;: 40}</span>
+not taken, and named by a file this project has:
+  skills/dev-handoff
+      named by .claude/skills/process-phase/references/implement.md and 1 more file(s)
+  skills/dev-takeover
+      named by .claude/skills/process-phase/references/orient.md
+  skills/phase/phase-tests
+      named by .claude/skills/process-phase/SKILL.md and 1 more file(s)
+  agents
+      named by .claude/skills/process-phase/references/implement.md and 3 more file(s)
+to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there
 
 <span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
-<span class="ok">29 managed file(s), 0 problem(s)</span>
-
-<span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
-<span class="ok">applied: {&quot;keep&quot;: 29}</span></pre></div>
-      <p class="caption">29 files copied, then checked. Running it again changes nothing.</p>
+<span class="ok">40 managed file(s), 0 problem(s)</span>
+not taken, and named by a file this project has:
+  skills/dev-handoff
+      named by .claude/skills/process-phase/references/implement.md and 1 more file(s)
+  skills/dev-takeover
+      named by .claude/skills/process-phase/references/orient.md
+  skills/phase/phase-tests
+      named by .claude/skills/process-phase/SKILL.md and 1 more file(s)
+  agents
+      named by .claude/skills/process-phase/references/implement.md and 3 more file(s)
+to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there</pre></div>
+      <p class="caption">40 files copied, then checked. The phase skill mentions four shared pieces this project does not take, and both commands name them until each is taken or listed under <code>declined</code>.</p>
         </div>
       </div>
     </li>
@@ -132,7 +149,7 @@ after_apply: python3 scripts/components_index.py write
 
 <span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
 <span class="bad">.claude/skills/process-phase/references/verify.md: differs from the receipt</span>
-<span class="bad">29 managed file(s), 1 problem(s)</span>
+<span class="bad">40 managed file(s), 1 problem(s)</span>
 <span class="dim">exit code 1</span>
 
 <span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
@@ -140,6 +157,17 @@ after_apply: python3 scripts/components_index.py write
 <span class="bad">nothing written; 1 file(s) refused</span>
 <span class="dim">exit code 3</span></pre></div>
       <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it.</p>
+      <div class="term"><div class="bar"><i></i><i></i><i></i><b>a project synced from an older dev-tools</b><em>captured</em></div>
+<pre><span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+<span class="ok">60 managed file(s), 0 problem(s)</span>
+not current: an apply would update 22 file(s) (synced from dev-tools at c9648dd; this source is at 8ec1f91)
+not taken, and named by a file this project has:
+  skills/milestone/review-pr
+      named by .claude/skills/handle-issue/SKILL.md and 3 more file(s)
+not taken (this receipt was written before the sync recorded what dev-tools ships; listed this once):
+  agents
+to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there</pre></div>
+      <p class="caption">Synced at an older commit, this project reads as clean against its receipt, yet an update would change 22 files, and two of its skills mention <code>review-pr</code>, which it never took. The last list is printed once, because the receipt predates the record of what dev-tools ships.</p>
     </div>
     <div>
       <div class="table-scroll"><table>
@@ -151,6 +179,11 @@ after_apply: python3 scripts/components_index.py write
         <tr><td>You added files beside the synced ones</td><td>Leaves them alone</td></tr>
         <tr><td>A file was removed upstream</td><td>Removes your copy only if you had not changed it</td></tr>
         <tr><td>Something must be rebuilt after an update</td><td>Runs the commands you listed, only when a file actually changed</td></tr>
+        <tr><td>Dev-tools has moved on since your sync</td><td>The check says how many files an update would change, and from which version you synced</td></tr>
+        <tr><td>Your synced files mention a shared piece you do not take</td><td>Names it, with the file that mentions it, on every update and check</td></tr>
+        <tr><td>A shared piece is new since your last sync</td><td>Names it once, on the next update or check</td></tr>
+        <tr><td>You leave a piece out on purpose</td><td>List it under <code>declined</code>; it is not named again. A workflow you take nothing from is never named</td></tr>
+        <tr><td>Your automated checks should fail on any of these</td><td><code>check --strict</code> exits 5 while there is something to report; a changed file still exits 1</td></tr>
       </table></div>
     </div>
   </div>
