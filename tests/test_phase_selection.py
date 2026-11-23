@@ -43,7 +43,8 @@ class Project:
 
     def pytest(self, *args: str) -> subprocess.CompletedProcess:
         env = {key: value for key, value in os.environ.items() if key != "PYTEST_ADDOPTS"}
-        return subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", *args],
+        # --color=no: the summary line is read below, and PY_COLORS or FORCE_COLOR would put escapes in it.
+        return subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "--color=no", *args],
                               cwd=self.root, capture_output=True, text=True, env=env)
 
     def kept(self, *args: str) -> set:
@@ -118,3 +119,10 @@ def test_a_real_run_counts_what_it_left_out(selection):
     done = selection.pytest("-q")
     assert done.returncode == 0, done.stdout + done.stderr
     assert re.search(r"^4 passed in ", done.stdout, re.M) and "deselected" not in done.stdout, done.stdout
+
+
+def test_the_checks_do_not_depend_on_the_colour_settings_of_whoever_runs_them(selection, monkeypatch):
+    monkeypatch.setenv("PY_COLORS", "1")  # pytest then colours its summary line unless told not to
+    done = selection.pytest("-q")
+    assert done.returncode == 0 and re.search(r"^2 passed, 2 deselected in ", done.stdout, re.M), done.stdout
+    assert selection.kept() == {"test_done", "test_unit"}

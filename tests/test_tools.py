@@ -223,7 +223,7 @@ def test_phase_numbers_above_99_work_like_any_other(project):
     assert list(env["data"]["files"]) == ["tests/acceptance/p122_1_deck_fix/test_p122_1_deck_fix.py"]
 
     def run(*args):
-        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--color=no", *args],
                               cwd=project, capture_output=True, text=True)
         return proc.stdout.strip().splitlines()[-1]
 
@@ -1345,16 +1345,19 @@ def offered(command, flag):
 SYNTH_EXTRA = "needs the optional 'synth' extra"
 
 
-def without_synth_extra(out: str) -> bool:
-    """Whether `rules_check.py test` reported that GND built no cases for want of its synth extra."""
-    return any(line.startswith("note: gnd synth --guarded-cases built no cases (exit 5): ") and SYNTH_EXTRA in line
-               for line in out.splitlines())
+def without_synth_extra(code: int, out: str) -> bool:
+    """Whether `rules_check.py test` found nothing wrong (exit 0) and reported that GND built no cases for want
+    of its synth extra. With anything wrong the answer is no: the refusal is then not the only thing to see."""
+    return code == 0 and any(
+        line.startswith("note: gnd synth --guarded-cases built no cases (exit 5): ") and SYNTH_EXTRA in line
+        for line in out.splitlines())
 
 
-def skip_without_synth_extra(out: str) -> None:
+def skip_without_synth_extra(code: int, out: str) -> None:
     """Skip the running test when GND lists --guarded-cases and cannot run it: the flag is in `gnd synth --help`
-    with or without the extra, so `offered` cannot tell. Any other failure of `gnd synth` skips nothing."""
-    if without_synth_extra(out):
+    with or without the extra, so `offered` cannot tell. Any other failure of `gnd synth`, and any rule or
+    example `test` calls wrong, skips nothing."""
+    if without_synth_extra(code, out):
         pytest.skip("this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'")
 
 
@@ -1380,9 +1383,20 @@ def test_a_gnd_without_its_synth_extra_is_a_note_and_the_guard_skips(project):
     assert code == 0, out
     assert ("note: gnd synth --guarded-cases built no cases (exit 5): ERROR: the synthetic-value generator needs "
             "the optional 'synth' extra.\n") in out
-    assert without_synth_extra(out)
+    assert without_synth_extra(code, out)
     with pytest.raises(pytest.skip.Exception, match="lacks its synth extra"):
-        skip_without_synth_extra(out)
+        skip_without_synth_extra(code, out)
+
+
+def test_the_guard_does_not_hide_a_rule_that_is_wrong(project):
+    # The refusal is one line of the output; an example that is wrong is another, and still a failure.
+    layered(project)  # the starter rules with their examples: the stand-in judges nothing, so each is "wrong"
+    fake_gnd(project, cases={}, synth_exit=5, synth_stderr=EXTRA_MISSING)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1 and "wrong: no_forbidden_area_use: the failing example 1 does not break the rule" in out, out
+    assert "note: gnd synth --guarded-cases built no cases (exit 5): " in out and SYNTH_EXTRA in out
+    assert not without_synth_extra(code, out)
+    assert skip_without_synth_extra(code, out) is None
 
 
 @pytest.mark.parametrize("synth_exit, synth_stderr, cases", [
@@ -1397,8 +1411,8 @@ def test_the_guard_skips_for_the_missing_extra_only(project, synth_exit, synth_s
     code, out = tool(project, "test", script=RULES)
     assert code == 0, out
     assert ("built no cases (exit %d)" % synth_exit in out) == bool(synth_exit), out
-    assert not without_synth_extra(out)
-    assert skip_without_synth_extra(out) is None
+    assert not without_synth_extra(code, out)
+    assert skip_without_synth_extra(code, out) is None
 
 
 @pytest.mark.skipif(not offered("discover", "--joined-relation") or not offered("synth", "--guarded-cases"),
@@ -1430,7 +1444,7 @@ def test_suggestions_and_generated_cases_with_newer_gnd(project):
                            "consequent": {"atom": {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}}})
     path.write_text(json.dumps(rules))
     code, out = tool(project, "test", script=RULES)
-    skip_without_synth_extra(out)
+    skip_without_synth_extra(code, out)
     assert code == 1 and "wrong: cannot_fail can never fail" in out, out
     assert out.endswith("7 rule(s), 12 example(s); 1 wrong; 1 rule(s) without examples\n"), out
 
@@ -1952,7 +1966,7 @@ def test_plain_pytest_leaves_out_phases_that_are_not_complete(project):
     state(project, completed_phases='"01"')
 
     def run(*args):
-        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--color=no", *args],
                               cwd=project, capture_output=True, text=True)
         return proc.stdout.strip().splitlines()[-1]
 

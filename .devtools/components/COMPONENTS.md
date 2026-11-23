@@ -401,7 +401,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_tools.py, tests/test_phase_selection.py
-- notes: tests/test_tools.py runs it as the sync delivers it (test_plain_pytest_leaves_out_phases_that_are_not_complete); tests/test_phase_selection.py holds its other branches.
+- notes: tests/test_tools.py runs it as the sync delivers it (test_plain_pytest_leaves_out_phases_that_are_not_complete, test_phase_numbers_above_99_work_like_any_other); tests/test_phase_selection.py holds its other branches.
 
 ## Where one script runs another
 

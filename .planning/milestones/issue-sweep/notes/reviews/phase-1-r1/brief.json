@@ -1,0 +1,76 @@
+{
+  "base": "dd0e7a1",
+  "claims": [
+    "P1.1. With a stand-in gnd that lists --guarded-cases and exits 5 naming the synth extra, rules_check.py test exits 0 with its note line, and the guard skips.",
+    "P1.2. The guard does not skip for any other failure of gnd synth, or for anything else rules_check.py test can print.",
+    "P1.3. Every branch of the plugin in the spec's table of section 6.2 (B1 to B18) has a case in tests/test_phase_selection.py or in the existing test of tests/test_tools.py that fails when that branch is wrong.",
+    "P1.4. from_gsd.py holds no list of other planning tools of its own; a change to sync.OTHER_PLANS changes what both scripts report; and from_gsd.py survey and convert print what they printed before the change for every project.",
+    "P1.5. After this diff, components_index.py review prints 0 for components with no tests listed and for the same public name in two or three components.",
+    "P1.6. No file under plugins/ changes, and nothing a project runs behaves differently.",
+    "The implementation findings I1 to I6 at the end of the spec describe what the diff does and what was run."
+  ],
+  "created": "2026-11-23T23:38:24.786720+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/issue-sweep/notes/reviews/phase-1-r1/diff.patch",
+      "sha256": "e474234961d434bfc2e565b97dbc49db152f42fe056d5e6f56ea0b714c64f3c1"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "7f3378c223ac8d40576a8db5c9827ca2dd9df8bca4bcfbed07578664128776fe"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "d603e2622c30e848ae895c51b06d094e12c5ecdbd4f765c3a3bbb064973700ac"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/phase-1-spec.md",
+      "sha256": "319fe086febaf88f483592e1e0560475b31fc6dfc4470b5c1a8151a8a8b0b913"
+    },
+    {
+      "path": "devtools/from_gsd.py",
+      "sha256": "67983517b29c9c62a687772c616cd39d40c003259b11d36e05df8a15fee273a8"
+    },
+    {
+      "path": "tests/test_from_gsd.py",
+      "sha256": "9b3c4a12fca5be70278e70a07e424abc533841bb17b174c52fd99b993af2d4cf"
+    },
+    {
+      "path": "tests/test_phase_selection.py",
+      "sha256": "37e1b6a6e6a203228122c91a305a8a1a4699cdf3f2c7ba32a786b6ec89ea7071"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "4c5ab1785091022f9a754595921b9bfef8099d2e9b495262823c0ddb06a4f99b"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issue-sweep-plan.md",
+      "sha256": "309c6e556ac85f24e71f3c63f79356421392e570cdf143472b02f1acd90481a4"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issues-2026-11-23.md",
+      "sha256": "7584fec3d861c1113450fa58207fbc671f1ad9e77f2db673d6b1df1f575dc84c"
+    },
+    {
+      "path": "skills/phase/pytest/phase_selection.py",
+      "sha256": "0d8f6ebf67e585ed573975d4e6fe31760592fa64f357091e589504bcc8dc9227"
+    },
+    {
+      "path": "devtools/sync.py",
+      "sha256": "c3632fc092eb44208e20e04a3124e2a109c3a6031b6c6a0b58b3fc85160d27fd"
+    },
+    {
+      "path": "skills/components/scripts/rules_check.py",
+      "sha256": "7e2e49cb065942aa7868a7f615c3b06bef8a603bb82f6edcd5ec60d76b9779ec"
+    }
+  ],
+  "head": "2921a3bbf35df17e0cce0ad940f2bb505c4a5951",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this diff do what the phase 1 spec says for issues 31, 42 and 41, and can each new test fail when the behaviour it names is wrong?",
+  "subject": "phase",
+  "version": 1
+}

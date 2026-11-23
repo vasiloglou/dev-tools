@@ -441,3 +441,46 @@ All on 2026-11-23, at the phase's base `dd0e7a1` unless said.
 - **I6. `review` after the index edits** prints 0 for "Components with no tests listed"
   and for "The same public name in two or three components", as the spec's section 6.4
   expected: `distinct_from` settles what `duplicates` did.
+- **I7. A second existing test runs the plugin** (found while repairing r1 F2):
+  `tests/test_tools.py::test_phase_numbers_above_99_work_like_any_other` runs pytest
+  with `--phase 122` and `--phase 122.1` in a synced project. Section 6.2 named one
+  existing test; there are two. The index entry's note names both.
+
+## Phase review round 1 (r1)
+
+`notes/reviews/phase-1-r1`, 2026-11-23: the review helper with `--subject phase --base
+dd0e7a1`, reviewer Codex, read-only, effort `high`, over the diff and 13 files; brief
+SHA-256 `1e67658134e9624558fd11a3c9575ec0910942296712fb14ad81b611bfdb49af`. `VERDICT:
+CHANGES_REQUESTED`, 2 findings. One reviewer is one reviewer. By its own account it
+could not rerun the suites, the file-based breaks of the plugin or a real GND, so I2, I3
+and I5 above are this phase's evidence, not the reviewer's.
+
+- **F1 (blocking), reproduced.** The guard skipped on the refusal's note alone, before
+  the exit of `rules_check.py test` was looked at, so a GND without the extra would hide
+  an example that is wrong. Reproduced with the stand-in `gnd` and the starter rules'
+  examples left in: exit 1, six `wrong:` lines and the note, and the guard as written
+  answered "skip". Repaired: `without_synth_extra(code, out)` and
+  `skip_without_synth_extra(code, out)` skip only when the exit is 0. The spec's section
+  6.1 gave the guard one argument; this corrects it. Branch A of its table now reads
+  "exit 0, and the note with exit 5 and the extra's sentence"; a new branch, F, "the same
+  note with exit 1", runs. Regression test:
+  `test_the_guard_does_not_hide_a_rule_that_is_wrong`, red before the repair
+  (`TypeError: without_synth_extra() takes 1 positional argument but 2 were given`; the
+  guard's old body, run on that output, returned true).
+- **F2 (hardening), reproduced.** With `PY_COLORS=1` in the caller's environment pytest
+  colours its summary line, and S9's anchored match failed: `1 failed, 14 passed`.
+  Repaired: the fixture passes `--color=no`. Regression test:
+  `test_the_checks_do_not_depend_on_the_colour_settings_of_whoever_runs_them`, red before
+  the repair. The same defect was in the two older tests of the plugin in
+  `tests/test_tools.py` (`test_plain_pytest_leaves_out_phases_that_are_not_complete`
+  failed under `PY_COLORS=1` at the phase's base too); both now pass `--color=no`. That
+  goes beyond the finding, and beyond this phase's diff, because the defect is the same
+  line in the same file the phase edits.
+
+| Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
+|---|---|---|---|---|---|---|
+| r1 | 1 (Codex) | 2 | 0 / 2 (first round) | 1 / 2 | blocking | CHANGES_REQUESTED |
+
+Round 2 is not run. Both repairs are a few lines of test code, each held by a test that
+was seen red; the next instrument is those tests, which run in every suite run. The
+repaired bytes carry no review opinion.
