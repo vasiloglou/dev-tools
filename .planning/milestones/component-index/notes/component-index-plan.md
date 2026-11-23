@@ -66,6 +66,10 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   `007-close.md`.
 - **Closed, 2026-11-23.** Phases 1 to 4 are merged into `main` (vasiloglou/dev-tools#29,
   #30, #32 and #36). The close is `007-close.md`.
+- **After the close record, 2026-11-23.** The independent review of the close's pull
+  request (vasiloglou/dev-tools#37) found a counterexample to C5 at `811b4a3`: a git
+  remote whose path holds line breaks. It was fixed in vasiloglou/dev-tools#38, and
+  `008-close-correction.md` corrects the close record and rules again.
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 

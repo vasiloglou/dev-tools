@@ -1,0 +1,40 @@
+{
+  "base": null,
+  "claims": [
+    "The note is now kept to one line per generated line at the two places it is put together (the header and the snapshot), whatever a value holds.",
+    "After this change, takeover does not report a checkout ready while an ignored path is missing, for any note written by handoff.py write, whatever the git remote, the base, --from, the project's setup_command or any other value the note prints.",
+    "A note with no control character in any value is written byte for byte as before.",
+    "test_t22 puts a forged section into every string of the snapshot and of the header in turn, found by walking the data, not from a list of field names, and into the setup command, once for each of the 8 line breaks Python splits lines at. Before the fix it failed for all 8.",
+    "The plugins are released as 0.1.6 (devtools/PLUGIN_VERSION, plugins/ rebuilt), and dev-tools' own component index is regenerated, with the handoff.notes entry updated."
+  ],
+  "created": "2026-11-23T20:19:27.279499+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-38-r1/diff.patch",
+      "sha256": "b8784d328310b939a4281abe0889e09f90ec76258e42008254eee72cfdbfea65"
+    },
+    {
+      "path": "skills/dev-handoff/references/handoff.md",
+      "sha256": "4ab09c9621c60c1f7afdef00aa1eba4d4626d6490cf39fa8bc3222ec55a85629"
+    },
+    {
+      "path": ".planning/reviews/pr-37-r1/review.md",
+      "sha256": "1aeec1217056d7aabaf1138ee94bc782b654201602c09019c82a9645c24e87d1"
+    }
+  ],
+  "head": "17e63c61231fc8020d7e2a467778a593b61abf97",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "811b4a3ef993aa7a9b7a9ff108a3b56c43a1440d",
+    "head": "17e63c61231fc8020d7e2a467778a593b61abf97",
+    "number": 38,
+    "title": "Keep every line a hand-off note prints to one line",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/38"
+  },
+  "question": "This pull request changes how a hand-off note is written, so that no value it prints can add a line of the note's own. Does it do what it sets out to do, and what does it break?",
+  "subject": "pr",
+  "version": 1
+}
