@@ -89,7 +89,7 @@ def load_settings(path=SETTINGS_FILE) -> dict:
         loaded = json.loads(path.read_text(encoding="utf-8"))
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
         settings.update(loaded)
     return settings
 
@@ -825,7 +825,7 @@ def check_note(root: Path, path: Path | None = None, *, base: str | None = None,
         names = _skill_names(root)
         if meta.get("to", "any") != "claude" and names:
             body = text.split(SNAPSHOT_END, 1)[-1]
-            called = re.compile(r"(?<![\w/.])/(?:[\w-]+:)?(%s)\b(?![/.])" % "|".join(map(re.escape, names)))
+            called = re.compile(r"(?<![\w/.])/(?:[\w-]+:)?({})\b(?![/.])".format("|".join(map(re.escape, names))))
             used = sorted({m.group(0) for m in called.finditer(body)})
             if used:
                 add("claude-only", "minor", "slash commands only Claude Code can run", ", ".join(used),
@@ -1054,8 +1054,8 @@ def _render_takeover(report: dict) -> str:
         "unknown": "the note has no snapshot head",
     }[report["head"]]
     lines = [
-        f"takeover: {report['note']} (level {meta.get('level', '?')}, from {meta.get('from', '?')} "
-        f"to {meta.get('to', '?')}, updated {meta.get('updated', '?')})",
+        (f"takeover: {report['note']} (level {meta.get('level', '?')}, from {meta.get('from', '?')} "
+         f"to {meta.get('to', '?')}, updated {meta.get('updated', '?')})"),
         f"  head: {head}",
     ]
     lines += [f"  missing ignored path: {rel}  (handoff.py pull --from-checkout <old checkout>)"
