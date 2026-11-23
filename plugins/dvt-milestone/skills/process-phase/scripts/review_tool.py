@@ -48,6 +48,7 @@ plugin install, in the project's .devtools/review_tool.settings.json.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime
 import hashlib
 import json
@@ -58,8 +59,8 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from pathlib import Path
+
 
 def plugin_root(script: Path):
     """The plugin install that holds this script, or None. A plugin keeps it in
@@ -124,15 +125,16 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         loaded = json.loads(path.read_text(encoding="utf-8"))
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
         settings.update(loaded)
     if settings["reviewer"] not in ("auto", "codex", "claude"):
-        raise SystemExit("%s: reviewer must be auto, codex or claude" % path)
+        raise SystemExit(f"{path}: reviewer must be auto, codex or claude")
     return settings
 
 
 def now(precise: bool = False) -> str:
-    stamp = datetime.datetime.now(datetime.timezone.utc)
+    # datetime.UTC is new in 3.11; this script runs on 3.9 (README).
+    stamp = datetime.datetime.now(datetime.timezone.utc)  # noqa: UP017
     return (stamp if precise else stamp.replace(microsecond=0)).isoformat()
 
 
@@ -146,7 +148,8 @@ def git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProce
 
 
 def repo_root() -> Path:
-    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    proc = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
+                          check=False)
     if proc.returncode != 0:
         raise Stop("not inside a git repository")
     return Path(proc.stdout.strip()).resolve()
@@ -222,7 +225,7 @@ def split_diff(text: str) -> list[tuple[list[str], str]]:
                 blocks.append((paths, "".join(lines)))
             paths, lines, header = header_paths(bare), [line], True
             continue
-        if header and (line.startswith("@@") or line.startswith("Binary files")):
+        if header and line.startswith(("@@", "Binary files")):
             header = False
         elif header:
             side = re.match(r"(?:rename|copy) (?:from|to) (.*)$|(?:---|\+\+\+) (.*)$", bare)
@@ -254,7 +257,7 @@ def cmd_brief(args, settings) -> int:
     root = repo_root()
     out = Path(args.dir)
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
-        raise Stop("%s already exists: a round is never rewritten; start the next round in a new folder" % args.dir)
+        raise Stop(f"{args.dir} already exists: a round is never rewritten; start the next round in a new folder")
     if not args.question.strip():
         raise Stop("--question is empty")
     if args.base and args.pr is not None:
@@ -264,7 +267,7 @@ def cmd_brief(args, settings) -> int:
     if args.subject == "phase" and not args.base:
         raise Stop("--subject phase needs --base REF, the commit the phase began from")
     if args.subject in ("plan", "spec", "close") and not args.file:
-        raise Stop("--subject %s needs --file for each file the reviewer must read" % args.subject)
+        raise Stop(f"--subject {args.subject} needs --file for each file the reviewer must read")
 
     files, notes, deleted, left_out = [], [], [], []
 
@@ -273,21 +276,21 @@ def cmd_brief(args, settings) -> int:
         try:
             rel = path.relative_to(root).as_posix()
         except ValueError:
-            raise Stop("%s is outside the repository" % rel)
+            raise Stop(f"{rel} is outside the repository")
         if looks_secret(rel) or rel in tainted:
             if named:
-                raise Stop("%s looks like a credential file; a brief never lists one" % rel)
+                raise Stop(f"{rel} looks like a credential file; a brief never lists one")
             left_out.append(rel)
             return
         if out.resolve() in path.parents:
             return
         if path.is_dir():
             if named:
-                raise Stop("%s is a folder: name its files" % rel)
+                raise Stop(f"{rel} is a folder: name its files")
             return
         if not path.is_file():
             if named:
-                raise Stop("%s does not exist" % rel)
+                raise Stop(f"{rel} does not exist")
             deleted.append(rel)
             return
         if rel not in [f["path"] for f in files]:
@@ -298,7 +301,7 @@ def cmd_brief(args, settings) -> int:
     diff, pr, tainted = None, None, []
     if args.base:
         if git(root, "rev-parse", "--verify", "--quiet", args.base + "^{commit}", check=False).returncode:
-            raise Stop("--base %s is not a commit here" % args.base)
+            raise Stop(f"--base {args.base} is not a commit here")
         # Which files changed, from git itself (-z: no quoting), with renames found whatever
         # diff.renames says. An entry that names a credential file on either side is left out
         # whole, and only the other entries are diffed.
@@ -320,13 +323,13 @@ def cmd_brief(args, settings) -> int:
         untracked = git(root, "ls-files", "--others", "--exclude-standard", "-z").stdout.split("\0")
         for rel in [p for p in kept + untracked if p]:
             add(rel, named=False)
-        notes += ["new: %s (not tracked yet, so not in the diff: read it whole)" % p
+        notes += [f"new: {p} (not tracked yet, so not in the diff: read it whole)"
                   for p in untracked if p and any(f["path"] == p for f in files)]
     if args.pr is not None:
         pr = pr_view(args.pr)
         diff, tainted = without_secrets(run_gh(["pr", "diff", str(args.pr)]))
         if pr_view(args.pr)["head"] != pr["head"]:
-            raise Stop("PR #%s moved while the brief was written: write it again" % args.pr)
+            raise Stop(f"PR #{args.pr} moved while the brief was written: write it again")
     for rel in args.file:
         add(rel, named=True)
 
@@ -354,14 +357,14 @@ def cmd_brief(args, settings) -> int:
     write_json(out / "brief.json", brief)
     (out / "FINDINGS.md").write_text(ledger_text(out), encoding="utf-8")
     for rel in left_out:
-        print("left out: %s (a credential file, or a rename of one)" % rel)
-    print("wrote %s/BRIEF.md: %d files, SHA-256 %s" % (args.dir, len(files), sha256(out / "BRIEF.md")))
-    print("next: review_tool.py run %s" % args.dir)
+        print(f"left out: {rel} (a credential file, or a rename of one)")
+    print(f"wrote {args.dir}/BRIEF.md: {len(files):d} files, SHA-256 {sha256(out / 'BRIEF.md')}")
+    print(f"next: review_tool.py run {args.dir}")
     return 0
 
 
 def brief_text(root: Path, out: Path, brief: dict) -> str:
-    lines = ["# Review brief: %s" % SUBJECTS[brief["subject"]], "",
+    lines = ["# Review brief: {}".format(SUBJECTS[brief["subject"]]), "",
              "You are an independent reviewer, working in a different tool from the one that produced",
              "this work. Nothing here asks you to agree with it. Answer from the files themselves, not",
              "from any summary of them, including this brief's.", "",
@@ -370,39 +373,36 @@ def brief_text(root: Path, out: Path, brief: dict) -> str:
         lines += ["## Claims to test", "",
                   "The author claims what follows. For each, try to show where it is false: a claim is",
                   "met only if you looked for the case that breaks it and did not find one.", ""]
-        lines += ["- C%d. %s" % (i, claim) for i, claim in enumerate(brief["claims"], 1)] + [""]
+        lines += [f"- C{i:d}. {claim}" for i, claim in enumerate(brief["claims"], 1)] + [""]
     lines += ["## The change under review", ""]
     pr, diff = brief["pr"], shown(root, out / "diff.patch")
     if pr:
-        lines.append("Pull request #%s, %s, at head `%s` (base `%s`). Its diff is `%s`."
-                     % (pr["number"], pr["url"], pr["head"], pr["base"], diff))
+        lines.append("Pull request #{}, {}, at head `{}` (base `{}`). Its diff is `{}`.".format(pr["number"], pr["url"], pr["head"], pr["base"], diff))
         if brief["head"] == pr["head"] and not brief["dirty"]:
             lines.append("Your checkout is at that head, so the files in it are the PR's.")
         elif brief["head"] == pr["head"]:
             lines.append("Your checkout is at that head, with uncommitted changes. Read a file as the PR has "
-                         "it with `git show %s:<path>`." % pr["head"])
+                         "it with `git show {}:<path>`.".format(pr["head"]))
         elif git(root, "cat-file", "-e", pr["head"] + "^{commit}", check=False).returncode == 0:
             lines.append("Your checkout is not at that head. Read a file as the PR has it with "
-                         "`git show %s:<path>`." % pr["head"])
+                         "`git show {}:<path>`.".format(pr["head"]))
         else:
             lines.append("The head commit is not in your checkout: judge the diff, and say which "
                          "findings you could not check against the whole file.")
     elif brief["base"]:
-        lines.append("The work from `%s` to the working tree at `%s`%s. Its diff is `%s`."
-                     % (brief["base"], brief["head"][:12],
+        lines.append("The work from `{}` to the working tree at `{}`{}. Its diff is `{}`.".format(brief["base"], brief["head"][:12],
                         " with uncommitted changes" if brief["dirty"] else "", diff))
     else:
-        lines.append("The files below, as they stand at `%s`%s."
-                     % (brief["head"][:12], " with uncommitted changes" if brief["dirty"] else ""))
-    lines += ["- %s" % note for note in brief["notes"]]
-    lines += ["- deleted: %s" % rel for rel in brief["deleted"]]
-    lines += ["- left out: %s (a credential file, or a rename of one; do not open it)" % rel for rel in brief["left_out"]]
+        lines.append("The files below, as they stand at `{}`{}.".format(brief["head"][:12], " with uncommitted changes" if brief["dirty"] else ""))
+    lines += [f"- {note}" for note in brief["notes"]]
+    lines += [f"- deleted: {rel}" for rel in brief["deleted"]]
+    lines += [f"- left out: {rel} (a credential file, or a rename of one; do not open it)" for rel in brief["left_out"]]
     lines += ["", "## What to read", "",
               "Paths are relative to the repository root, the directory you start in. Before you rely",
               "on a file, check its SHA-256 (`shasum -a 256 <path>`); if one differs, say so first in",
               "your answer: you are not reading the bytes this brief names.", "",
               "| File | SHA-256 |", "|---|---|"]
-    lines += ["| `%s` | `%s` |" % (f["path"], f["sha256"]) for f in brief["files"]]
+    lines += ["| `{}` | `{}` |".format(f["path"], f["sha256"]) for f in brief["files"]]
     lines += ["", "You may read anything else in the repository that helps you answer.", "",
               "## Rules", "",
               "- Read only. Do not edit, create, stage, commit, push or post anything.",
@@ -422,7 +422,7 @@ def brief_text(root: Path, out: Path, brief: dict) -> str:
 
 def ledger_text(out: Path) -> str:
     return "\n".join([
-        "# Findings ledger: %s" % out.name, "",
+        f"# Findings ledger: {out.name}", "",
         "One row per finding the review returned, under the reviewer's own id. Fill every cell:", "",
         "- Reproduced: yes or no. A finding is believed only once it is reproduced against the bytes.",
         "- Class: blocking, hardening or completeness, assigned here, not by the reviewer",
@@ -432,7 +432,7 @@ def ledger_text(out: Path) -> str:
         "  bytes are unreviewed until a later round reads them; `review_tool.py status` says which.",
         "- Notes: the regression test for a fixed finding, the target for a deferred one, the reason",
         "  for a rejected one.", "",
-        "If the review returned no findings, replace the table with the line: %s" % NO_FINDINGS, "",
+        f"If the review returned no findings, replace the table with the line: {NO_FINDINGS}", "",
         "| " + " | ".join(LEDGER_COLUMNS) + " |",
         "|" + "---|" * len(LEDGER_COLUMNS), ""])
 
@@ -443,7 +443,7 @@ def load_brief(path: str) -> tuple[Path, dict]:
     out = Path(path)
     brief = read_json(out / "brief.json")
     if not brief:
-        raise Stop("%s has no brief.json: write one with review_tool.py brief" % path)
+        raise Stop(f"{path} has no brief.json: write one with review_tool.py brief")
     return out, brief
 
 
@@ -452,9 +452,9 @@ def changed_files(root: Path, out: Path, brief: dict) -> list[str]:
     for f in brief["files"]:
         path = root / f["path"] if not os.path.isabs(f["path"]) else Path(f["path"])
         if not path.is_file():
-            problems.append("missing: %s" % f["path"])
+            problems.append("missing: {}".format(f["path"]))
         elif sha256(path) != f["sha256"]:
-            problems.append("changed since the brief: %s" % f["path"])
+            problems.append("changed since the brief: {}".format(f["path"]))
     return problems
 
 
@@ -475,7 +475,7 @@ def command(name: str, settings: dict) -> tuple[list[str], str]:
         argv = ["codex", "exec", "--ephemeral"]
         if settings["codex_model"]:
             argv += ["-m", settings["codex_model"]]
-        argv += ["-c", 'model_reasoning_effort="%s"' % settings["codex_effort"], "--sandbox", "read-only",
+        argv += ["-c", 'model_reasoning_effort="{}"'.format(settings["codex_effort"]), "--sandbox", "read-only",
                  "--color", "never", "--skip-git-repo-check", "--add-dir", "{dir}",
                  "-o", "{dir}/review.md", PROMPT]
         return argv, "review.log"
@@ -485,11 +485,12 @@ def command(name: str, settings: dict) -> tuple[list[str], str]:
 
 def preconditions(name: str) -> list[str]:
     if not shutil.which(name):
-        return ["%s is not on PATH" % name]
+        return [f"{name} is not on PATH"]
     if name == "codex":
-        proc = subprocess.run(["codex", "login", "status"], stdin=subprocess.DEVNULL, capture_output=True, text=True)
+        proc = subprocess.run(["codex", "login", "status"], stdin=subprocess.DEVNULL, capture_output=True,
+                              text=True, check=False)
         if proc.returncode != 0:
-            return ["codex login status exited %d: log in to Codex first" % proc.returncode]
+            return [f"codex login status exited {proc.returncode:d}: log in to Codex first"]
     return []
 
 
@@ -498,7 +499,7 @@ def cmd_run(args, settings) -> int:
     out, brief = load_brief(args.dir)
     run = read_json(out / "run.json")
     if run and not args.dry_run:
-        raise Stop("%s was already run (%s): a new round is a new brief" % (args.dir, run.get("state")))
+        raise Stop("{} was already run ({}): a new round is a new brief".format(args.dir, run.get("state")))
     name = pick_reviewer(args, settings)
     argv, stdout = command(name, settings)
     if args.dry_run:
@@ -520,7 +521,7 @@ def cmd_run(args, settings) -> int:
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "_watch", str(out.resolve())],
                      cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
-    print("started %s on %s in the background; review_tool.py status %s" % (name, args.dir, args.dir))
+    print(f"started {name} on {args.dir} in the background; review_tool.py status {args.dir}")
     return 0
 
 
@@ -536,18 +537,16 @@ def watch(root: Path, out: Path) -> int:
         return 1
     argv = [part.replace("{dir}", str(out.resolve())) for part in run["argv"]]
     note, code = "", None
-    with open(out / "review.log", "ab") as log:
-        sink = log if run["stdout"] == "review.log" else open(out / run["stdout"], "wb")
+    with contextlib.ExitStack() as files:
+        log = files.enter_context(open(out / "review.log", "ab"))
+        sink = log if run["stdout"] == "review.log" else files.enter_context(open(out / run["stdout"], "wb"))
         try:
             code = subprocess.run(argv, cwd=root, stdin=subprocess.DEVNULL, stdout=sink, stderr=log,
-                                  timeout=run["timeout_minutes"] * 60).returncode
+                                  timeout=run["timeout_minutes"] * 60, check=False).returncode
         except subprocess.TimeoutExpired:
-            note = "stopped after %s minutes" % run["timeout_minutes"]
+            note = "stopped after {} minutes".format(run["timeout_minutes"])
         except OSError as error:
             note = str(error)
-        finally:
-            if sink is not log:
-                sink.close()
     review = out / "review.md"
     if code == 0 and not (review.is_file() and review.read_text(encoding="utf-8", errors="replace").strip()):
         note = "the reviewer exited 0 and wrote no review"
@@ -569,7 +568,7 @@ def rounds(paths: list[str]) -> list[Path]:
         elif path.is_dir():
             found += sorted(p.parent for p in path.rglob("brief.json"))
         else:
-            raise Stop("%s is not a review round or a folder of them" % path)
+            raise Stop(f"{path} is not a review round or a folder of them")
     return found
 
 
@@ -591,7 +590,7 @@ def run_state(run: dict) -> str:
 def split_row(line: str) -> list[str]:
     """The cells of a table row, with or without its outer pipes."""
     line = line.strip()
-    line = line[1:] if line.startswith("|") else line
+    line = line.removeprefix("|")
     line = line[:-1] if line.endswith("|") and not line.endswith("\\|") else line
     return [c.strip().replace("\\|", "|") for c in re.split(r"(?<!\\)\|", line)]
 
@@ -632,36 +631,35 @@ def ledger_problems(root: Path, out: Path, finished: bool) -> tuple[list[dict], 
     text = path.read_text(encoding="utf-8")
     rows, problems = ledger_rows(text), []
     if finished and not rows and not says_none(text):
-        problems.append("the ledger has no rows: fill it, or write the line '%s'" % NO_FINDINGS)
+        problems.append(f"the ledger has no rows: fill it, or write the line '{NO_FINDINGS}'")
     for row in rows:
         fid = row.get("Id") or "a row with no id"
         blank = [c for c in LEDGER_COLUMNS[:5] if not row.get(c)]
         if blank:
-            problems.append("%s: fill %s" % (fid, ", ".join(blank)))
+            problems.append("{}: fill {}".format(fid, ", ".join(blank)))
             continue
         reproduced, kind, disposition = (row["Reproduced"].lower(), row["Class"].lower(),
                                          row["Disposition"].lower())
         if reproduced not in ("yes", "no"):
-            problems.append("%s: Reproduced is yes or no, not %r" % (fid, row["Reproduced"]))
+            problems.append("{}: Reproduced is yes or no, not {!r}".format(fid, row["Reproduced"]))
         if kind not in CLASSES:
-            problems.append("%s: Class is one of %s, not %r" % (fid, ", ".join(CLASSES), row["Class"]))
+            problems.append("{}: Class is one of {}, not {!r}".format(fid, ", ".join(CLASSES), row["Class"]))
         if disposition not in DISPOSITIONS:
-            problems.append("%s: Disposition is one of %s, not %r"
-                            % (fid, ", ".join(DISPOSITIONS), row["Disposition"]))
+            problems.append("{}: Disposition is one of {}, not {!r}".format(fid, ", ".join(DISPOSITIONS), row["Disposition"]))
         elif disposition == "open":
-            problems.append("%s: still open" % fid)
+            problems.append(f"{fid}: still open")
         elif disposition == "fixed":
             if reproduced == "no":
-                problems.append("%s: fixed, but not reproduced" % fid)
+                problems.append(f"{fid}: fixed, but not reproduced")
             where = row.get("Repaired at", "").strip("` ")
             if not where:
-                problems.append("%s: fixed, with no commit or tag for the repaired bytes" % fid)
+                problems.append(f"{fid}: fixed, with no commit or tag for the repaired bytes")
             elif git(root, "rev-parse", "--verify", "--quiet", where + "^{commit}", check=False).returncode:
-                problems.append("%s: Repaired at %r is not a commit or tag here" % (fid, where))
+                problems.append(f"{fid}: Repaired at {where!r} is not a commit or tag here")
             if not row.get("Notes"):
-                problems.append("%s: fixed, with no regression test in Notes" % fid)
+                problems.append(f"{fid}: fixed, with no regression test in Notes")
         elif disposition in ("deferred", "rejected") and not row.get("Notes"):
-            problems.append("%s: %s, with no %s in Notes" % (fid, disposition,
+            problems.append("{}: {}, with no {} in Notes".format(fid, disposition,
                                                             "target" if disposition == "deferred" else "reason"))
     return rows, problems
 
@@ -670,24 +668,24 @@ def cmd_status(args, settings) -> int:
     root = repo_root()
     found = rounds(args.paths)
     if not found:
-        raise Stop("no review rounds under %s" % ", ".join(args.paths))
+        raise Stop("no review rounds under {}".format(", ".join(args.paths)))
     home = str(Path.home())
     report, latest = [], {}
     # Oldest first, ties by folder name, so the order the paths were given never matters.
-    found = sorted(set(p.resolve() for p in found),
+    found = sorted({p.resolve() for p in found},
                    key=lambda p: (read_json(p / "brief.json").get("created", ""), p.as_posix()))
     for out in found:
         brief, run = read_json(out / "brief.json"), read_json(out / "run.json")
         state = run_state(run)
         rows, problems = ledger_problems(root, out, state == "done")
         if state == "not run":
-            problems.insert(0, "not run yet: review_tool.py run %s" % shown(root, out))
+            problems.insert(0, f"not run yet: review_tool.py run {shown(root, out)}")
         elif state in ("starting", "running"):
-            problems.insert(0, "still %s" % state)
+            problems.insert(0, f"still {state}")
         elif state in ("failed", "stopped"):
-            problems.insert(0, "the review %s%s: see review.log" % (
-                state, " (%s)" % run.get("note") if run.get("note") else
-                " (exit %s)" % run.get("exit") if run.get("exit") is not None else ""))
+            problems.insert(0, "the review {}{}: see review.log".format(
+                state, " ({})".format(run.get("note")) if run.get("note") else
+                " (exit {})".format(run.get("exit")) if run.get("exit") is not None else ""))
         review = out / "review.md"
         if state == "done":
             if not review.is_file() or not review.read_text(encoding="utf-8", errors="replace").strip():
@@ -698,7 +696,7 @@ def cmd_status(args, settings) -> int:
             if not (out / "BRIEF.md").is_file() or sha256(out / "BRIEF.md") != run.get("brief_sha256"):
                 problems.append("BRIEF.md changed after the review read it")
         if review.is_file() and home in review.read_text(encoding="utf-8", errors="replace"):
-            problems.append("review.md names this machine's home folder: review_tool.py sanitize %s" % out)
+            problems.append(f"review.md names this machine's home folder: review_tool.py sanitize {out}")
         report.append({"round": shown(root, out), "subject": brief.get("subject"), "state": state,
                        "reviewer": run.get("reviewer"), "model": run.get("model"),
                        "findings": len(rows), "problems": problems})
@@ -714,10 +712,10 @@ def cmd_status(args, settings) -> int:
             coverage.append({"path": rel, "state": "missing", "round": where})
         elif sha256(path) != digest:
             coverage.append({"path": rel, "state": "unreviewed", "round": where,
-                             "why": "changed since %s read %s" % (where, digest[:12])})
+                             "why": f"changed since {where} read {digest[:12]}"})
         elif state != "done":
             coverage.append({"path": rel, "state": "unreviewed", "round": where,
-                             "why": "%s has no finished review" % where})
+                             "why": f"{where} has no finished review"})
         else:
             coverage.append({"path": rel, "state": "reviewed", "round": where})
     bad = any(r["problems"] for r in report) or any(c["state"] != "reviewed" for c in coverage)
@@ -725,14 +723,14 @@ def cmd_status(args, settings) -> int:
         print(json.dumps({"rounds": report, "coverage": coverage, "ok": not bad}, indent=2))
         return 1 if bad else 0
     for r in report:
-        who = " by %s (%s)" % (r["reviewer"], r["model"]) if r["reviewer"] else ""
-        print("%s: %s review%s, %s, %d finding(s) in the ledger" % (
-            r["round"], r["subject"], who, r["state"], r["findings"]))
+        who = " by {} ({})".format(r["reviewer"], r["model"]) if r["reviewer"] else ""
+        print(f"{r['round']}: {r['subject']} review{who}, {r['state']}, "
+              f"{r['findings']:d} finding(s) in the ledger")
         for problem in r["problems"]:
-            print("  problem: %s" % problem)
+            print(f"  problem: {problem}")
     for c in coverage:
-        print("%s: %s%s" % (c["state"], c["path"], " (%s)" % c["why"] if c.get("why") else
-                            " (%s)" % c["round"]))
+        print("{}: {}{}".format(c["state"], c["path"], " ({})".format(c["why"]) if c.get("why") else
+                            " ({})".format(c["round"])))
     return 1 if bad else 0
 
 
@@ -741,9 +739,10 @@ def cmd_status(args, settings) -> int:
 def run_gh(args: list[str]) -> str:
     if not shutil.which("gh"):
         raise Stop("gh is not on PATH")
-    proc = subprocess.run(["gh", *args], stdin=subprocess.DEVNULL, capture_output=True, text=True)
+    proc = subprocess.run(["gh", *args], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                          check=False)
     if proc.returncode != 0:
-        raise Stop("gh %s exited %d: %s" % (" ".join(args[:2]), proc.returncode, proc.stderr.strip()))
+        raise Stop(f"gh {' '.join(args[:2])} exited {proc.returncode:d}: {proc.stderr.strip()}")
     return proc.stdout
 
 
@@ -758,33 +757,34 @@ def cmd_post(args, settings) -> int:
     out, brief = load_brief(args.dir)
     run = read_json(out / "run.json")
     if run_state(run) != "done":
-        raise Stop("%s has no finished review to post" % args.dir)
+        raise Stop(f"{args.dir} has no finished review to post")
     number = args.pr if args.pr is not None else (brief.get("pr") or {}).get("number")
     if number is None:
         raise Stop("pass --pr N: this round is not a PR review")
     if (out / "posted.json").is_file() and not args.again:
-        raise Stop("already posted (%s): pass --again to post once more" % read_json(out / "posted.json").get("url"))
+        raise Stop("already posted ({}): pass --again to post once more".format(read_json(out / "posted.json").get("url")))
     review = sha256(out / "review.md") if (out / "review.md").is_file() else None
     if review not in (run.get("review_sha256"), run.get("sanitized_sha256")):
         raise Stop("review.md is not the reviewer's output (see review_tool.py status): nothing posted")
     reviewed = (brief.get("pr") or {}).get("head") or brief.get("head")
     current = pr_view(number)["head"]
-    lines = ["**Independent review** by %s (%s) of `%s`." % (run["reviewer"], run["model"], reviewed),
-             "Brief SHA-256 `%s`, review SHA-256 `%s`%s." % (
+    lines = ["**Independent review** by {} ({}) of `{}`.".format(run["reviewer"], run["model"], reviewed),
+             "Brief SHA-256 `{}`, review SHA-256 `{}`{}.".format(
                  run["brief_sha256"], run["review_sha256"],
-                 " (sanitized, SHA-256 `%s`)" % review if review != run["review_sha256"] else "")]
+                 f" (sanitized, SHA-256 `{review}`)" if review != run["review_sha256"] else "")]
     if current != reviewed:
-        lines.append("> The PR head is now `%s`. This review did not read it." % current)
+        lines.append(f"> The PR head is now `{current}`. This review did not read it.")
     lines += ["", (out / "review.md").read_text(encoding="utf-8").rstrip(), ""]
     ledger = (out / "FINDINGS.md").read_text(encoding="utf-8") if (out / "FINDINGS.md").is_file() else ""
     if ledger_rows(ledger) or says_none(ledger):
         lines += ["<details><summary>Findings ledger</summary>", "", ledger.rstrip(), "", "</details>", ""]
     body = "\n".join(lines)
     if len(body) > 60000:
-        raise Stop("the comment would be %d characters, over GitHub's limit: post a shorter one by hand" % len(body))
+        raise Stop(f"the comment would be {len(body):d} characters, over GitHub's limit: "
+                   "post a shorter one by hand")
     if not args.yes:
         print(body)
-        print("\nnot posted: run again with --yes once the owner approves posting this to PR #%s" % number)
+        print(f"\nnot posted: run again with --yes once the owner approves posting this to PR #{number}")
         return 0
     with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as handle:
         handle.write(body)
@@ -793,7 +793,7 @@ def cmd_post(args, settings) -> int:
     finally:
         os.unlink(handle.name)
     write_json(out / "posted.json", {"pr": number, "url": url, "posted": now(), "head": current})
-    print("posted: %s" % url)
+    print(f"posted: {url}")
     return 0
 
 
@@ -811,19 +811,19 @@ def cmd_sanitize(args, settings) -> int:
             count += text.count(real)
             text = text.replace(real, placeholder)
         if not count:
-            print("%s: nothing to replace" % name)
+            print(f"{name}: nothing to replace")
             continue
         if name == "review.md":
-            text = ("<!-- Edited by review_tool.py sanitize: %d absolute path(s) replaced with <repo> or <home>. "
-                    "The reviewer's words are otherwise unchanged; run.json holds the SHA-256 of the original. -->\n"
-                    % count) + text
+            text = (f"<!-- Edited by review_tool.py sanitize: {count:d} absolute path(s) replaced with <repo> "
+                    "or <home>. The reviewer's words are otherwise unchanged; run.json holds the SHA-256 of "
+                    "the original. -->\n") + text
         path.write_text(text, encoding="utf-8")
         if name == "review.md":
             run = read_json(out / "run.json")
             if run:
                 run["sanitized_sha256"] = sha256(path)
                 write_json(out / "run.json", run)
-        print("%s: replaced %d absolute path(s)" % (name, count))
+        print(f"{name}: replaced {count:d} absolute path(s)")
     return 0
 
 
@@ -863,7 +863,7 @@ def main(argv=None) -> int:
         return {"brief": cmd_brief, "run": cmd_run, "status": cmd_status, "post": cmd_post,
                 "sanitize": cmd_sanitize}[args.command](args, settings)
     except Stop as error:
-        print("error: %s" % error, file=sys.stderr)
+        print(f"error: {error}", file=sys.stderr)
         return 2
 
 
