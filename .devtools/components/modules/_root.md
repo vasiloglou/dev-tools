@@ -97,43 +97,56 @@ Copy dev-tools skills and scripts into a project and keep the copies honest.
 
 | Symbol | Kind | Line | Summary |
 | --- | --- | --- | --- |
-| `SyncError` | class(Exception) | 71 | (no docstring) |
-| `digest(data) -> str` | function | 77 | (no docstring) |
-| `inside(root, relative) -> Path` | function | 81 | Resolve a configured relative path, refusing anything that leaves ``root``. |
-| `fill_tokens(data, values, origin, used) -> bytes` | function | 88 | Replace ``{{devtools:<key>}}`` in text files with the project's value; a missing value is an error. |
-| `read_config(project) -> dict` | function | 102 | (no docstring) |
-| `desired_files(source_root, config, project) -> dict[str, dict]` | function | 113 | Project-relative path -> {data, mode, origin} for everything the config asks for. |
-| `read_json(path) -> dict` | function | 174 | (no docstring) |
-| `source_identity(source_root, config) -> dict` | function | 178 | The dev-tools commit, and whether what the config takes from it has uncommitted changes. |
-| `warn_if_dirty(source_root, config) -> None` | function | 187 | (no docstring) |
-| `plan(project, wanted) -> tuple[list[dict], list[str]]` | function | 193 | Classify every wanted or previously managed file. Returns (actions, refusals). |
-| `write_atomic(path, data, mode) -> None` | function | 230 | (no docstring) |
-| `ignored_by_git(project, paths) -> list[str]` | function | 243 | The paths git would leave out of the repository: ignored and not tracked. Empty outside git. |
-| `entry_paths(entry, wanted) -> list[str]` | function | 259 | The delivered paths that come from one [[sync]] entry: under its dest, or the dest itself, |
-| `warn_if_ignored(project, config, wanted) -> None` | function | 267 | Say, per entry, when git ignores files the sync delivers: they would stay out of the repository. |
-| `cmd_apply(args) -> int` | function | 281 | (no docstring) |
-| `cmd_check(args) -> int` | function | 340 | (no docstring) |
-| `kept_lines(data) -> list[tuple[int, str]]` | function | 368 | (line number, stripped text) for the lines that say something; nothing for a binary file. |
-| `squeeze(text) -> str` | function | 378 | The text with every run of spaces and line breaks as one space, so a re-wrapped sentence still matches. |
-| `shared(shipped, local) -> float` | function | 383 | The share of the shipped file's lines that the local file also has (lines with a token left out). |
-| `shipped_files(directory) -> list[Path]` | function | 389 | (no docstring) |
-| `shipped_units(source_root) -> list[dict]` | function | 393 | What a project can take: each skill directory, the agents directory, and the scripts that stand alone. |
-| `walk(top)` | function | 406 | (regular files, symlinked directories) under a folder, skipping caches and nested checkouts. |
-| `walk_project(project)` | function | 418 | (regular files, symlinked directories), skipping caches and checkouts nested in the project. |
-| `other_plans(project, planning) -> list[tuple[str, str]]` | function | 459 | (path, tool) for each other planning tool whose files are here, and for a planning |
-| `related(name, shipped) -> bool` | function | 481 | `acme-components` and `components-acme` are other names for `components`. |
-| `literals(script) -> dict` | function | 486 | The top-level `NAME = <literal>` assignments of a script, read without running it. |
-| `survey(source_root, project) -> dict` | function | 502 | Match what the project has against what dev-tools ships. Reads only. |
-| `covered(project) -> tuple[set[str], set[str], set[str]]` | function | 566 | (paths the config delivers to, paths in the receipt, old copies it names); empty without a config. |
-| `tracked(project, path) -> bool` | function | 576 | False only when git answers and knows no file at or under the path. |
-| `survey_text(source_root, project, result) -> list[str]` | function | 582 | (no docstring) |
-| `by_folder(paths) -> list[str]` | function | 687 | One line per parent folder, with the names inside it. |
-| `toml_value(value) -> str` | function | 695 | (no docstring) |
-| `token_values(source, copy) -> dict[str, tuple[str, str]]` | function | 699 | Token -> (value, where it was read), for the tokens whose value the project's copy shows. |
-| `starter_config(source_root, project, result) -> list[str]` | function | 727 | A .devtools.toml that puts each shipped unit where the project keeps its own copy. |
-| `cmd_survey(args) -> int` | function | 841 | (no docstring) |
-| `headings(text) -> dict[int, str]` | function | 851 | Line number -> the Markdown heading it sits under (its own text for a heading); code fences are skipped. |
-| `compare_rows(project, source_root, config, wanted) -> tuple[list[dict], list[str]]` | function | 863 | One row per file an apply would touch, per file of an old copy, and per excluded file the project keeps. |
-| `row_note(row) -> str` | function | 942 | (no docstring) |
-| `cmd_compare(args) -> int` | function | 959 | (no docstring) |
-| `main(argv) -> int` | function | 1061 | (no docstring) |
+| `SyncError` | class(Exception) | 82 | (no docstring) |
+| `digest(data) -> str` | function | 88 | (no docstring) |
+| `inside(root, relative) -> Path` | function | 92 | Resolve a configured relative path, refusing anything that leaves ``root``. |
+| `fill_tokens(data, values, origin, used) -> bytes` | function | 99 | Replace ``{{devtools:<key>}}`` in text files with the project's value; a missing value is an error. |
+| `read_config(project) -> dict` | function | 113 | (no docstring) |
+| `desired_files(source_root, config, project) -> dict[str, dict]` | function | 127 | Project-relative path -> {data, mode, origin} for everything the config asks for. |
+| `read_json(path) -> dict` | function | 188 | (no docstring) |
+| `source_identity(source_root, config) -> dict` | function | 192 | The dev-tools commit, and whether what the config takes from it has uncommitted changes. |
+| `warn_if_dirty(source_root, config) -> None` | function | 201 | (no docstring) |
+| `plan(project, wanted) -> tuple[list[dict], list[str]]` | function | 207 | Classify every wanted or previously managed file. Returns (actions, refusals). |
+| `write_atomic(path, data, mode) -> None` | function | 244 | (no docstring) |
+| `ignored_by_git(project, paths) -> list[str]` | function | 257 | The paths git would leave out of the repository: ignored and not tracked. Empty outside git. |
+| `entry_paths(entry, wanted) -> list[str]` | function | 273 | The delivered paths that come from one [[sync]] entry: under its dest, or the dest itself, |
+| `warn_if_ignored(project, config, wanted) -> None` | function | 281 | Say, per entry, when git ignores files the sync delivers: they would stay out of the repository. |
+| `cmd_apply(args) -> int` | function | 295 | (no docstring) |
+| `cmd_check(args) -> int` | function | 359 | (no docstring) |
+| `kept_lines(data) -> list[tuple[int, str]]` | function | 406 | (line number, stripped text) for the lines that say something; nothing for a binary file. |
+| `squeeze(text) -> str` | function | 416 | The text with every run of spaces and line breaks as one space, so a re-wrapped sentence still matches. |
+| `shared(shipped, local) -> float` | function | 421 | The share of the shipped file's lines that the local file also has (lines with a token left out). |
+| `shipped_files(directory) -> list[Path]` | function | 427 | (no docstring) |
+| `shipped_units(source_root) -> list[dict]` | function | 431 | What a project can take: each skill directory, the agents directory, and the scripts that stand alone. |
+| `covers(path, unit) -> bool` | function | 450 | ``path`` is the unit's source or a folder above it, compared by whole path segments. |
+| `takes(path, unit) -> bool` | function | 456 | A config path and a unit's source meet: equal, or either lies under the other. |
+| `declined_paths(config, units) -> tuple[list[str], list[str]]` | function | 461 | (the paths ``declined`` lists, those among them that cover no shipped unit). A value that is |
+| `unit_names(source_root, unit) -> set[str]` | function | 481 | What a file can call the unit: a skill's folder name; for `agents`, each file's name without |
+| `workflow_folder(unit) -> str \| None` | function | 490 | ``skills/<folder>`` for a unit deeper than one level under ``skills/``; else None. |
+| `names_in(text, name) -> bool` | function | 496 | The text names ``name`` alone between backticks, or as the folder a relative path climbs into. |
+| `unit_report(source_root, config, wanted, receipt) -> dict` | function | 501 | What to say about the units the config does not take. Reads only. |
+| `pending(wanted, receipt, source) -> dict \| None` | function | 540 | What an apply would deliver that the last one did not: the files to create, update and |
+| `short(commit) -> str` | function | 555 | (no docstring) |
+| `report_lines(report, behind) -> list[str]` | function | 559 | The lines to print about the units and about being current, in order; empty when there is |
+| `print_report(report, behind) -> None` | function | 591 | (no docstring) |
+| `default_source(root) -> Path \| None` | function | 598 | The folder that holds this file, when it is a dev-tools source (every example config is |
+| `walk(top)` | function | 604 | (regular files, symlinked directories) under a folder, skipping caches and nested checkouts. |
+| `walk_project(project)` | function | 616 | (regular files, symlinked directories), skipping caches and checkouts nested in the project. |
+| `other_plans(project, planning) -> list[tuple[str, str]]` | function | 657 | (path, tool) for each other planning tool whose files are here, and for a planning |
+| `related(name, shipped) -> bool` | function | 679 | `acme-components` and `components-acme` are other names for `components`. |
+| `literals(script) -> dict` | function | 684 | The top-level `NAME = <literal>` assignments of a script, read without running it. |
+| `survey(source_root, project) -> dict` | function | 700 | Match what the project has against what dev-tools ships. Reads only. |
+| `covered(project) -> tuple[set[str], set[str], set[str]]` | function | 764 | (paths the config delivers to, paths in the receipt, old copies it names); empty without a config. |
+| `tracked(project, path) -> bool` | function | 774 | False only when git answers and knows no file at or under the path. |
+| `survey_text(source_root, project, result) -> list[str]` | function | 780 | (no docstring) |
+| `unit_marks(source_root, project) -> dict[str, str]` | function | 886 | Unit -> the mark survey adds to it: declined in the config, or named by a file the config |
+| `by_folder(paths) -> list[str]` | function | 903 | One line per parent folder, with the names inside it. |
+| `toml_value(value) -> str` | function | 911 | (no docstring) |
+| `token_values(source, copy) -> dict[str, tuple[str, str]]` | function | 915 | Token -> (value, where it was read), for the tokens whose value the project's copy shows. |
+| `starter_config(source_root, project, result) -> list[str]` | function | 943 | A .devtools.toml that puts each shipped unit where the project keeps its own copy. |
+| `cmd_survey(args) -> int` | function | 1057 | (no docstring) |
+| `headings(text) -> dict[int, str]` | function | 1067 | Line number -> the Markdown heading it sits under (its own text for a heading); code fences are skipped. |
+| `compare_rows(project, source_root, config, wanted) -> tuple[list[dict], list[str]]` | function | 1079 | One row per file an apply would touch, per file of an old copy, and per excluded file the project keeps. |
+| `row_note(row) -> str` | function | 1158 | (no docstring) |
+| `cmd_compare(args) -> int` | function | 1175 | (no docstring) |
+| `main(argv) -> int` | function | 1277 | (no docstring) |

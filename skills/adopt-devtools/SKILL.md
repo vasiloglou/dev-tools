@@ -24,7 +24,7 @@ stands for `python3 <dev-tools>/devtools/sync.py` (Python 3.11 or newer).
 | `sync compare --project . <path> …` | The lines only the project's copy has, with line numbers, the heading they sit under, the shipped line a line is close to (`~ shipped:`), and the project-owned file a line is now in (`[in …]`). `--added` prints the other side, the lines only the shipped file has; `--diff` prints the full difference | No |
 | `sync compare --project . --record` | The table for the migration record, one row per file, with the counts filled in | No |
 | `sync apply --project . --adopt [--dry-run]` | Replaces the files and writes the receipt. It calls the same files `create` and `update` | Yes |
-| `sync check --project .` | Confirms the synced files are what was delivered | No |
+| `sync check --project .` | Confirms the synced files are what was delivered. Run from a dev-tools checkout, it then says whether an apply would change files (`not current:`) and which shipped units a synced file names that the config does not take. `--receipt-only` skips that comparison; `--strict` exits 5 while there is anything to report | No |
 
 ## Rules
 
@@ -154,6 +154,11 @@ own copies had written into them, so every setting is a decision about this proj
   (`scripts/review_tool.settings.json`), all of which have defaults.
 - **`replaces`** names an old copy under another name, so that `compare` reads it.
   Nothing deletes it; you do, in step 7.
+- **`declined`**, at the top, lists the shipped units the project leaves out on purpose.
+  `apply` and `check` name a unit the config does not take when a synced file names it,
+  and once when it is new in dev-tools; a path in `declined` ends both. Put a unit there
+  only when the user chose to leave it out: a unit the shipped text names and the
+  project lacks is usually one it needs.
 - **A command to run after a sync.** If a synced script generates files (the component
   index does), uncomment the `after_apply` line at the top and give it the interpreter
   and the script's path as the project runs it. It runs without a shell: to set a

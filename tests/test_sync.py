@@ -618,3 +618,450 @@ def test_both_examples_deliver_the_handoff_skills_with_the_script_they_share(tmp
     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
     done = subprocess.run([sys.executable, str(script), "doctor"], cwd=project, capture_output=True, text=True)
     assert done.returncode == 0 and "handoff doctor:" in done.stdout, done.stderr
+
+
+# --------------------------------------------------------------------------- what the sync says about units
+# Milestone sync-reports, phase 1: units the config does not take, `declined`, the receipt's
+# `shipped`, and `check` against a dev-tools source.
+
+import os
+import subprocess
+
+NAMED = "not taken, and named by a file this project has:"
+NEW = "new in dev-tools since this project's last sync:"
+UNLISTED = ("not taken (this receipt was written before the sync recorded what dev-tools ships; "
+            "listed this once):")
+CLOSING = ("to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, "
+           "add its path to `declined` there")
+HEADINGS = (NAMED, NEW, UNLISTED, CLOSING)
+
+
+@pytest.fixture(autouse=True)
+def no_implicit_source(monkeypatch):
+    """Plain `check` in a test never reads the repository's own checkout as its source."""
+    monkeypatch.setattr(sync, "default_source", lambda *args, **kwargs: None, raising=False)
+
+
+def git(root, *args):
+    return subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com",
+                           *args], check=True, capture_output=True, text=True).stdout.strip()
+
+
+def commit(root, message="change"):
+    git(root, "add", "-A")
+    git(root, "commit", "-q", "-m", message)
+    return git(root, "rev-parse", "HEAD")
+
+
+def write(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+
+
+@pytest.fixture
+def workflows(tmp_path):
+    """A dev-tools source with both workflows, a skill that names another, agents and a script."""
+    root = tmp_path / "workflows-source"
+    files = {
+        "skills/milestone/process-phase/SKILL.md": "The milestone phase protocol, step by step.\n",
+        "skills/milestone/process-phase/references/review-tool.md":
+            "A pull-request review is taken by the `review-pr` skill.\n",
+        "skills/milestone/process-phase/scripts/review_tool.py": "print('review')\n",
+        "skills/milestone/review-pr/SKILL.md":
+            "Run `../process-phase/scripts/review_tool.py brief` for the pull request.\n",
+        "skills/milestone/start-milestone/SKILL.md": "Plan a milestone before any phase runs.\n",
+        "skills/phase/process-phase/SKILL.md": "The phase workflow, with its own state tool.\n",
+        "skills/phase/phase-tests/SKILL.md": "Acceptance tests written before the code.\n",
+        "skills/phase/pytest/phase_selection.py": "SELECT = True\n",
+        "skills/handle-issue/SKILL.md": "Route a fix to `review-pr` or the plan to `start-milestone`.\n",
+        "skills/components/SKILL.md": "The component index of the project's code.\n",
+        "agents/phase-implementer.md": "Implement one plan.\n",
+    }
+    for name, text in files.items():
+        write(root / name, text)
+    git(root, "init", "-q")
+    commit(root, "first")
+    return root
+
+
+def milestone_config(declined=None, entries=("skills/milestone/process-phase", "skills/milestone/start-milestone",
+                                             "skills/handle-issue", "skills/components"),
+                     folders=(".claude/skills", ".codex/skills"), extra=""):
+    lines = [f"declined = {json.dumps(declined)}", ""] if declined is not None else []
+    for folder in folders:
+        for source in entries:
+            lines += ["[[sync]]", f'source = "{source}"', f'dest = "{folder}/{source.rsplit("/", 1)[-1]}"', extra, ""]
+    return "\n".join(lines)
+
+
+@pytest.fixture
+def mproject(tmp_path):
+    root = tmp_path / "mproject"
+    root.mkdir()
+    (root / ".devtools.toml").write_text(milestone_config())
+    return root
+
+
+def out_of(capsys, *args):
+    code = run(*args)
+    captured = capsys.readouterr()
+    return code, captured.out, captured.err
+
+
+def check_source(project, source, *flags):
+    return ("check", "--project", project, "--source", source, *flags)
+
+
+def report_of(source, project):
+    config = sync.read_config(project)
+    wanted = sync.desired_files(source, config, project)
+    return sync.unit_report(source, config, wanted, sync.read_json(project / ".devtools-receipt.json"))
+
+
+def test_the_observed_case_a_missing_named_skill_and_a_receipt_older_than_the_source(workflows, mproject, capsys):
+    # T1: the config lacks review-pr, the delivered process-phase names it, and the source moved on.
+    first = git(workflows, "rev-parse", "HEAD")
+    assert apply(workflows, mproject) == 0
+    write(workflows / "skills/milestone/process-phase/SKILL.md", "The milestone phase protocol, revised.\n")
+    second = commit(workflows)
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows, "--dry-run")
+    assert code == 0
+    lines = out.splitlines()
+    assert lines[lines.index(NAMED) + 1:lines.index(NAMED) + 3] == [
+        "  skills/milestone/review-pr",
+        "      named by .claude/skills/handle-issue/SKILL.md and 3 more file(s)"]
+    assert lines[-1] == CLOSING
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert code == 0
+    lines = out.splitlines()
+    assert lines[0] == "12 managed file(s), 0 problem(s)"
+    assert lines[1] == (f"not current: an apply would update 2 file(s) "
+                        f"(synced from dev-tools at {first[:7]}; this source is at {second[:7]})")
+    assert NAMED in lines
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
+    code, out, _ = out_of(capsys, "check", "--project", mproject, "--receipt-only")
+    assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
+
+
+def test_the_report_is_rows_before_it_is_lines(workflows, mproject):
+    # T2
+    assert apply(workflows, mproject) == 0
+    assert report_of(workflows, mproject) == {
+        "named": [{"unit": "skills/milestone/review-pr",
+                   "by": [".claude/skills/handle-issue/SKILL.md",
+                          ".claude/skills/process-phase/references/review-tool.md",
+                          ".codex/skills/handle-issue/SKILL.md",
+                          ".codex/skills/process-phase/references/review-tool.md"]}],
+        "new": [], "unlisted": [], "stale_declined": []}
+
+
+def test_a_declined_unit_is_never_reported(workflows, mproject, capsys):
+    # T3
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
+    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert code == 0 and not any(h in out for h in HEADINGS)
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
+
+
+def test_a_workflow_the_config_takes_nothing_from_is_silent(workflows, tmp_path):
+    # T4: handle-issue names two milestone skills, but the project runs the phase workflow.
+    project = tmp_path / "phase-project"
+    project.mkdir()
+    (project / ".devtools.toml").write_text(milestone_config(
+        entries=("skills/phase/process-phase", "skills/handle-issue"), folders=(".claude/skills",)))
+    assert apply(workflows, project) == 0
+    assert report_of(workflows, project)["named"] == []
+
+
+def test_a_name_a_taken_unit_has_is_satisfied(workflows, tmp_path):
+    # T5: `process-phase` names the phase workflow's skill, which the project takes.
+    write(workflows / "skills/handle-issue/SKILL.md", "Route a fix to `review-pr`; the work runs in `process-phase`.\n")
+    project = tmp_path / "p"
+    project.mkdir()
+    (project / ".devtools.toml").write_text(milestone_config(
+        entries=("skills/phase/process-phase", "skills/milestone/start-milestone", "skills/handle-issue"),
+        folders=(".claude/skills",)))
+    assert apply(workflows, project) == 0
+    named = [row["unit"] for row in report_of(workflows, project)["named"]]
+    assert named == ["skills/milestone/review-pr"]
+
+
+def test_a_unit_added_since_the_last_sync_is_new_until_the_next_apply(workflows, mproject, capsys):
+    # T6
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
+    assert apply(workflows, mproject) == 0
+    write(workflows / "skills/extra/SKILL.md", "Something new to take.\n")
+    for args in (("apply", "--project", mproject, "--source", workflows, "--dry-run"), check_source(mproject, workflows)):
+        code, out, _ = out_of(capsys, *args)
+        lines = out.splitlines()
+        assert code == 0
+        assert lines[lines.index(NEW) + 1] == "  skills/extra"
+        assert NAMED not in lines and UNLISTED not in lines and not out.count("not current")
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
+    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert NEW in out
+    assert "skills/extra" in json.loads((mproject / ".devtools-receipt.json").read_text())["shipped"]
+    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert not any(h in out for h in HEADINGS)
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
+
+
+@pytest.mark.parametrize("where, declined", [("skills/phase/extra", ["skills/milestone/review-pr", "agents"]),
+                                              ("skills/extra", ["skills/milestone/review-pr", "agents", "skills/extra"])])
+def test_a_new_unit_under_an_untaken_workflow_or_declined_is_silent(workflows, mproject, capsys, where, declined):
+    # T7
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
+    assert apply(workflows, mproject) == 0
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=declined))
+    write(workflows / where / "SKILL.md", "Something new.\n")
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert code == 0 and not any(h in out for h in HEADINGS)
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
+
+
+def test_a_receipt_from_before_shipped_lists_the_untaken_units_once(workflows, mproject, capsys):
+    # T8
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
+    assert apply(workflows, mproject) == 0
+    receipt_path = mproject / ".devtools-receipt.json"
+    receipt = json.loads(receipt_path.read_text())
+    del receipt["shipped"]
+    receipt_path.write_text(json.dumps(receipt))
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert code == 0
+    assert out.splitlines()[1:] == [UNLISTED, "  agents", CLOSING]
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
+    assert apply(workflows, mproject) == 0
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert not any(h in out for h in HEADINGS)
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
+
+
+def test_the_first_apply_reports_named_units_and_nothing_new(workflows, mproject, capsys):
+    # T9
+    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert code == 0 and NAMED in out and NEW not in out and UNLISTED not in out
+
+
+@pytest.mark.parametrize("declined", ['"skills/milestone/review-pr"', '["/abs"]', '["../x"]', '["skills/milestone"]'])
+def test_a_declined_value_that_cannot_be_right_is_refused_before_anything_is_written(workflows, mproject, capsys, declined):
+    # T10, the four refusals
+    (mproject / ".devtools.toml").write_text(f"declined = {declined}\n\n" + milestone_config())
+    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert code == 2 and "declined" in err
+    assert sorted(p.name for p in mproject.iterdir()) == [".devtools.toml"]
+
+
+def test_a_declined_path_dev_tools_no_longer_ships_is_a_warning(workflows, mproject, capsys):
+    # T10, the fifth case
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "skills/retired"]))
+    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert code == 0
+    assert "warning: declined names nothing dev-tools ships: skills/retired" in err
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
+
+
+def test_an_excluded_file_names_nothing(workflows, tmp_path):
+    # T11
+    project = tmp_path / "p"
+    project.mkdir()
+    (project / ".devtools.toml").write_text("\n".join([
+        "[[sync]]", 'source = "skills/milestone/process-phase"', 'dest = ".claude/skills/process-phase"',
+        'exclude = ["references/review-tool.md"]', "",
+        "[[sync]]", 'source = "skills/handle-issue"', 'dest = ".claude/skills/handle-issue"', 'exclude = ["SKILL.md"]', ""]))
+    assert apply(workflows, project) == 0
+    assert report_of(workflows, project)["named"] == []
+
+
+def test_an_agent_and_a_script_are_named_by_their_own_names(workflows, tmp_path):
+    # T12
+    write(workflows / "skills/phase/process-phase/references/notes.md",
+          "Brief `phase-implementer`, then run `phase_selection.py`.\n")
+    project = tmp_path / "p"
+    project.mkdir()
+    (project / ".devtools.toml").write_text(milestone_config(entries=("skills/phase/process-phase",),
+                                                             folders=(".claude/skills",)))
+    assert apply(workflows, project) == 0
+    by = [".claude/skills/process-phase/references/notes.md"]
+    assert report_of(workflows, project)["named"] == [
+        {"unit": "agents", "by": by}, {"unit": "skills/phase/pytest/phase_selection.py", "by": by}]
+
+
+def test_a_name_is_found_only_alone_in_backticks_or_as_a_folder_after_dotdot(workflows, tmp_path):
+    # T13
+    notes = workflows / "skills/phase/process-phase/references/notes.md"
+    write(notes, "The review-pr skill; see `review-pr/SKILL.md`; the index is in docs/components/.\n")
+    project = tmp_path / "p"
+    project.mkdir()
+    (project / ".devtools.toml").write_text(milestone_config(
+        entries=("skills/phase/process-phase", "skills/milestone/start-milestone"), folders=(".claude/skills",)))
+    assert apply(workflows, project) == 0
+    assert report_of(workflows, project)["named"] == []
+    write(notes, notes.read_text() + "Search `components` first.\n")
+    assert [row["unit"] for row in report_of(workflows, project)["named"]] == ["skills/components"]
+
+
+@pytest.mark.parametrize("config", [None, "unknown_key = 1\n", "[[sync]\n", "unreadable"])
+def test_a_check_that_cannot_read_the_config_keeps_the_receipt_verdict(workflows, mproject, capsys, config):
+    # T14
+    assert apply(workflows, mproject) == 0
+    path = mproject / ".devtools.toml"
+    if config is None:
+        path.unlink()
+    elif config == "unreadable":
+        if os.geteuid() == 0:
+            pytest.skip("root reads a file of mode 000")
+        path.chmod(0)
+    else:
+        path.write_text(config)
+    capsys.readouterr()
+    try:
+        code, out, err = out_of(capsys, *check_source(mproject, workflows))
+        assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
+        assert err.startswith("warning: not compared with dev-tools: ")
+        assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
+    finally:
+        path.chmod(0o644) if path.exists() else None
+
+
+def test_apply_with_a_config_that_is_not_toml_is_a_configuration_error(workflows, mproject, capsys):
+    # T14b
+    (mproject / ".devtools.toml").write_text("[[sync]\n")
+    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
+    assert code == 2 and err.startswith("error: ")
+
+
+def test_drift_wins_over_every_note_under_strict(workflows, mproject, capsys):
+    # T15
+    assert apply(workflows, mproject) == 0
+    (mproject / ".claude/skills/start-milestone/SKILL.md").write_text("edited\n")
+    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 1
+
+
+def test_receipt_only_reads_no_source_and_the_default_source_is_a_dev_tools_checkout(source, project, capsys,
+                                                                                     monkeypatch, tmp_path):
+    # T16
+    assert apply(source, project) == 0
+    capsys.readouterr()
+    real = sync.__dict__["default_source"]
+    monkeypatch.undo()
+    assert sync.default_source() == sync.SOURCE_ROOT
+    assert sync.default_source(tmp_path) is None
+    monkeypatch.setattr(sync, "default_source", real)
+
+    def refuse(*args, **kwargs):
+        raise AssertionError("check --receipt-only started a process")
+    monkeypatch.setattr(sync.subprocess, "run", refuse)
+    code, out, _ = out_of(capsys, "check", "--project", project, "--receipt-only")
+    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
+    monkeypatch.undo()
+    monkeypatch.setattr(sync, "default_source", lambda *args, **kwargs: None)
+    assert out_of(capsys, "check", "--project", project, "--receipt-only", "--source", source)[0] == 2
+    assert out_of(capsys, "check", "--project", project, "--receipt-only", "--strict")[0] == 2
+    assert out_of(capsys, "check", "--project", project, "--strict")[0] == 5
+
+
+@pytest.mark.parametrize("declined, mark", [
+    (["skills/milestone/review-pr"], "skills/milestone/review-pr  [declined in .devtools.toml]"),
+    (None, "skills/milestone/review-pr  [named by .claude/skills/handle-issue/SKILL.md]")])
+def test_the_survey_marks_a_declined_unit_and_a_named_one(workflows, mproject, capsys, declined, mark):
+    # T17
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=declined))
+    assert apply(workflows, mproject) == 0
+    capsys.readouterr()
+    assert run("survey", "--project", mproject, "--source", workflows) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert mark in out[out.index("## Shipped, with no counterpart here"):]
+
+
+@pytest.mark.parametrize("example", ["phase-project.devtools.toml", "milestone-project.devtools.toml"])
+def test_each_example_applies_with_no_unit_report(tmp_path, capsys, example):
+    # T18
+    project = tmp_path / "fresh"
+    project.mkdir()
+    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples" / example).read_text())
+    code, out, _ = out_of(capsys, "apply", "--project", project)
+    assert code == 0 and not any(h in out for h in HEADINGS), out
+
+
+def test_a_current_project_prints_exactly_what_main_printed(source, project, capsys):
+    # T19
+    assert apply(source, project) == 0
+    capsys.readouterr()
+    assert out_of(capsys, "apply", "--project", project, "--source", source)[1] == 'applied: {"keep": 4}\n'
+    assert out_of(capsys, *check_source(project, source))[1] == "4 managed file(s), 0 problem(s)\n"
+
+
+def test_not_current_counts_what_an_apply_would_create_update_and_delete(source, project, capsys):
+    # T20
+    assert apply(source, project) == 0
+    (source / "skills/demo/SKILL.md").write_text("demo skill, revised\n")
+    (source / "skills/demo/new.md").write_text("new\n")
+    (source / "skills/demo/scripts/tool.py").unlink()
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(project, source))
+    assert out.splitlines()[1] == ("not current: an apply would create 1, update 1 and delete 1 file(s) "
+                                   "(synced from dev-tools at an unknown commit; this source is at an unknown commit)")
+
+
+def test_a_path_covers_whole_segments_only():
+    # T21
+    assert [sync.takes("skills/phase", unit) for unit in ("skills/phase-extra", "skills/phase/x", "skills/phase/")] == [
+        False, True, True]
+    assert [sync.covers("skills/phase", unit) for unit in ("skills/phase-extra", "skills/phase/x", "skills/phase/")] == [
+        False, True, True]
+    assert sync.takes("skills/phase/x/y", "skills/phase/x") and not sync.covers("skills/phase/x/y", "skills/phase/x")
+
+
+def test_a_relative_path_names_the_folder_it_climbs_into(workflows, tmp_path):
+    # T22
+    project = tmp_path / "p"
+    project.mkdir()
+    (project / ".devtools.toml").write_text(milestone_config(entries=("skills/milestone/review-pr",),
+                                                             folders=(".claude/skills",)))
+    assert apply(workflows, project) == 0
+    assert report_of(workflows, project)["named"] == [
+        {"unit": "skills/milestone/process-phase", "by": [".claude/skills/review-pr/SKILL.md"]}]
+
+
+def test_each_cause_alone_makes_strict_fail(workflows, mproject, capsys):
+    # T23 (a) pending only, (b) named only; (c) new only is T6
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
+    assert apply(workflows, mproject) == 0
+    write(workflows / "skills/components/SKILL.md", "The component index, revised.\n")
+    commit(workflows)
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows, "--strict"))
+    assert code == 5 and "not current" in out and not any(h in out for h in HEADINGS)
+    (mproject / ".devtools.toml").write_text(milestone_config())
+    assert apply(workflows, mproject) == 0
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows, "--strict"))
+    assert code == 5 and NAMED in out and "not current" not in out and NEW not in out
+
+
+def test_a_unit_both_new_and_named_is_reported_as_named(workflows, mproject):
+    # T24
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
+    assert apply(workflows, mproject) == 0
+    write(workflows / "skills/milestone/extra/SKILL.md", "Something new.\n")
+    write(workflows / "skills/handle-issue/SKILL.md", "Route a fix with `extra`.\n")
+    report = report_of(workflows, mproject)
+    assert [row["unit"] for row in report["named"]] == ["skills/milestone/extra"]
+    assert report["new"] == []
+
+
+def test_a_hand_edited_file_is_drift_and_not_a_sign_the_project_is_behind(workflows, mproject, capsys):
+    # T25 (implementation finding 1): "not current" counts the receipt against the source.
+    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
+    assert apply(workflows, mproject) == 0
+    (mproject / ".claude/skills/start-milestone/SKILL.md").write_text("edited\n")
+    capsys.readouterr()
+    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
+    assert (code, out) == (1, ".claude/skills/start-milestone/SKILL.md: differs from the receipt\n"
+                              "12 managed file(s), 1 problem(s)\n")
