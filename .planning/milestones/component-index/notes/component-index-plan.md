@@ -60,6 +60,12 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   from phase 1's branch tip, and its pull request names phase 1's branch as its base
   (section 8, "Branches"). The phases still run one at a time and release one version
   each. Recorded in `003-phase-2.md`. The amended bytes are not reviewed.
+- **Amendment c1, 2026-11-23, at the close: delegated approval (auto=true).** The plan
+  repairs that the phase records deferred to the close, each marked `(c1)` at its site
+  with the record that raised it. The earlier wording is kept beside each. Recorded in
+  `007-close.md`.
+- **Closed, 2026-11-23.** Phases 1 to 4 are merged into `main` (vasiloglou/dev-tools#29,
+  #30, #32 and #36). The close is `007-close.md`.
 
 **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
 
@@ -74,14 +80,18 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
   or no hit that matches more than one word.
 - C3. `uv run --no-project --with pytest python -m pytest tests -q` exits 0, except for
   the known GND `synth` case (section 6, R5). The suite includes a test that fails while
-  the index is stale.
+  the index is stale. *(c1, from `004-phase-3.md`: the `synth` case was a property of how
+  GND was installed on this machine, not of the code. Since 2026-11-21 it passes, and C3
+  is judged as "exits 0".)*
 - C4. `.devtools/project.md` names the index, its folder and its two gates. The
   documentation that describes dev-tools' own use names the index.
 - C5. `handoff.takeover` returns `ready: false` when any ignored path the note was written
   with, other than a key file, is absent, including one after the 25th. A missing key file
   is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T10 of
   `notes/phase-1-spec.md` exit as that spec lists, and the pull request says
-  `Fixes #28`.
+  `Fixes #28`. *(c1, from `002-phase-1.md`, Q4: the spec's list grew with each review
+  round, up to T20, with T10b, T14b and T16b. C5 is judged by the exit of
+  `tests/test_handoff.py`, which holds them.)*
 - C6. A close record, after the close review.
 
 ## 0. Binding design rules
@@ -235,6 +245,10 @@ cannot see:
 
 The subsystems' flows state these in `notes:`.
 
+*(c1, from `004-phase-3.md`: there are five, not three. `rules_check.py` also runs
+`components_index.py facts`, and `phase_tool.py` runs `coder_pool.py`. The three
+subsystems of the index state all five.)*
+
 ### Artifact homes
 
 | Artifact | Home |
@@ -269,7 +283,10 @@ The subsystems' flows state these in `notes:`.
 - the tests in `tests/test_handoff.py`;
 - one sentence each in `skills/dev-handoff/references/handoff.md` and
   `docs/handoff.html`;
-- `release_plugins.py bump`, to 0.1.4;
+- `release_plugins.py bump`, to 0.1.4 *(c1, from `002-phase-1.md` and `006-phase-4.md`:
+  0.1.3 was never tagged, though installs of it exist. And vasiloglou/dev-tools#34 took
+  0.1.4 on `main` first, so 0.1.4 is that change and this phase together; in the same
+  way 0.1.5 is phase 2 and vasiloglou/dev-tools#35)*;
 - `.gitignore` line 7 anchored to `/notes/`, so the milestone's planning files can be
   committed with it (a2);
 - a pull request with `Fixes #28`.
@@ -297,7 +314,9 @@ its `package_dir`. The default is unchanged.
 - the tests in `tests/test_tools.py`;
 - the setting described in `skills/components/SKILL.md`, `references/build.md`,
   `docs/components.html` and `examples/phase-project.devtools.toml`;
-- the retaken `docs/adopt.html` capture (that spec's D2);
+- the retaken `docs/adopt.html` capture (that spec's D2) *(c1, from `003-phase-2.md`: it
+  was not retaken. The capture is kept as taken on 2026-11-05 and its caption says what
+  0.1.5 prints besides: D2 (d), which the owner ruled on 2026-11-22)*;
 - `release_plugins.py bump`, to 0.1.5.
 
 *Criteria:*
@@ -336,6 +355,11 @@ modules, the subsystems, and the generated pages.
 *Reading:* about 10,800 lines, roughly one reader's share by `build.md`'s measure. The
 driving agent reads it, and no readers are fanned out.
 
+*(c1, from `005-phase-3-reread.md`: that was not enough. The first build read ten of the
+twelve modules in part, and four entries then said something false. The reread used four
+readers, each reading whole modules and returning a table of every definition; no entry
+is marked `checked: partial` now.)*
+
 ### Phase 4: keep it current
 
 *Outcome:* a change that leaves the index stale is caught, by a test and a gate.
@@ -346,7 +370,8 @@ driving agent reads it, and no readers are fanned out.
   repository root (D3);
 - `.devtools/project.md`: the index's folder in "What runs here", and two rows in "Gates"
   (`changed --base main` before a pull request, and `--check --strict` when a phase
-  closes);
+  closes) *(c1, from `006-phase-4.md`: the row names `origin/main`, after a fetch. In a
+  worktree the local `main` is moved by nothing and was eight days old)*;
 - one line in `AGENTS.md`: search the index before writing a module or a function;
 - a row naming `.devtools/components/` in `README.md` and `docs/milestone.html#own-use`,
   and a pointer to it on `docs/components.html` as an example of a built index.
@@ -393,6 +418,9 @@ repairs, and the close record (C6).
 
 - Import resolution across several source folders: the graph stays within `package_dir`.
   The scripts have no static imports of each other, so it would show nothing here.
+  *(c1, from `003-phase-2.md`, Q6: not quite. The module graph already holds a module
+  outside `package_dir` when the catalog names it, before phase 2 and after. What stays
+  out of scope is resolving imports between source folders.)*
 - Splitting or merging scripts, or consolidating shared helpers (R0.1). `REVIEW.md` lists
   them; nothing is done about them.
 - How many ignored paths a note lists for a reader (the 25).
@@ -414,7 +442,10 @@ repairs, and the close record (C6).
   request is open, the next branch is cut from that branch's tip and its pull request
   names that branch as its base. Once the previous phase merges, the branch is rebased
   onto main and the base changed to main. The prior wording, above, stands for every
-  other case.
+  other case. *(c1, from `006-phase-4.md`: no branch was rebased. When `main` moved,
+  `main` was merged into phase 1, phase 1 into phase 2 and phase 2 into phase 3, and each
+  pull request's base was changed to `main` just before its merge. A rebase would have
+  rewritten commits the records name.)*
 - **Reviews.** The review helper (`review_tool.py`), with the other tool as reviewer:
   - `--subject plan` over this plan, before the plan gate (the project's plan-review bar);
   - `--subject phase` over each phase's diff (process-phase step 4);
@@ -453,6 +484,9 @@ abbreviated (r1 F7). In a search row, `<words>` is the query of one case of
 | 3 | `INDEX review` | exits 0 (it always does); its leads go into `REVIEW.md` | Same |
 | 4 | `uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q` | exits 0; exits 1 with one module path removed (P4.2), and with a baseline present (P4.3) | Every contributor: the full suite now checks the index |
 | 4 | `INDEX changed --base main` | exits 0 on the phase's head | Same |
+
+*(c1: the two "1 failure, the R5 case" rows above now expect exit 0, as C3 says; and the
+phase 4 row's `changed --base main` is run against `origin/main`, as section 4 says.)*
 
 `12/12` is the value expected at write time. If phase 2 changes which files count, phase
 3's spec states the count, and C1 is judged by the exit code, not by the number.

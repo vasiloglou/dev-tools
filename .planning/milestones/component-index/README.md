@@ -36,4 +36,9 @@ note did not list is missing.
   [005-phase-3-reread.md](005-phase-3-reread.md): every entry read in full, and the
   third review rounds of phases 1 and 2;
   [006-phase-4.md](006-phase-4.md): the test that keeps the index current, the gate rows
-  and the pages.
+  and the pages;
+  [007-close.md](007-close.md): the close, with the sweep of Q1 to Q15 and the plan
+  repairs.
+- **Closed** on 2026-11-23, by delegated approval (auto=true), after a close review that
+  approved with no findings. Phase 4 is vasiloglou/dev-tools#36, merged `811b4a3`. Still
+  the owner's: the release tags, and the eight issues the close proposes.
