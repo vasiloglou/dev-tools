@@ -1,0 +1,1156 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index 365ce94..4f4b88a 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -40,6 +40,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - check plans: phase.state
+ - check plans of a phase: components.rules
+ - check plugins stale: plugins.build
++- check strict: sync.copies
+ - claims to test: review.rounds
+ - claude fallback: phase.coder_pool
+ - claude reviewer: review.rounds
+@@ -68,6 +69,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - count extra dirs: components.index
+ - coverage: components.index
+ - credential files left out: review.rounds
++- declined units: sync.copies
+ - deferred ledger: phase.state
+ - delete files no longer shipped: sync.copies
+ - deselect tests: phase.test_selection
+@@ -148,12 +150,15 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - migration check: phase.state
+ - minor version: plugins.release
+ - move from gsd: migrate.from_gsd
++- named by a delivered file: sync.copies
+ - near misses: components.rules
+ - new caller of deprecated component: components.index
++- new units since last sync: sync.copies
+ - new violation since base: components.rules
+ - next phase: phase.state
+ - normative document ownership: phase.state
+ - normative_for frontmatter: phase.state
++- not current: sync.copies
+ - outside allowlist: phase.codex_gate
+ - parallel tracks: phase.coder_pool
+ - parked phases: migrate.from_gsd
+@@ -178,6 +183,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - post review to pull request: review.rounds
+ - pr review: review.rounds
+ - private module rule: components.rules
++- project behind dev-tools: sync.copies
+ - pull ignored files: handoff.notes
+ - push release tag: plugins.release
+ - pytest phase option: phase.test_selection
+@@ -185,6 +191,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - raise version: plugins.release
+ - rebuild plugins: plugins.build
+ - receipt: sync.copies
++- receipt only: sync.copies
+ - regenerate plugins: plugins.build
+ - release flow: subsystem.release
+ - release notes: plugins.release
+@@ -244,6 +251,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - unassigned baseline: components.index
+ - unassigned modules: components.index
+ - unfinished phase: migrate.from_gsd
++- units not taken: sync.copies
+ - untracked files: phase.codex_gate
+ - validate catalog: components.index
+ - what would be lost: handoff.notes
+@@ -279,15 +287,15 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ ## Taking the skills into a project
+ 
+ ### sync.copies
+-- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift, survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
+-- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has
++- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
++- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only
+ - status: canonical
+ - modules: devtools/sync.py
+ - uses: (none)
+ - used_by: (none)
+ - tests: tests/test_sync.py
+ - duplicates: devtools/from_gsd.py
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed, 5 check --strict with something to report (milestone sync-reports). unit_report returns the rows and report_lines prints them; the receipt's shipped list is what makes a unit new. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
+ 
+ ### migrate.from_gsd
+ - does: Move a project's planning folder from GSD to the dev-tools phase workflow: survey says what a move would do and what to settle; convert archives GSD's files, rewrites STATE, ROADMAP and REQUIREMENTS, adds the missing planning files without overwriting any, and records the move in CONVERSION.md (from_gsd.py)
+diff --git a/.devtools/components/modules/_root.md b/.devtools/components/modules/_root.md
+index ca88484..995c698 100644
+--- a/.devtools/components/modules/_root.md
++++ b/.devtools/components/modules/_root.md
+@@ -97,43 +97,56 @@ Copy dev-tools skills and scripts into a project and keep the copies honest.
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `SyncError` | class(Exception) | 71 | (no docstring) |
+-| `digest(data) -> str` | function | 77 | (no docstring) |
+-| `inside(root, relative) -> Path` | function | 81 | Resolve a configured relative path, refusing anything that leaves ``root``. |
+-| `fill_tokens(data, values, origin, used) -> bytes` | function | 88 | Replace ``{{devtools:<key>}}`` in text files with the project's value; a missing value is an error. |
+-| `read_config(project) -> dict` | function | 102 | (no docstring) |
+-| `desired_files(source_root, config, project) -> dict[str, dict]` | function | 113 | Project-relative path -> {data, mode, origin} for everything the config asks for. |
+-| `read_json(path) -> dict` | function | 174 | (no docstring) |
+-| `source_identity(source_root, config) -> dict` | function | 178 | The dev-tools commit, and whether what the config takes from it has uncommitted changes. |
+-| `warn_if_dirty(source_root, config) -> None` | function | 187 | (no docstring) |
+-| `plan(project, wanted) -> tuple[list[dict], list[str]]` | function | 193 | Classify every wanted or previously managed file. Returns (actions, refusals). |
+-| `write_atomic(path, data, mode) -> None` | function | 230 | (no docstring) |
+-| `ignored_by_git(project, paths) -> list[str]` | function | 243 | The paths git would leave out of the repository: ignored and not tracked. Empty outside git. |
+-| `entry_paths(entry, wanted) -> list[str]` | function | 259 | The delivered paths that come from one [[sync]] entry: under its dest, or the dest itself, |
+-| `warn_if_ignored(project, config, wanted) -> None` | function | 267 | Say, per entry, when git ignores files the sync delivers: they would stay out of the repository. |
+-| `cmd_apply(args) -> int` | function | 281 | (no docstring) |
+-| `cmd_check(args) -> int` | function | 340 | (no docstring) |
+-| `kept_lines(data) -> list[tuple[int, str]]` | function | 368 | (line number, stripped text) for the lines that say something; nothing for a binary file. |
+-| `squeeze(text) -> str` | function | 378 | The text with every run of spaces and line breaks as one space, so a re-wrapped sentence still matches. |
+-| `shared(shipped, local) -> float` | function | 383 | The share of the shipped file's lines that the local file also has (lines with a token left out). |
+-| `shipped_files(directory) -> list[Path]` | function | 389 | (no docstring) |
+-| `shipped_units(source_root) -> list[dict]` | function | 393 | What a project can take: each skill directory, the agents directory, and the scripts that stand alone. |
+-| `walk(top)` | function | 406 | (regular files, symlinked directories) under a folder, skipping caches and nested checkouts. |
+-| `walk_project(project)` | function | 418 | (regular files, symlinked directories), skipping caches and checkouts nested in the project. |
+-| `other_plans(project, planning) -> list[tuple[str, str]]` | function | 459 | (path, tool) for each other planning tool whose files are here, and for a planning |
+-| `related(name, shipped) -> bool` | function | 481 | `acme-components` and `components-acme` are other names for `components`. |
+-| `literals(script) -> dict` | function | 486 | The top-level `NAME = <literal>` assignments of a script, read without running it. |
+-| `survey(source_root, project) -> dict` | function | 502 | Match what the project has against what dev-tools ships. Reads only. |
+-| `covered(project) -> tuple[set[str], set[str], set[str]]` | function | 566 | (paths the config delivers to, paths in the receipt, old copies it names); empty without a config. |
+-| `tracked(project, path) -> bool` | function | 576 | False only when git answers and knows no file at or under the path. |
+-| `survey_text(source_root, project, result) -> list[str]` | function | 582 | (no docstring) |
+-| `by_folder(paths) -> list[str]` | function | 687 | One line per parent folder, with the names inside it. |
+-| `toml_value(value) -> str` | function | 695 | (no docstring) |
+-| `token_values(source, copy) -> dict[str, tuple[str, str]]` | function | 699 | Token -> (value, where it was read), for the tokens whose value the project's copy shows. |
+-| `starter_config(source_root, project, result) -> list[str]` | function | 727 | A .devtools.toml that puts each shipped unit where the project keeps its own copy. |
+-| `cmd_survey(args) -> int` | function | 841 | (no docstring) |
+-| `headings(text) -> dict[int, str]` | function | 851 | Line number -> the Markdown heading it sits under (its own text for a heading); code fences are skipped. |
+-| `compare_rows(project, source_root, config, wanted) -> tuple[list[dict], list[str]]` | function | 863 | One row per file an apply would touch, per file of an old copy, and per excluded file the project keeps. |
+-| `row_note(row) -> str` | function | 942 | (no docstring) |
+-| `cmd_compare(args) -> int` | function | 959 | (no docstring) |
+-| `main(argv) -> int` | function | 1061 | (no docstring) |
++| `SyncError` | class(Exception) | 82 | (no docstring) |
++| `digest(data) -> str` | function | 88 | (no docstring) |
++| `inside(root, relative) -> Path` | function | 92 | Resolve a configured relative path, refusing anything that leaves ``root``. |
++| `fill_tokens(data, values, origin, used) -> bytes` | function | 99 | Replace ``{{devtools:<key>}}`` in text files with the project's value; a missing value is an error. |
++| `read_config(project) -> dict` | function | 113 | (no docstring) |
++| `desired_files(source_root, config, project) -> dict[str, dict]` | function | 127 | Project-relative path -> {data, mode, origin} for everything the config asks for. |
++| `read_json(path) -> dict` | function | 188 | (no docstring) |
++| `source_identity(source_root, config) -> dict` | function | 192 | The dev-tools commit, and whether what the config takes from it has uncommitted changes. |
++| `warn_if_dirty(source_root, config) -> None` | function | 201 | (no docstring) |
++| `plan(project, wanted) -> tuple[list[dict], list[str]]` | function | 207 | Classify every wanted or previously managed file. Returns (actions, refusals). |
++| `write_atomic(path, data, mode) -> None` | function | 244 | (no docstring) |
++| `ignored_by_git(project, paths) -> list[str]` | function | 257 | The paths git would leave out of the repository: ignored and not tracked. Empty outside git. |
++| `entry_paths(entry, wanted) -> list[str]` | function | 273 | The delivered paths that come from one [[sync]] entry: under its dest, or the dest itself, |
++| `warn_if_ignored(project, config, wanted) -> None` | function | 281 | Say, per entry, when git ignores files the sync delivers: they would stay out of the repository. |
++| `cmd_apply(args) -> int` | function | 295 | (no docstring) |
++| `cmd_check(args) -> int` | function | 359 | (no docstring) |
++| `kept_lines(data) -> list[tuple[int, str]]` | function | 406 | (line number, stripped text) for the lines that say something; nothing for a binary file. |
++| `squeeze(text) -> str` | function | 416 | The text with every run of spaces and line breaks as one space, so a re-wrapped sentence still matches. |
++| `shared(shipped, local) -> float` | function | 421 | The share of the shipped file's lines that the local file also has (lines with a token left out). |
++| `shipped_files(directory) -> list[Path]` | function | 427 | (no docstring) |
++| `shipped_units(source_root) -> list[dict]` | function | 431 | What a project can take: each skill directory, the agents directory, and the scripts that stand alone. |
++| `covers(path, unit) -> bool` | function | 450 | ``path`` is the unit's source or a folder above it, compared by whole path segments. |
++| `takes(path, unit) -> bool` | function | 456 | A config path and a unit's source meet: equal, or either lies under the other. |
++| `declined_paths(config, units) -> tuple[list[str], list[str]]` | function | 461 | (the paths ``declined`` lists, those among them that cover no shipped unit). A value that is |
++| `unit_names(source_root, unit) -> set[str]` | function | 481 | What a file can call the unit: a skill's folder name; for `agents`, each file's name without |
++| `workflow_folder(unit) -> str \| None` | function | 490 | ``skills/<folder>`` for a unit deeper than one level under ``skills/``; else None. |
++| `names_in(text, name) -> bool` | function | 496 | The text names ``name`` alone between backticks, or as the folder a relative path climbs into. |
++| `unit_report(source_root, config, wanted, receipt) -> dict` | function | 501 | What to say about the units the config does not take. Reads only. |
++| `pending(wanted, receipt, source) -> dict \| None` | function | 540 | What an apply would deliver that the last one did not: the files to create, update and |
++| `short(commit) -> str` | function | 555 | (no docstring) |
++| `report_lines(report, behind) -> list[str]` | function | 559 | The lines to print about the units and about being current, in order; empty when there is |
++| `print_report(report, behind) -> None` | function | 591 | (no docstring) |
++| `default_source(root) -> Path \| None` | function | 598 | The folder that holds this file, when it is a dev-tools source (every example config is |
++| `walk(top)` | function | 604 | (regular files, symlinked directories) under a folder, skipping caches and nested checkouts. |
++| `walk_project(project)` | function | 616 | (regular files, symlinked directories), skipping caches and checkouts nested in the project. |
++| `other_plans(project, planning) -> list[tuple[str, str]]` | function | 657 | (path, tool) for each other planning tool whose files are here, and for a planning |
++| `related(name, shipped) -> bool` | function | 679 | `acme-components` and `components-acme` are other names for `components`. |
++| `literals(script) -> dict` | function | 684 | The top-level `NAME = <literal>` assignments of a script, read without running it. |
++| `survey(source_root, project) -> dict` | function | 700 | Match what the project has against what dev-tools ships. Reads only. |
++| `covered(project) -> tuple[set[str], set[str], set[str]]` | function | 764 | (paths the config delivers to, paths in the receipt, old copies it names); empty without a config. |
++| `tracked(project, path) -> bool` | function | 774 | False only when git answers and knows no file at or under the path. |
++| `survey_text(source_root, project, result) -> list[str]` | function | 780 | (no docstring) |
++| `unit_marks(source_root, project) -> dict[str, str]` | function | 886 | Unit -> the mark survey adds to it: declined in the config, or named by a file the config |
++| `by_folder(paths) -> list[str]` | function | 903 | One line per parent folder, with the names inside it. |
++| `toml_value(value) -> str` | function | 911 | (no docstring) |
++| `token_values(source, copy) -> dict[str, tuple[str, str]]` | function | 915 | Token -> (value, where it was read), for the tokens whose value the project's copy shows. |
++| `starter_config(source_root, project, result) -> list[str]` | function | 943 | A .devtools.toml that puts each shipped unit where the project keeps its own copy. |
++| `cmd_survey(args) -> int` | function | 1057 | (no docstring) |
++| `headings(text) -> dict[int, str]` | function | 1067 | Line number -> the Markdown heading it sits under (its own text for a heading); code fences are skipped. |
++| `compare_rows(project, source_root, config, wanted) -> tuple[list[dict], list[str]]` | function | 1079 | One row per file an apply would touch, per file of an old copy, and per excluded file the project keeps. |
++| `row_note(row) -> str` | function | 1158 | (no docstring) |
++| `cmd_compare(args) -> int` | function | 1175 | (no docstring) |
++| `main(argv) -> int` | function | 1277 | (no docstring) |
+diff --git a/README.md b/README.md
+index 52ef83b..44fe970 100644
+--- a/README.md
++++ b/README.md
+@@ -80,7 +80,18 @@ python3 path/to/dev-tools/devtools/sync.py check --project .
+ - `apply` copies the files and records each one in `.devtools-receipt.json`. It writes
+   nothing unless every file can be written: a file the project edited by hand needs
+   `--force`, and an existing file it does not manage yet needs `--adopt`.
+-- `check` compares the managed files with the receipt. It needs only the project.
++- `check` compares the managed files with the receipt, then, run from a dev-tools
++  checkout (or given `--source`), with dev-tools: it says whether an apply would change
++  files, and from which commit the project was synced. `check --receipt-only` does the
++  first part alone and needs only the project, for a CI job with no dev-tools checkout.
++- Both name a shipped unit the config does not take when a synced file names it (a skill
++  that cites `review-pr`, say, when `review-pr` is not synced), and once a unit that is
++  new in dev-tools since the last sync. A workflow the project takes nothing from is not
++  named. To stop hearing of a unit, list it in `.devtools.toml`:
++  `declined = ["skills/milestone/review-pr"]`; a folder covers every unit under it.
++- Exits: `check` exits 1 when a synced file differs from the receipt. `check --strict`
++  also exits 5 when the project is not current, a unit is named or new, or the comparison
++  with dev-tools could not be made, for a CI job that should fail on any of them.
+ 
+ Rules that belong to one project go in a file that project owns,
+ `references/project.md` beside the synced skill. The sync never touches it.
+diff --git a/devtools/sync.py b/devtools/sync.py
+index 6cd09db..4d95e96 100644
+--- a/devtools/sync.py
++++ b/devtools/sync.py
+@@ -17,10 +17,20 @@ Prototype. The project lists what it takes in ``.devtools.toml``::
+     after_apply = ["python3 scripts/components_index.py write"]  # optional, top level: run when apply changed a file
+                                                    # (no shell: write `env NAME=value command` to set a variable)
+ 
++    declined = ["skills/milestone/review-pr"]       # optional, top level: units the project does not take
++                                                   # on purpose; a folder covers every unit under it
++
+ ``apply`` copies the files, writes the settings files and records every managed file in
+-``.devtools-receipt.json`` (sha256 and mode). It refuses to overwrite a file the project
+-changed by hand, or one it does not manage yet, unless told to (``--force``, ``--adopt``).
+-``check`` needs only the project: it compares the managed files with the receipt.
++``.devtools-receipt.json`` (sha256 and mode), and every unit dev-tools ships (``shipped``). It
++refuses to overwrite a file the project changed by hand, or one it does not manage yet, unless
++told to (``--force``, ``--adopt``).
++
++``check`` compares the managed files with the receipt. Run from a dev-tools checkout, or given
++``--source``, it then compares the project with that source: whether an apply would change files,
++and which units it does not take. ``--receipt-only`` does the first part alone and needs only the
++project. ``apply`` reports the same units. A unit is reported when a file the project has names it,
++and once when it is new since the last apply; ``declined`` ends both, and a workflow folder the
++config takes nothing from (``skills/phase``, ``skills/milestone``) is never reported.
+ 
+ For a project that already has its own copies of these skills: ``survey`` finds them and can
+ print a starter ``.devtools.toml`` (``--toml``), and ``compare`` shows, before anything is
+@@ -28,7 +38,8 @@ written, which files an apply would replace and which of the project's lines wou
+ Neither writes anything. ``skills/adopt-devtools/SKILL.md`` is the guide that uses them.
+ 
+ Exit codes: 0 ok; 1 check found drift; 2 usage or configuration; 3 apply refused (nothing written);
+-4 files were written but an after_apply command failed.
++4 files were written but an after_apply command failed; 5 ``check --strict``: no drift, but the project
++is not current, a unit is reported, or the comparison with dev-tools could not be made.
+ 
+ Needs Python 3.11 or newer.
+ """
+@@ -46,7 +57,7 @@ import stat
+ import subprocess
+ import sys
+ import tempfile
+-from pathlib import Path
++from pathlib import Path, PurePosixPath
+ 
+ try:
+     import tomllib
+@@ -103,8 +114,11 @@ def read_config(project: Path) -> dict:
+     config_path = project / CONFIG
+     if not config_path.is_file():
+         raise SyncError(f"{config_path} not found")
+-    config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+-    unknown = sorted(set(config) - {"sync", "after_apply"})
++    try:
++        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
++    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
++        raise SyncError(f"{config_path} cannot be read: {error}")
++    unknown = sorted(set(config) - {"sync", "after_apply", "declined"})
+     if unknown:
+         raise SyncError(f"{config_path}: unknown top-level keys: {unknown}")
+     return config
+@@ -282,6 +296,8 @@ def cmd_apply(args) -> int:
+     project = args.project.resolve()
+     config = read_config(project)
+     wanted = desired_files(args.source.resolve(), config, project)
++    receipt_before = read_json(project / RECEIPT)
++    report = unit_report(args.source.resolve(), config, wanted, receipt_before)
+     warn_if_dirty(args.source.resolve(), config)
+     actions, _ = plan(project, wanted)
+     allowed = {"force"} if args.force else set()
+@@ -300,6 +316,7 @@ def cmd_apply(args) -> int:
+             if action["do"] != "keep":
+                 print(f"{action['do']}: {action['dest']}")
+         print("dry run:", json.dumps(counts, sort_keys=True))
++        print_report(report)
+         warn_if_ignored(project, config, wanted)
+         return 0
+     # The journal names what this run intends, so an interrupted run can be finished by running apply again.
+@@ -315,10 +332,12 @@ def cmd_apply(args) -> int:
+         "source": source_identity(args.source.resolve(), config),
+         "files": {dest: {"sha256": digest(item["data"]), "mode": oct(item["mode"]), "origin": item["origin"]}
+                   for dest, item in sorted(wanted.items())},
++        "shipped": sorted(unit["source"] for unit in shipped_units(args.source.resolve())),
+     }
+     write_atomic(project / RECEIPT, (json.dumps(receipt, indent=2, sort_keys=True) + "\n").encode("utf-8"), 0o644)
+     (project / JOURNAL).unlink()
+     print("applied:", json.dumps(counts, sort_keys=True))
++    print_report(report)
+     warn_if_ignored(project, config, wanted)
+     if set(counts) - {"keep"}:
+         for command in config.get("after_apply", []):
+@@ -356,7 +375,26 @@ def cmd_check(args) -> int:
+     for problem in problems:
+         print(problem)
+     print(f"{len(receipt['files'])} managed file(s), {len(problems)} problem(s)")
+-    return 1 if problems else 0
++    if args.receipt_only and (args.source or args.strict):
++        raise SyncError("--receipt-only reads no dev-tools source: it takes neither --source nor --strict")
++    source_root = None if args.receipt_only else (args.source or default_source())
++    noted = source_root is None  # with no source, nothing was compared
++    if source_root is not None:
++        source_root = source_root.resolve()
++        try:
++            config = read_config(project)
++            wanted = desired_files(source_root, config, project)
++            report = unit_report(source_root, config, wanted, receipt)
++            behind = pending(wanted, receipt, source_identity(source_root, config))
++        except SyncError as error:
++            print(f"warning: not compared with dev-tools: {error}", file=sys.stderr)
++            noted = True
++        else:
++            print_report(report, behind)
++            noted = bool(behind or report["named"] or report["new"] or report["unlisted"])
++    if problems:
++        return 1
++    return 5 if args.strict and noted else 0
+ 
+ 
+ # --------------------------------------------------------------------------- survey and compare
+@@ -403,6 +441,166 @@ def shipped_units(source_root: Path) -> list[dict]:
+     return [unit for unit in units if unit["source"] not in NOT_FOR_PROJECTS]
+ 
+ 
++# --------------------------------------------------------------------------- units the config does not take
++
++def _parts(path: str) -> tuple[str, ...]:
++    return PurePosixPath(path.rstrip("/")).parts
++
++
++def covers(path: str, unit: str) -> bool:
++    """``path`` is the unit's source or a folder above it, compared by whole path segments."""
++    outer, inner = _parts(path), _parts(unit)
++    return inner[:len(outer)] == outer
++
++
++def takes(path: str, unit: str) -> bool:
++    """A config path and a unit's source meet: equal, or either lies under the other."""
++    return covers(path, unit) or covers(unit, path)
++
++
++def declined_paths(config: dict, units: list[dict]) -> tuple[list[str], list[str]]:
++    """(the paths ``declined`` lists, those among them that cover no shipped unit). A value that is
++    not a list of relative paths, or that covers a unit the config takes, is a configuration error."""
++    declined = config.get("declined", [])
++    if not isinstance(declined, list) or not all(isinstance(path, str) and path.strip("/") for path in declined):
++        raise SyncError(f"declined in {CONFIG} must be a list of paths in dev-tools, such as "
++                        f'["skills/milestone/review-pr"]')
++    for path in declined:
++        if PurePosixPath(path).is_absolute() or ".." in _parts(path):
++            raise SyncError(f"declined in {CONFIG}: {path!r} must be a relative path in dev-tools")
++    taken = [entry["source"] for entry in config.get("sync", []) if "source" in entry]
++    for path in declined:
++        clash = sorted(unit["source"] for unit in units if covers(path, unit["source"])
++                       and any(takes(source, unit["source"]) for source in taken))
++        if clash:
++            raise SyncError(f"declined in {CONFIG}: {path} covers {', '.join(clash)}, which a [[sync]] entry takes")
++    stale = [path for path in declined if not any(covers(path, unit["source"]) for unit in units)]
++    return [path.rstrip("/") for path in declined], stale
++
++
++def unit_names(source_root: Path, unit: dict) -> set[str]:
++    """What a file can call the unit: a skill's folder name; for `agents`, each file's name without
++    its extension; for a script, its file name."""
++    path = source_root / unit["source"]
++    if unit["kind"] == "agents":
++        return {shipped.stem for shipped in shipped_files(path)}
++    return {path.name}
++
++
++def workflow_folder(unit: str) -> str | None:
++    """``skills/<folder>`` for a unit deeper than one level under ``skills/``; else None."""
++    parts = _parts(unit)
++    return "/".join(parts[:2]) if len(parts) > 2 and parts[0] == "skills" else None
++
++
++def names_in(text: str, name: str) -> bool:
++    """The text names ``name`` alone between backticks, or as the folder a relative path climbs into."""
++    return f"`{name}`" in text or f"../{name}/" in text
++
++
++def unit_report(source_root: Path, config: dict, wanted: dict[str, dict], receipt: dict) -> dict:
++    """What to say about the units the config does not take. Reads only.
++
++    Each unit takes the first of these that holds: taken, declined, under a workflow folder the
++    config takes nothing from (nothing is said of these three); named by a delivered file
++    (``named``); absent from the receipt's ``shipped`` (``new``); any unit, when the receipt has
++    no ``shipped`` (``unlisted``). A unit with none of these is not reported.
++    """
++    units = shipped_units(source_root)
++    declined, stale = declined_paths(config, units)
++    taken = [entry["source"] for entry in config.get("sync", []) if "source" in entry]
++    is_taken = lambda unit: any(takes(source, unit["source"]) for source in taken)
++    held = set().union(*[unit_names(source_root, unit) for unit in units if is_taken(unit)])
++    texts = {}
++    for dest, item in sorted(wanted.items()):
++        try:
++            texts[dest] = item["data"].decode("utf-8")
++        except UnicodeDecodeError:
++            pass
++    report = {"named": [], "new": [], "unlisted": [], "stale_declined": stale}
++    for unit in units:
++        source = unit["source"]
++        folder = workflow_folder(source)
++        if is_taken(unit) or any(covers(path, source) for path in declined):
++            continue
++        if folder is not None and not any(covers(folder, taken_source) for taken_source in taken):
++            continue
++        names = unit_names(source_root, unit) - held
++        by = [dest for dest, text in texts.items() if any(names_in(text, name) for name in names)]
++        if by:
++            report["named"].append({"unit": source, "by": by})
++        elif receipt.get("files") and "shipped" in receipt:
++            if source not in receipt["shipped"]:
++                report["new"].append(source)
++        elif receipt.get("files"):
++            report["unlisted"].append(source)
++    return report
++
++
++def pending(wanted: dict[str, dict], receipt: dict, source: dict) -> dict | None:
++    """What an apply would deliver that the last one did not: the files to create, update and
++    delete, counted from the receipt against the source, so a file edited in the project counts
++    only as drift. None when there are none; else the counts and both commits."""
++    delivered = receipt.get("files", {})
++    counts = {"create": sum(1 for dest in wanted if dest not in delivered),
++              "update": sum(1 for dest, item in wanted.items() if dest in delivered and (
++                  delivered[dest].get("sha256") != digest(item["data"])
++                  or delivered[dest].get("mode") != oct(item["mode"]))),
++              "delete": sum(1 for dest in delivered if dest not in wanted)}
++    if not any(counts.values()):
++        return None
++    return {"from": receipt.get("source", {}).get("commit"), "to": source.get("commit"), **counts}
++
++
++def short(commit: str | None) -> str:
++    return commit[:7] if commit else "an unknown commit"
++
++
++def report_lines(report: dict | None, behind: dict | None) -> list[str]:
++    """The lines to print about the units and about being current, in order; empty when there is
++    nothing to say."""
++    lines = []
++    if behind:
++        did = [f"{verb} {behind[verb]}" for verb in ("create", "update", "delete") if behind[verb]]
++        counts = did[0] if len(did) == 1 else ", ".join(did[:-1]) + " and " + did[-1]
++        if behind["from"] and behind["from"] == behind["to"]:
++            where = f"the same dev-tools commit, {short(behind['to'])}: the config or the source's files changed"
++        else:
++            where = f"synced from dev-tools at {short(behind['from'])}; this source is at {short(behind['to'])}"
++        lines.append(f"not current: an apply would {counts} file(s) ({where})")
++    if not report:
++        return lines
++    if report["named"]:
++        lines.append("not taken, and named by a file this project has:")
++        for row in report["named"]:
++            more = f" and {len(row['by']) - 1} more file(s)" if len(row["by"]) > 1 else ""
++            lines += [f"  {row['unit']}", f"      named by {row['by'][0]}{more}"]
++    if report["new"]:
++        lines.append("new in dev-tools since this project's last sync:")
++        lines += [f"  {unit}" for unit in report["new"]]
++    if report["unlisted"]:
++        lines.append("not taken (this receipt was written before the sync recorded what dev-tools ships; "
++                     "listed this once):")
++        lines += [f"  {unit}" for unit in report["unlisted"]]
++    if report["named"] or report["new"] or report["unlisted"]:
++        lines.append(f"to take a unit, add a [[sync]] entry to {CONFIG}; to stop hearing of one, "
++                     f"add its path to `declined` there")
++    return lines
++
++
++def print_report(report: dict | None, behind: dict | None = None) -> None:
++    for path in (report or {}).get("stale_declined", []):
++        print(f"warning: declined names nothing dev-tools ships: {path}", file=sys.stderr)
++    for line in report_lines(report, behind):
++        print(line)
++
++
++def default_source(root: Path = SOURCE_ROOT) -> Path | None:
++    """The folder that holds this file, when it is a dev-tools source (every example config is
++    there); None for a sync.py copied somewhere else."""
++    return root if all((root / example).is_file() for example in EXAMPLES) else None
++
++
+ def walk(top: Path):
+     """(regular files, symlinked directories) under a folder, skipping caches and nested checkouts."""
+     files, links = [], []
+@@ -652,7 +850,8 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
+             lines += [inner] + [f"  {place}{state(place)}" for place in places]
+     missing = [unit["source"] for unit in result["units"] if not result["found"][unit["source"]]]
+     if missing:
+-        lines += ["", "## Shipped, with no counterpart here"] + missing
++        marks = unit_marks(source_root, project)
++        lines += ["", "## Shipped, with no counterpart here"] + [source + marks.get(source, "") for source in missing]
+     if result["clashes"]:
+         lines += ["", "## Same name, different skill: a sync to this path would replace the project's own skill"]
+         lines += [f"{clash['path']}  (dev-tools ships {clash['unit']})" for clash in result["clashes"]]
+@@ -684,6 +883,23 @@ def survey_text(source_root: Path, project: Path, result: dict) -> list[str]:
+     return lines
+ 
+ 
++def unit_marks(source_root: Path, project: Path) -> dict[str, str]:
++    """Unit -> the mark survey adds to it: declined in the config, or named by a file the config
++    delivers. Empty without a config, or with one the sync refuses."""
++    try:
++        config = read_config(project)
++        wanted = desired_files(source_root, config, project)
++        declined, _ = declined_paths(config, shipped_units(source_root))
++        report = unit_report(source_root, config, wanted, read_json(project / RECEIPT))
++    except SyncError:
++        return {}
++    marks = {row["unit"]: f"  [named by {row['by'][0]}]" for row in report["named"]}
++    for unit in shipped_units(source_root):
++        if any(covers(path, unit["source"]) for path in declined):
++            marks[unit["source"]] = f"  [declined in {CONFIG}]"
++    return marks
++
++
+ def by_folder(paths: list[str]) -> list[str]:
+     """One line per parent folder, with the names inside it."""
+     groups: dict[str, list[str]] = {}
+@@ -833,7 +1049,7 @@ def starter_config(source_root: Path, project: Path, result: dict) -> list[str]:
+         lines.append("# A project planned with GSD reads skills/move-from-gsd/SKILL.md first.")
+         return lines
+     if missing:
+-        lines.append("# Shipped, with no counterpart found here (add an entry to take one):")
++        lines.append("# Shipped, with no counterpart found here (add an entry to take one, or list it under declined):")
+         lines += [f"#   {source}" for source in missing]
+     return lines
+ 
+@@ -1068,8 +1284,14 @@ def main(argv=None) -> int:
+     apply.add_argument("--force", action="store_true", help="overwrite managed files changed in the project")
+     apply.add_argument("--dry-run", action="store_true")
+     apply.set_defaults(run=cmd_apply)
+-    check = sub.add_parser("check", help="compare the project's managed files with its receipt")
++    check = sub.add_parser("check", help="compare the project's managed files with its receipt, then with dev-tools")
+     check.add_argument("--project", type=Path, required=True)
++    check.add_argument("--source", type=Path, default=None,
++                       help="dev-tools checkout to compare with (default: this one, when sync.py is in one)")
++    check.add_argument("--receipt-only", action="store_true",
++                       help="compare with the receipt only; read no dev-tools source")
++    check.add_argument("--strict", action="store_true",
++                       help="exit 5 when the project is not current, a unit is reported, or nothing was compared")
+     check.set_defaults(run=cmd_check)
+     survey_ = sub.add_parser("survey", help="find the project's own copies of what dev-tools ships")
+     survey_.add_argument("--project", type=Path, required=True)
+diff --git a/docs/adopt.html b/docs/adopt.html
+index d898fcb..9d3b327 100644
+--- a/docs/adopt.html
++++ b/docs/adopt.html
+@@ -75,20 +75,37 @@ dest   = "scripts/components_index.py"</pre>
+       <div class="two">
+         <div>
+           <p>One command copies the files and writes a receipt that lists every file it manages, with a fingerprint of each. Nothing is written unless everything can be written.</p>
+-          <p>A second command checks, at any time, that the copies are still what was delivered. It needs only your project, so it can run in your automated checks.</p>
++          <p>A second command checks, at any time, that the copies are still what was delivered. Run from a dev-tools checkout, it also says whether dev-tools has moved on since your sync. With <code>--receipt-only</code> it needs only your project, so it can run in your automated checks.</p>
++          <p>Both name a shared piece you do not take when one of your synced files mentions it, and once a piece that is new since your last sync. To stop hearing of one, list it under <code>declined</code>.</p>
+         </div>
+         <div>
+ <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · first sync</b><em>captured</em></div>
+ <pre><span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+-<span class="ok">applied: {&quot;create&quot;: 29}</span>
+-after_apply: python3 scripts/components_index.py write
++<span class="ok">applied: {&quot;create&quot;: 40}</span>
++not taken, and named by a file this project has:
++  skills/dev-handoff
++      named by .claude/skills/process-phase/references/implement.md and 1 more file(s)
++  skills/dev-takeover
++      named by .claude/skills/process-phase/references/orient.md
++  skills/phase/phase-tests
++      named by .claude/skills/process-phase/SKILL.md and 1 more file(s)
++  agents
++      named by .claude/skills/process-phase/references/implement.md and 3 more file(s)
++to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there
+ 
+ <span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+-<span class="ok">29 managed file(s), 0 problem(s)</span>
+-
+-<span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+-<span class="ok">applied: {&quot;keep&quot;: 29}</span></pre></div>
+-      <p class="caption">29 files copied, then checked. Running it again changes nothing.</p>
++<span class="ok">40 managed file(s), 0 problem(s)</span>
++not taken, and named by a file this project has:
++  skills/dev-handoff
++      named by .claude/skills/process-phase/references/implement.md and 1 more file(s)
++  skills/dev-takeover
++      named by .claude/skills/process-phase/references/orient.md
++  skills/phase/phase-tests
++      named by .claude/skills/process-phase/SKILL.md and 1 more file(s)
++  agents
++      named by .claude/skills/process-phase/references/implement.md and 3 more file(s)
++to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there</pre></div>
++      <p class="caption">40 files copied, then checked. The phase skill mentions four shared pieces this project does not take, and both commands name them until each is taken or listed under <code>declined</code>.</p>
+         </div>
+       </div>
+     </li>
+@@ -132,7 +149,7 @@ after_apply: python3 scripts/components_index.py write
+ 
+ <span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
+ <span class="bad">.claude/skills/process-phase/references/verify.md: differs from the receipt</span>
+-<span class="bad">29 managed file(s), 1 problem(s)</span>
++<span class="bad">40 managed file(s), 1 problem(s)</span>
+ <span class="dim">exit code 1</span>
+ 
+ <span class="p">$</span> <span class="cmd">devtools-sync apply --project .</span>
+@@ -140,6 +157,17 @@ after_apply: python3 scripts/components_index.py write
+ <span class="bad">nothing written; 1 file(s) refused</span>
+ <span class="dim">exit code 3</span></pre></div>
+       <p class="caption">Someone adds a line to a synced rule. The check reports it, and an update refuses to overwrite it.</p>
++      <div class="term"><div class="bar"><i></i><i></i><i></i><b>a project synced from an older dev-tools</b><em>captured</em></div>
++<pre><span class="p">$</span> <span class="cmd">devtools-sync check --project .</span>
++<span class="ok">60 managed file(s), 0 problem(s)</span>
++not current: an apply would update 22 file(s) (synced from dev-tools at c9648dd; this source is at 8ec1f91)
++not taken, and named by a file this project has:
++  skills/milestone/review-pr
++      named by .claude/skills/handle-issue/SKILL.md and 3 more file(s)
++not taken (this receipt was written before the sync recorded what dev-tools ships; listed this once):
++  agents
++to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, add its path to `declined` there</pre></div>
++      <p class="caption">Synced at an older commit, this project reads as clean against its receipt, yet an update would change 22 files, and two of its skills mention <code>review-pr</code>, which it never took. The last list is printed once, because the receipt predates the record of what dev-tools ships.</p>
+     </div>
+     <div>
+       <div class="table-scroll"><table>
+@@ -151,6 +179,11 @@ after_apply: python3 scripts/components_index.py write
+         <tr><td>You added files beside the synced ones</td><td>Leaves them alone</td></tr>
+         <tr><td>A file was removed upstream</td><td>Removes your copy only if you had not changed it</td></tr>
+         <tr><td>Something must be rebuilt after an update</td><td>Runs the commands you listed, only when a file actually changed</td></tr>
++        <tr><td>Dev-tools has moved on since your sync</td><td>The check says how many files an update would change, and from which version you synced</td></tr>
++        <tr><td>Your synced files mention a shared piece you do not take</td><td>Names it, with the file that mentions it, on every update and check</td></tr>
++        <tr><td>A shared piece is new since your last sync</td><td>Names it once, on the next update or check</td></tr>
++        <tr><td>You leave a piece out on purpose</td><td>List it under <code>declined</code>; it is not named again. A workflow you take nothing from is never named</td></tr>
++        <tr><td>Your automated checks should fail on any of these</td><td><code>check --strict</code> exits 5 while there is something to report; a changed file still exits 1</td></tr>
+       </table></div>
+     </div>
+   </div>
+diff --git a/examples/milestone-project.devtools.toml b/examples/milestone-project.devtools.toml
+index 5a622ce..d4e2d10 100644
+--- a/examples/milestone-project.devtools.toml
++++ b/examples/milestone-project.devtools.toml
+@@ -11,6 +11,15 @@
+ # `.claude/skills/*`, add `!.claude/skills/<name>/` for each folder below; a rule that
+ # excludes `.claude/skills/` itself must become `.claude/skills/*` first, since git does not
+ # look inside an excluded folder. `git check-ignore -v <file>` names the rule.
++#
++# `declined` lists what dev-tools ships and this project leaves out on purpose. `apply` and
++# `check` name a shipped unit the project does not take when a synced file names it, and a
++# unit added to dev-tools since the last sync; a path here ends both for that unit, and a
++# folder covers every unit under it. A workflow folder the project takes nothing from (here,
++# skills/phase) is never named, so it needs no line. This example leaves out the component
++# index, which three of these skills mention; phase-project.devtools.toml has the entries
++# that take it.
++declined = ["skills/components"]
+ 
+ [[sync]]
+ source = "skills/milestone/start-milestone"
+diff --git a/examples/phase-project.devtools.toml b/examples/phase-project.devtools.toml
+index fb3d235..e79f326 100644
+--- a/examples/phase-project.devtools.toml
++++ b/examples/phase-project.devtools.toml
+@@ -8,6 +8,13 @@
+ # component index (its first run also writes a starter catalog).
+ after_apply = ["python3 scripts/components_index.py write"]
+ 
++# `declined` lists what dev-tools ships and this project leaves out on purpose. `apply` and
++# `check` name a shipped unit the project does not take when a synced file names it, and a
++# unit added to dev-tools since the last sync; a path here ends both for that unit, and a
++# folder covers every unit under it. A workflow folder the project takes nothing from (here,
++# skills/milestone) is never named, so this example needs no line.
++# declined = ["skills/<the unit>"]
++
+ [[sync]]
+ source = "skills/phase/process-phase"
+ dest = ".claude/skills/process-phase"
+diff --git a/skills/adopt-devtools/SKILL.md b/skills/adopt-devtools/SKILL.md
+index cfe17e0..52a0ae7 100644
+--- a/skills/adopt-devtools/SKILL.md
++++ b/skills/adopt-devtools/SKILL.md
+@@ -24,7 +24,7 @@ stands for `python3 <dev-tools>/devtools/sync.py` (Python 3.11 or newer).
+ | `sync compare --project . <path> …` | The lines only the project's copy has, with line numbers, the heading they sit under, the shipped line a line is close to (`~ shipped:`), and the project-owned file a line is now in (`[in …]`). `--added` prints the other side, the lines only the shipped file has; `--diff` prints the full difference | No |
+ | `sync compare --project . --record` | The table for the migration record, one row per file, with the counts filled in | No |
+ | `sync apply --project . --adopt [--dry-run]` | Replaces the files and writes the receipt. It calls the same files `create` and `update` | Yes |
+-| `sync check --project .` | Confirms the synced files are what was delivered | No |
++| `sync check --project .` | Confirms the synced files are what was delivered. Run from a dev-tools checkout, it then says whether an apply would change files (`not current:`) and which shipped units a synced file names that the config does not take. `--receipt-only` skips that comparison; `--strict` exits 5 while there is anything to report | No |
+ 
+ ## Rules
+ 
+@@ -154,6 +154,11 @@ own copies had written into them, so every setting is a decision about this proj
+   (`scripts/review_tool.settings.json`), all of which have defaults.
+ - **`replaces`** names an old copy under another name, so that `compare` reads it.
+   Nothing deletes it; you do, in step 7.
++- **`declined`**, at the top, lists the shipped units the project leaves out on purpose.
++  `apply` and `check` name a unit the config does not take when a synced file names it,
++  and once when it is new in dev-tools; a path in `declined` ends both. Put a unit there
++  only when the user chose to leave it out: a unit the shipped text names and the
++  project lacks is usually one it needs.
+ - **A command to run after a sync.** If a synced script generates files (the component
+   index does), uncomment the `after_apply` line at the top and give it the interpreter
+   and the script's path as the project runs it. It runs without a shell: to set a
+diff --git a/tests/test_sync.py b/tests/test_sync.py
+index 5971464..6f71423 100644
+--- a/tests/test_sync.py
++++ b/tests/test_sync.py
+@@ -618,3 +618,450 @@ def test_both_examples_deliver_the_handoff_skills_with_the_script_they_share(tmp
+     subprocess.run(["git", "init", "-q"], cwd=project, check=True)
+     done = subprocess.run([sys.executable, str(script), "doctor"], cwd=project, capture_output=True, text=True)
+     assert done.returncode == 0 and "handoff doctor:" in done.stdout, done.stderr
++
++
++# --------------------------------------------------------------------------- what the sync says about units
++# Milestone sync-reports, phase 1: units the config does not take, `declined`, the receipt's
++# `shipped`, and `check` against a dev-tools source.
++
++import os
++import subprocess
++
++NAMED = "not taken, and named by a file this project has:"
++NEW = "new in dev-tools since this project's last sync:"
++UNLISTED = ("not taken (this receipt was written before the sync recorded what dev-tools ships; "
++            "listed this once):")
++CLOSING = ("to take a unit, add a [[sync]] entry to .devtools.toml; to stop hearing of one, "
++           "add its path to `declined` there")
++HEADINGS = (NAMED, NEW, UNLISTED, CLOSING)
++
++
++@pytest.fixture(autouse=True)
++def no_implicit_source(monkeypatch):
++    """Plain `check` in a test never reads the repository's own checkout as its source."""
++    monkeypatch.setattr(sync, "default_source", lambda *args, **kwargs: None, raising=False)
++
++
++def git(root, *args):
++    return subprocess.run(["git", "-C", str(root), "-c", "user.name=t", "-c", "user.email=t@example.com",
++                           *args], check=True, capture_output=True, text=True).stdout.strip()
++
++
++def commit(root, message="change"):
++    git(root, "add", "-A")
++    git(root, "commit", "-q", "-m", message)
++    return git(root, "rev-parse", "HEAD")
++
++
++def write(path, text):
++    path.parent.mkdir(parents=True, exist_ok=True)
++    path.write_text(text)
++
++
++@pytest.fixture
++def workflows(tmp_path):
++    """A dev-tools source with both workflows, a skill that names another, agents and a script."""
++    root = tmp_path / "workflows-source"
++    files = {
++        "skills/milestone/process-phase/SKILL.md": "The milestone phase protocol, step by step.\n",
++        "skills/milestone/process-phase/references/review-tool.md":
++            "A pull-request review is taken by the `review-pr` skill.\n",
++        "skills/milestone/process-phase/scripts/review_tool.py": "print('review')\n",
++        "skills/milestone/review-pr/SKILL.md":
++            "Run `../process-phase/scripts/review_tool.py brief` for the pull request.\n",
++        "skills/milestone/start-milestone/SKILL.md": "Plan a milestone before any phase runs.\n",
++        "skills/phase/process-phase/SKILL.md": "The phase workflow, with its own state tool.\n",
++        "skills/phase/phase-tests/SKILL.md": "Acceptance tests written before the code.\n",
++        "skills/phase/pytest/phase_selection.py": "SELECT = True\n",
++        "skills/handle-issue/SKILL.md": "Route a fix to `review-pr` or the plan to `start-milestone`.\n",
++        "skills/components/SKILL.md": "The component index of the project's code.\n",
++        "agents/phase-implementer.md": "Implement one plan.\n",
++    }
++    for name, text in files.items():
++        write(root / name, text)
++    git(root, "init", "-q")
++    commit(root, "first")
++    return root
++
++
++def milestone_config(declined=None, entries=("skills/milestone/process-phase", "skills/milestone/start-milestone",
++                                             "skills/handle-issue", "skills/components"),
++                     folders=(".claude/skills", ".codex/skills"), extra=""):
++    lines = [f"declined = {json.dumps(declined)}", ""] if declined is not None else []
++    for folder in folders:
++        for source in entries:
++            lines += ["[[sync]]", f'source = "{source}"', f'dest = "{folder}/{source.rsplit("/", 1)[-1]}"', extra, ""]
++    return "\n".join(lines)
++
++
++@pytest.fixture
++def mproject(tmp_path):
++    root = tmp_path / "mproject"
++    root.mkdir()
++    (root / ".devtools.toml").write_text(milestone_config())
++    return root
++
++
++def out_of(capsys, *args):
++    code = run(*args)
++    captured = capsys.readouterr()
++    return code, captured.out, captured.err
++
++
++def check_source(project, source, *flags):
++    return ("check", "--project", project, "--source", source, *flags)
++
++
++def report_of(source, project):
++    config = sync.read_config(project)
++    wanted = sync.desired_files(source, config, project)
++    return sync.unit_report(source, config, wanted, sync.read_json(project / ".devtools-receipt.json"))
++
++
++def test_the_observed_case_a_missing_named_skill_and_a_receipt_older_than_the_source(workflows, mproject, capsys):
++    # T1: the config lacks review-pr, the delivered process-phase names it, and the source moved on.
++    first = git(workflows, "rev-parse", "HEAD")
++    assert apply(workflows, mproject) == 0
++    write(workflows / "skills/milestone/process-phase/SKILL.md", "The milestone phase protocol, revised.\n")
++    second = commit(workflows)
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows, "--dry-run")
++    assert code == 0
++    lines = out.splitlines()
++    assert lines[lines.index(NAMED) + 1:lines.index(NAMED) + 3] == [
++        "  skills/milestone/review-pr",
++        "      named by .claude/skills/handle-issue/SKILL.md and 3 more file(s)"]
++    assert lines[-1] == CLOSING
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert code == 0
++    lines = out.splitlines()
++    assert lines[0] == "12 managed file(s), 0 problem(s)"
++    assert lines[1] == (f"not current: an apply would update 2 file(s) "
++                        f"(synced from dev-tools at {first[:7]}; this source is at {second[:7]})")
++    assert NAMED in lines
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
++    code, out, _ = out_of(capsys, "check", "--project", mproject, "--receipt-only")
++    assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
++
++
++def test_the_report_is_rows_before_it_is_lines(workflows, mproject):
++    # T2
++    assert apply(workflows, mproject) == 0
++    assert report_of(workflows, mproject) == {
++        "named": [{"unit": "skills/milestone/review-pr",
++                   "by": [".claude/skills/handle-issue/SKILL.md",
++                          ".claude/skills/process-phase/references/review-tool.md",
++                          ".codex/skills/handle-issue/SKILL.md",
++                          ".codex/skills/process-phase/references/review-tool.md"]}],
++        "new": [], "unlisted": [], "stale_declined": []}
++
++
++def test_a_declined_unit_is_never_reported(workflows, mproject, capsys):
++    # T3
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
++    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert code == 0 and not any(h in out for h in HEADINGS)
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
++
++
++def test_a_workflow_the_config_takes_nothing_from_is_silent(workflows, tmp_path):
++    # T4: handle-issue names two milestone skills, but the project runs the phase workflow.
++    project = tmp_path / "phase-project"
++    project.mkdir()
++    (project / ".devtools.toml").write_text(milestone_config(
++        entries=("skills/phase/process-phase", "skills/handle-issue"), folders=(".claude/skills",)))
++    assert apply(workflows, project) == 0
++    assert report_of(workflows, project)["named"] == []
++
++
++def test_a_name_a_taken_unit_has_is_satisfied(workflows, tmp_path):
++    # T5: `process-phase` names the phase workflow's skill, which the project takes.
++    write(workflows / "skills/handle-issue/SKILL.md", "Route a fix to `review-pr`; the work runs in `process-phase`.\n")
++    project = tmp_path / "p"
++    project.mkdir()
++    (project / ".devtools.toml").write_text(milestone_config(
++        entries=("skills/phase/process-phase", "skills/milestone/start-milestone", "skills/handle-issue"),
++        folders=(".claude/skills",)))
++    assert apply(workflows, project) == 0
++    named = [row["unit"] for row in report_of(workflows, project)["named"]]
++    assert named == ["skills/milestone/review-pr"]
++
++
++def test_a_unit_added_since_the_last_sync_is_new_until_the_next_apply(workflows, mproject, capsys):
++    # T6
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
++    assert apply(workflows, mproject) == 0
++    write(workflows / "skills/extra/SKILL.md", "Something new to take.\n")
++    for args in (("apply", "--project", mproject, "--source", workflows, "--dry-run"), check_source(mproject, workflows)):
++        code, out, _ = out_of(capsys, *args)
++        lines = out.splitlines()
++        assert code == 0
++        assert lines[lines.index(NEW) + 1] == "  skills/extra"
++        assert NAMED not in lines and UNLISTED not in lines and not out.count("not current")
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
++    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert NEW in out
++    assert "skills/extra" in json.loads((mproject / ".devtools-receipt.json").read_text())["shipped"]
++    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert not any(h in out for h in HEADINGS)
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
++
++
++@pytest.mark.parametrize("where, declined", [("skills/phase/extra", ["skills/milestone/review-pr", "agents"]),
++                                              ("skills/extra", ["skills/milestone/review-pr", "agents", "skills/extra"])])
++def test_a_new_unit_under_an_untaken_workflow_or_declined_is_silent(workflows, mproject, capsys, where, declined):
++    # T7
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
++    assert apply(workflows, mproject) == 0
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=declined))
++    write(workflows / where / "SKILL.md", "Something new.\n")
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert code == 0 and not any(h in out for h in HEADINGS)
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
++
++
++def test_a_receipt_from_before_shipped_lists_the_untaken_units_once(workflows, mproject, capsys):
++    # T8
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
++    assert apply(workflows, mproject) == 0
++    receipt_path = mproject / ".devtools-receipt.json"
++    receipt = json.loads(receipt_path.read_text())
++    del receipt["shipped"]
++    receipt_path.write_text(json.dumps(receipt))
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert code == 0
++    assert out.splitlines()[1:] == [UNLISTED, "  agents", CLOSING]
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
++    assert apply(workflows, mproject) == 0
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert not any(h in out for h in HEADINGS)
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
++
++
++def test_the_first_apply_reports_named_units_and_nothing_new(workflows, mproject, capsys):
++    # T9
++    code, out, _ = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert code == 0 and NAMED in out and NEW not in out and UNLISTED not in out
++
++
++@pytest.mark.parametrize("declined", ['"skills/milestone/review-pr"', '["/abs"]', '["../x"]', '["skills/milestone"]'])
++def test_a_declined_value_that_cannot_be_right_is_refused_before_anything_is_written(workflows, mproject, capsys, declined):
++    # T10, the four refusals
++    (mproject / ".devtools.toml").write_text(f"declined = {declined}\n\n" + milestone_config())
++    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert code == 2 and "declined" in err
++    assert sorted(p.name for p in mproject.iterdir()) == [".devtools.toml"]
++
++
++def test_a_declined_path_dev_tools_no_longer_ships_is_a_warning(workflows, mproject, capsys):
++    # T10, the fifth case
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "skills/retired"]))
++    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert code == 0
++    assert "warning: declined names nothing dev-tools ships: skills/retired" in err
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 0
++
++
++def test_an_excluded_file_names_nothing(workflows, tmp_path):
++    # T11
++    project = tmp_path / "p"
++    project.mkdir()
++    (project / ".devtools.toml").write_text("\n".join([
++        "[[sync]]", 'source = "skills/milestone/process-phase"', 'dest = ".claude/skills/process-phase"',
++        'exclude = ["references/review-tool.md"]', "",
++        "[[sync]]", 'source = "skills/handle-issue"', 'dest = ".claude/skills/handle-issue"', 'exclude = ["SKILL.md"]', ""]))
++    assert apply(workflows, project) == 0
++    assert report_of(workflows, project)["named"] == []
++
++
++def test_an_agent_and_a_script_are_named_by_their_own_names(workflows, tmp_path):
++    # T12
++    write(workflows / "skills/phase/process-phase/references/notes.md",
++          "Brief `phase-implementer`, then run `phase_selection.py`.\n")
++    project = tmp_path / "p"
++    project.mkdir()
++    (project / ".devtools.toml").write_text(milestone_config(entries=("skills/phase/process-phase",),
++                                                             folders=(".claude/skills",)))
++    assert apply(workflows, project) == 0
++    by = [".claude/skills/process-phase/references/notes.md"]
++    assert report_of(workflows, project)["named"] == [
++        {"unit": "agents", "by": by}, {"unit": "skills/phase/pytest/phase_selection.py", "by": by}]
++
++
++def test_a_name_is_found_only_alone_in_backticks_or_as_a_folder_after_dotdot(workflows, tmp_path):
++    # T13
++    notes = workflows / "skills/phase/process-phase/references/notes.md"
++    write(notes, "The review-pr skill; see `review-pr/SKILL.md`; the index is in docs/components/.\n")
++    project = tmp_path / "p"
++    project.mkdir()
++    (project / ".devtools.toml").write_text(milestone_config(
++        entries=("skills/phase/process-phase", "skills/milestone/start-milestone"), folders=(".claude/skills",)))
++    assert apply(workflows, project) == 0
++    assert report_of(workflows, project)["named"] == []
++    write(notes, notes.read_text() + "Search `components` first.\n")
++    assert [row["unit"] for row in report_of(workflows, project)["named"]] == ["skills/components"]
++
++
++@pytest.mark.parametrize("config", [None, "unknown_key = 1\n", "[[sync]\n", "unreadable"])
++def test_a_check_that_cannot_read_the_config_keeps_the_receipt_verdict(workflows, mproject, capsys, config):
++    # T14
++    assert apply(workflows, mproject) == 0
++    path = mproject / ".devtools.toml"
++    if config is None:
++        path.unlink()
++    elif config == "unreadable":
++        if os.geteuid() == 0:
++            pytest.skip("root reads a file of mode 000")
++        path.chmod(0)
++    else:
++        path.write_text(config)
++    capsys.readouterr()
++    try:
++        code, out, err = out_of(capsys, *check_source(mproject, workflows))
++        assert (code, out) == (0, "12 managed file(s), 0 problem(s)\n")
++        assert err.startswith("warning: not compared with dev-tools: ")
++        assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 5
++    finally:
++        path.chmod(0o644) if path.exists() else None
++
++
++def test_apply_with_a_config_that_is_not_toml_is_a_configuration_error(workflows, mproject, capsys):
++    # T14b
++    (mproject / ".devtools.toml").write_text("[[sync]\n")
++    code, _, err = out_of(capsys, "apply", "--project", mproject, "--source", workflows)
++    assert code == 2 and err.startswith("error: ")
++
++
++def test_drift_wins_over_every_note_under_strict(workflows, mproject, capsys):
++    # T15
++    assert apply(workflows, mproject) == 0
++    (mproject / ".claude/skills/start-milestone/SKILL.md").write_text("edited\n")
++    assert out_of(capsys, *check_source(mproject, workflows, "--strict"))[0] == 1
++
++
++def test_receipt_only_reads_no_source_and_the_default_source_is_a_dev_tools_checkout(source, project, capsys,
++                                                                                     monkeypatch, tmp_path):
++    # T16
++    assert apply(source, project) == 0
++    capsys.readouterr()
++    real = sync.__dict__["default_source"]
++    monkeypatch.undo()
++    assert sync.default_source() == sync.SOURCE_ROOT
++    assert sync.default_source(tmp_path) is None
++    monkeypatch.setattr(sync, "default_source", real)
++
++    def refuse(*args, **kwargs):
++        raise AssertionError("check --receipt-only started a process")
++    monkeypatch.setattr(sync.subprocess, "run", refuse)
++    code, out, _ = out_of(capsys, "check", "--project", project, "--receipt-only")
++    assert (code, out) == (0, "4 managed file(s), 0 problem(s)\n")
++    monkeypatch.undo()
++    monkeypatch.setattr(sync, "default_source", lambda *args, **kwargs: None)
++    assert out_of(capsys, "check", "--project", project, "--receipt-only", "--source", source)[0] == 2
++    assert out_of(capsys, "check", "--project", project, "--receipt-only", "--strict")[0] == 2
++    assert out_of(capsys, "check", "--project", project, "--strict")[0] == 5
++
++
++@pytest.mark.parametrize("declined, mark", [
++    (["skills/milestone/review-pr"], "skills/milestone/review-pr  [declined in .devtools.toml]"),
++    (None, "skills/milestone/review-pr  [named by .claude/skills/handle-issue/SKILL.md]")])
++def test_the_survey_marks_a_declined_unit_and_a_named_one(workflows, mproject, capsys, declined, mark):
++    # T17
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=declined))
++    assert apply(workflows, mproject) == 0
++    capsys.readouterr()
++    assert run("survey", "--project", mproject, "--source", workflows) == 0
++    out = capsys.readouterr().out.splitlines()
++    assert mark in out[out.index("## Shipped, with no counterpart here"):]
++
++
++@pytest.mark.parametrize("example", ["phase-project.devtools.toml", "milestone-project.devtools.toml"])
++def test_each_example_applies_with_no_unit_report(tmp_path, capsys, example):
++    # T18
++    project = tmp_path / "fresh"
++    project.mkdir()
++    (project / ".devtools.toml").write_text((sync.SOURCE_ROOT / "examples" / example).read_text())
++    code, out, _ = out_of(capsys, "apply", "--project", project)
++    assert code == 0 and not any(h in out for h in HEADINGS), out
++
++
++def test_a_current_project_prints_exactly_what_main_printed(source, project, capsys):
++    # T19
++    assert apply(source, project) == 0
++    capsys.readouterr()
++    assert out_of(capsys, "apply", "--project", project, "--source", source)[1] == 'applied: {"keep": 4}\n'
++    assert out_of(capsys, *check_source(project, source))[1] == "4 managed file(s), 0 problem(s)\n"
++
++
++def test_not_current_counts_what_an_apply_would_create_update_and_delete(source, project, capsys):
++    # T20
++    assert apply(source, project) == 0
++    (source / "skills/demo/SKILL.md").write_text("demo skill, revised\n")
++    (source / "skills/demo/new.md").write_text("new\n")
++    (source / "skills/demo/scripts/tool.py").unlink()
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(project, source))
++    assert out.splitlines()[1] == ("not current: an apply would create 1, update 1 and delete 1 file(s) "
++                                   "(synced from dev-tools at an unknown commit; this source is at an unknown commit)")
++
++
++def test_a_path_covers_whole_segments_only():
++    # T21
++    assert [sync.takes("skills/phase", unit) for unit in ("skills/phase-extra", "skills/phase/x", "skills/phase/")] == [
++        False, True, True]
++    assert [sync.covers("skills/phase", unit) for unit in ("skills/phase-extra", "skills/phase/x", "skills/phase/")] == [
++        False, True, True]
++    assert sync.takes("skills/phase/x/y", "skills/phase/x") and not sync.covers("skills/phase/x/y", "skills/phase/x")
++
++
++def test_a_relative_path_names_the_folder_it_climbs_into(workflows, tmp_path):
++    # T22
++    project = tmp_path / "p"
++    project.mkdir()
++    (project / ".devtools.toml").write_text(milestone_config(entries=("skills/milestone/review-pr",),
++                                                             folders=(".claude/skills",)))
++    assert apply(workflows, project) == 0
++    assert report_of(workflows, project)["named"] == [
++        {"unit": "skills/milestone/process-phase", "by": [".claude/skills/review-pr/SKILL.md"]}]
++
++
++def test_each_cause_alone_makes_strict_fail(workflows, mproject, capsys):
++    # T23 (a) pending only, (b) named only; (c) new only is T6
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
++    assert apply(workflows, mproject) == 0
++    write(workflows / "skills/components/SKILL.md", "The component index, revised.\n")
++    commit(workflows)
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows, "--strict"))
++    assert code == 5 and "not current" in out and not any(h in out for h in HEADINGS)
++    (mproject / ".devtools.toml").write_text(milestone_config())
++    assert apply(workflows, mproject) == 0
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows, "--strict"))
++    assert code == 5 and NAMED in out and "not current" not in out and NEW not in out
++
++
++def test_a_unit_both_new_and_named_is_reported_as_named(workflows, mproject):
++    # T24
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr", "agents"]))
++    assert apply(workflows, mproject) == 0
++    write(workflows / "skills/milestone/extra/SKILL.md", "Something new.\n")
++    write(workflows / "skills/handle-issue/SKILL.md", "Route a fix with `extra`.\n")
++    report = report_of(workflows, mproject)
++    assert [row["unit"] for row in report["named"]] == ["skills/milestone/extra"]
++    assert report["new"] == []
++
++
++def test_a_hand_edited_file_is_drift_and_not_a_sign_the_project_is_behind(workflows, mproject, capsys):
++    # T25 (implementation finding 1): "not current" counts the receipt against the source.
++    (mproject / ".devtools.toml").write_text(milestone_config(declined=["skills/milestone/review-pr"]))
++    assert apply(workflows, mproject) == 0
++    (mproject / ".claude/skills/start-milestone/SKILL.md").write_text("edited\n")
++    capsys.readouterr()
++    code, out, _ = out_of(capsys, *check_source(mproject, workflows))
++    assert (code, out) == (1, ".claude/skills/start-milestone/SKILL.md: differs from the receipt\n"
++                              "12 managed file(s), 1 problem(s)\n")
