@@ -1,0 +1,707 @@
+diff --git a/.planning/milestones/component-index/007-close.md b/.planning/milestones/component-index/007-close.md
+new file mode 100644
+index 0000000..c01b90d
+--- /dev/null
++++ b/.planning/milestones/component-index/007-close.md
+@@ -0,0 +1,290 @@
++---
++milestone: component-index
++station: "close"
++skill: "n/a -- repository development, not a run of a project workflow skill"
++scope: close
++date: 2026-11-23
++gates:
++  - command: "python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict"
++    exit: 0
++    output: "(no output)"
++  - command: "test ! -e .devtools/components/unassigned-baseline.txt"
++    exit: 0
++    output: "(no output)"
++  - command: "python3 plugins/dvt-milestone/skills/components/scripts/components_index.py search --explain <each case of search-cases.md>"
++    exit: 0
++    output: "9 of 9 cases put the expected component first; the negative case printed 'no component matched'"
++  - command: "uv run --no-project --with pytest python -m pytest tests -q"
++    exit: 0
++    output: "350 passed in 167.71s (0:02:47)"
++  - command: "uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q"
++    exit: 0
++    output: "8 passed in 2.88s"
++  - command: "uv run --no-project --with pytest python -m pytest tests/test_handoff.py -q"
++    exit: 0
++    output: "103 passed in 44.70s"
++  - command: "python3 devtools/build_plugins.py --check"
++    exit: 0
++    output: "(no output)"
++  - command: "review_tool.py run .planning/milestones/component-index/notes/reviews/close-r1 (the close review, Codex, read-only)"
++    exit: 0
++    output: "VERDICT: APPROVE; no findings"
++  - command: "ruling: delegated (auto=true) approved the close of component-index, with the residuals this record lists"
++    exit: "n/a -- ruling"
++slow_cadence:
++  command: "uv run --no-project --with pytest python -m pytest tests -q"
++  trigger: "n/a -- the full suite is completion predicate C3, and it ran"
++  reason: "this repository has no broader lane than the full suite"
++evidence:
++  - path: .planning/milestones/component-index/notes/component-index-plan.md
++    sha256: 9684c846e59bf116b706aa3c64dc5d4710486572a20f73cf581d11a188132f31
++  - path: .planning/milestones/component-index/notes/reviews/close-r1/BRIEF.md
++    sha256: d83e92c4dd7d101a14c5df9ca2915afb060b6486b16c83b4ed08661e08f00d0e
++  - path: .planning/milestones/component-index/notes/reviews/close-r1/review.md
++    sha256: f9b5999d89f2cd75d18f581197057138dd3c161e9cb3b74621539d393e436695
++  - path: .planning/milestones/component-index/notes/reviews/close-r1/FINDINGS.md
++    sha256: c1b4b82e630e2ed6171e89f5011af1f8c0d4d3134396a8b86a3a1c6c25875fc5
++  - path: .devtools/components/COMPONENTS.md
++    sha256: 33b6da675aa123e43bb1ce610c583ddcc6c326e22bbade8aad8eb650a7e8a099
++  - path: skills/dev-handoff/scripts/handoff.py
++    sha256: e891bdb31f0a48089a9db0a117ed5aad12486d34d536dc3fa35f049dc3e16a35
++  - path: tests/test_own_index.py
++    sha256: 20eb2fa283b4ece497665e188eceecea50581193c7119b729fcc0b7b69e9f405
++---
++
++# Claim
++
++On `main` at `811b4a3`, the five measurable completion predicates of the plan hold: the
++index check exits 0 at 12 of 12 modules with no baseline (C1); each of the 9 search cases
++puts its component first and the negative case matches nothing (C2); the full suite exits
++0 with 350 passed, and it includes a test that fails while the index is stale (C3);
++`.devtools/project.md` and the pages that describe dev-tools' own use name the index
++(C4); and `tests/test_handoff.py` exits 0, with issue 28 closed by a pull request that
++says `Fixes #28` (C5). This record is C6. Fifteen questions are swept below: six are
++closed, eight carried to the owner and one partly closed. The plan is repaired at ten
++sites (amendment c1).
++
++## Close ruling (verbatim)
++
++    ruling: delegated (auto=true) approved
++    subject: the close of the component-index milestone
++    date: 2026-11-23
++    authorization: the owner's invocation "/dvt-milestone:process-milestone auto" of
++      2026-11-21, which delegates the plan, spec and close rulings of this milestone, and
++      the owner's "Yes, run the close" of 2026-11-23
++    on: C1 to C5 measured at 811b4a3; the close review's APPROVE with no findings; the
++      sweep of Q1 to Q15; plan amendment c1
++    accepts: the five residuals of "Residuals the close accepts"
++    carries: Q1, Q3, Q7, Q9, Q10, Q12, Q13, Q14 and the rest of Q15 to the owner
++
++This is an agent's ruling under the owner's delegation, not the owner's own reading of
++this record. It covers neither the merge of the pull request that carries the record, nor
++a release tag, nor the filing of any proposed issue.
++
++## What the milestone delivered
++
++| Phase | What | Pull request | Record |
++|---|---|---|---|
++| Plan | The plan, three review rounds, the plan gate | in #29 | `001-plan.md` |
++| 1 | `takeover` checks every ignored path a hand-off note was written with (issue 28) | vasiloglou/dev-tools#29, merged `2b5173a` | `002-phase-1.md`, `005-phase-3-reread.md` |
++| 2 | An index can count the modules of extra source folders (`count_extra_dirs`) | vasiloglou/dev-tools#30, merged `938c4e6` | `003-phase-2.md` |
++| 3 | dev-tools' own index: 12 components, 3 subsystems, 9 search cases, six suggested code changes | vasiloglou/dev-tools#32, merged `827e766` | `004-phase-3.md`, `005-phase-3-reread.md` |
++| 4 | A test that fails while the index is stale; the gate rows; the pages | vasiloglou/dev-tools#36, merged `811b4a3` | `006-phase-4.md` |
++
++Fifteen review rounds ran, all with Codex as the one reviewer: 3 over the plan and 12 over
++phase diffs, with 40 findings in their ledgers: 19 classed blocking, 8 hardening and 13
++completeness. All 40 were reproduced; 39 were fixed and 1 was rejected.
++
++## Since record 006
++
++- vasiloglou/dev-tools#35 (a standing check in review briefs for code fitted to its
++  examples; plugins 0.1.5) was merged into `main` while phase 4 was being pushed. It
++  changed `review_tool.py`, which the index covers.
++- `main` was merged into phase 4 (`05abd23`). On that merge the new test exited 1 with
++  `stale or missing: .devtools/components/modules/skills.md`: its first failure on a
++  real change. The page was regenerated and the `review.rounds` entry, read beside #35's
++  diff, gained the standing check in its `verbs` and `notes` (`181bde9`). The full suite
++  then exited 0 with 350 passed, and the 9 search cases still held.
++- The owner asked for vasiloglou/dev-tools#36 to be opened and then merged; the agent
++  merged it with a merge commit (`811b4a3`). `main`'s tree is the tree of `090e3a0`.
++
++## Completion predicates, measured
++
++All on `main` at `811b4a3`, with a clean tree (`git diff HEAD | shasum -a 256` gave the
++empty-input hash, `e3b0c442…`).
++
++| Predicate | Measurement |
++|---|---|
++| C1 Every module of `devtools/` and `skills/` has a component, with no baseline | `--check --strict` exit 0; `stats`: `coverage: 12/12 devtools, skills modules assigned to components`; the `test ! -e` exit 0 |
++| C2 Each search case puts its component first; the negative case matches nothing | 9 of 9; `no component matched` |
++| C3 The suite exits 0 and includes a test that fails while the index is stale | `350 passed`, exit 0. `tests/test_own_index.py`: 8 passed; it exited 1 on the merge of #35 (above) and in the two gates of record 006 |
++| C4 `.devtools/project.md` names the index, its folder and its two gates; the own-use documentation names it | `.devtools/project.md`, "What runs here" and "Gates"; `README.md`, `docs/milestone.html#own-use`, `docs/components.html`, `docs/contribute.html`, `AGENTS.md`, `CONTRIBUTING.md` |
++| C5 `takeover` is not ready while an ignored path the note was written with, other than a key file, is absent; the phase 1 tests exit as their spec lists; the pull request says `Fixes #28` | `tests/test_handoff.py`: 103 passed, exit 0. #29's description opens `Fixes #28.`; issue 28 closed with its merge on 2026-11-23 |
++| C6 A close record, after the close review | This record |
++
++## Gate output (verbatim)
++
++    $ C=plugins/dvt-milestone/skills/components/scripts/components_index.py
++    $ python3 $C --check --strict                                 -> exit 0
++    $ test ! -e .devtools/components/unassigned-baseline.txt      -> exit 0
++    $ python3 $C stats | head -1
++    coverage: 12/12 devtools, skills modules assigned to components; external: none
++    $ python3 $C search --explain <each query of search-cases.md>
++    9 of 9 cases put the expected component first
++    $ python3 $C search --explain deploy to kubernetes
++    no component matched: this is not proof that nothing exists; search modules/ and git grep
++    $ uv run --no-project --with pytest python -m pytest tests/test_handoff.py -q
++    103 passed in 44.70s                                          -> exit 0
++    $ uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q
++    8 passed in 2.88s                                             -> exit 0
++    $ python3 devtools/build_plugins.py --check                   -> exit 0
++    $ uv run --no-project --with pytest python -m pytest tests -q
++    350 passed in 167.71s (0:02:47)                               -> exit 0
++
++## Plan repairs (amendment c1)
++
++The phase records deferred these to the close. Each is written into
++`notes/component-index-plan.md` at its site, marked `(c1)`, with the earlier wording kept
++and the record that raised it named. The amended plan's SHA-256 is in the evidence list.
++
++| Site | Earlier wording | Repair | Raised in |
++|---|---|---|---|
++| C3; section 9 | "except for the known GND `synth` case" | The suite exits 0; that case was this machine's GND install | `004-phase-3.md` |
++| C5 | "The tests T1 to T10" | The list grew to T20; C5 is judged by the exit of `tests/test_handoff.py` | `002-phase-1.md`, Q4 |
++| Section 3 | "Three load another script at run time" | Five do | `004-phase-3.md` |
++| Section 4, phase 1 | "bump, to 0.1.4" | 0.1.3 was never tagged; 0.1.4 is also #34, and 0.1.5 also #35 | `002-phase-1.md`, `006-phase-4.md`, this record |
++| Section 4, phase 2 | "the retaken `docs/adopt.html` capture" | Kept, not retaken: D2 (d), the owner's ruling of 2026-11-22 | `003-phase-2.md` |
++| Section 4, phase 3 | "no readers are fanned out" | The reread used four readers; partial reading left four entries false | `005-phase-3-reread.md` |
++| Section 4, phase 4; section 9 | "`changed --base main`" | `origin/main`, after a fetch | `006-phase-4.md` |
++| Section 7 | "the graph stays within `package_dir`" | It already holds a module outside it that the catalog names | `003-phase-2.md`, Q6 |
++| Section 8, a3 | "the branch is rebased onto main" | `main` was merged into each branch, bottom up; nothing was rebased | `006-phase-4.md` |
++| Status | (none) | Amendment c1 and the close are named | this record |
++
++## Review
++
++One round of the review helper, `--subject close`, reviewer Codex (read-only, effort
++`high`), over 18 files: this record as drafted, the amended plan, records 001 to 006, the
++milestone's `README.md`, the phase 4 spec, `.devtools/project.md`, the catalog with its
++search cases and `REVIEW.md`, `handoff.py` with its reference and tests, and
++`tests/test_own_index.py`. **One reviewer is one reviewer.**
++
++| Round | Brief | Findings | Verdict |
++|---|---|---|---|
++| close-r1 | `d83e92c4…0d0e` | 0 | APPROVE |
++
++- The review read this record at SHA-256
++  `2207e2d76851c9c97cd9c5980870c821c5d1600268a8d1889041931630220103`. This section,
++  the ruling above, the two matching entries of `gates`, five entries of `evidence` and
++  the last sentence of the paragraph below were written afterwards, and carry no review
++  opinion. Nothing else in the record changed.
++- It checked: the 18 hashes; the strict index check at 12 of 12 with no baseline; the 9
++  search cases and the negative one; the build check; that the sweep accounts for Q1 to
++  Q15; and the 40 findings of the earlier ledgers, 39 fixed and 1 rejected.
++- For `handoff.py`, whose repairs of `22d6258` no earlier round had read, it ran the
++  writer and reader in memory over 516 scenarios (paths before and after the 25th, control
++  characters, backticks, missing keys), with further probes of forged snapshot lines and
++  of a rest line without its cut line, and found no case that reads as ready with a path
++  missing.
++- It did not run pytest, by the read-only rule: the 350, 103 and 8 passed above are this
++  record's evidence, not the reviewer's. It did not check issue 28 or pull request 29 on
++  GitHub; local history holds `Fixes #28`. Its file-system probes were in memory.
++- No second round: the first found nothing.
++
++**Which files a review covers at their present bytes.** `review_tool.py status` was run
++over all fifteen earlier rounds on `main` at `811b4a3`. A file it calls unreviewed
++carries no review opinion from those rounds:
++
++- this milestone's own work: `skills/dev-handoff/scripts/handoff.py` and its two plugin
++  copies, `skills/dev-handoff/references/handoff.md` and its copies, `tests/test_handoff.py`
++  (all changed at `22d6258`, after phase-1-r4, and again by the merge of #34);
++  `tests/test_own_index.py` (changed at `b807ca1`, after phase-4-r1);
++  `.devtools/components/COMPONENTS.md` and `modules/skills.md` (changed at `181bde9`);
++  `notes/phase-2-spec.md` (the owner's D2 (d) ruling), `notes/phase-4-spec.md`,
++  `notes/phase-3-reading/handoff.md`, the milestone's `README.md`, `.gitignore`;
++- other people's changes since: `skills/components/scripts/rules_check.py` (#34),
++  `skills/milestone/process-phase/scripts/review_tool.py` (#34, #35) and
++  `docs/milestone.html` (#35 and phase 4).
++
++The close review read the first group, except the plugin copies (which the build check
++shows equal to their sources), the generated `modules/skills.md` (which the index check
++shows equal to what the script writes), `notes/phase-2-spec.md`,
++`notes/phase-3-reading/handoff.md` and `.gitignore`.
++
++## The open-questions sweep
++
++Every record of the milestone was reread. Each question it raised is here once.
++
++| Q | Question | Raised in | Disposition |
++|---|---|---|---|
++| Q1 | The import graph cannot see run-time loads. Should the index tool read `spec_from_file_location` and `runpy.run_path` calls with literal paths? | plan, section 10 | **Carried** to the owner, as proposed issue P1. A product change. The three subsystems state the five loads in `notes:` meanwhile |
++| Q2 | One entry per file gives large scripts one entry each. Does search find what a planner asks for? | plan, section 10 | **Closed** by this record: 9 of 9 cases on `main`; and in use, phase 4's reuse searches and the search for #35's new check each put the right component first (`006-phase-4.md`; above). No finer grain is needed now |
++| Q3 | A machine-readable inventory of ignored paths in every hand-off note, so `takeover` stops parsing Markdown | `002-phase-1.md` | **Carried** to the owner, as proposed issue P2 and a milestone of its own: it changes a format other projects' branches hold, which `.devtools/project.md` puts in the evidence lane. Four review rounds of phase 1 each found another way the Markdown misleads `takeover` |
++| Q4 | Plan C5 names "T1 to T10" | `002-phase-1.md` | **Closed**: plan amendment c1 |
++| Q5 | Should `.gitignore` carry `review.log`? | `002-phase-1.md` | **Closed** by `005-phase-3-reread.md`: `.planning/**/review.log`, at `3963a46` |
++| Q6 | Plan section 7, "the graph stays within `package_dir`" | `003-phase-2.md` | **Closed**: plan amendment c1 |
++| Q7 | Who takes `REVIEW.md`'s suggestions, and when | `004-phase-3.md` | **Carried** to the owner. Suggestion 4 is vasiloglou/dev-tools#33, filed 2026-11-22. 1 (one list of other planning tools), 2 (a test for `phase_selection.py`) and 6 (four docstrings, Q12) are fast-lane fixes: proposed issues P3, P4 and P5. 5 is Q10. 3 (split the three largest modules) is not proposed: R0.1 says a shipped script stands alone |
++| Q8 | The six copies of `plugin_root`, `checkout_root` and `load_settings` were not compared | `004-phase-3.md` | **Closed** by `005-phase-3-reread.md`: the first two are the same code in all six; `load_settings` differs by design |
++| Q9 | dvt-milestone ships `rules_check.py` without the `phase_tool.py` it names | `005-phase-3-reread.md` | **Carried** to the owner as vasiloglou/dev-tools#33. Record 005's wording is corrected here: `check --phase` exits 2 with a message that says why, which is a refusal, not the defect. The defect is `rules_check.py test`, which exits 1 with `2 wrong` on the starter rules `init` has just written; the dvt-phase copy prints `0 wrong` |
++| Q10 | `review`'s same-named-definition leads look only under `package_dir` | `005-phase-3-reread.md` | **Carried** to the owner, as proposed issue P6. A product gap that phase 2's setting did not reach |
++| Q11 | A tracked file whose name holds a newline is printed raw in the snapshot's uncommitted list | `005-phase-3-reread.md` | **Closed** in the code at `22d6258`: `_snapshot_text` now writes the uncommitted and the paused-phase paths through `_one_line`. `test_t17` pins the paused-phase list; no test pins the uncommitted list (a residual, below) |
++| Q12 | Four docstrings say what their code does not do | `005-phase-3-reread.md` | **Carried** to the owner, as proposed issue P5 (with Q7) |
++| Q13 | `changed` compares with the local `main`, which in a worktree nothing moves | `006-phase-4.md` | **Carried** to the owner, as proposed issue P7. Here the gate row names `origin/main` |
++| Q14 | `--check --strict` cannot refuse a baseline | `006-phase-4.md` | **Carried** to the owner, as proposed issue P8. Here the test refuses the file itself |
++| Q15 | After a change that keeps behaviour, is an entry reread, and how is its date brought forward? | `006-phase-4.md` | **Partly closed** by this record. The two entries `review` still lists (`handoff.notes`, `components.rules`) were read beside #34's diff at this close: it reformats strings, passes `check=False` and uses `datetime.UTC`, and both entries stay true. `review.rounds` was reread and edited at `181bde9`. What remains, a way to mark an entry reread without editing its `does` or `verbs`, is **carried** to the owner with P7 and P8 |
++
++**Proposed issues** (none is filed; posting to GitHub needs the owner each time):
++
++- P1. components: let the index see run-time loads written with literal paths (Q1).
++- P2. dev-handoff: keep the ignored inventory machine-readably in the note (Q3). A
++  milestone, not a fix.
++- P3. One list of other planning tools for `sync.py` and `from_gsd.py` (Q7, suggestion 1).
++- P4. A test that runs the `phase_selection.py` pytest plugin (Q7, suggestion 2).
++- P5. Four docstrings that say what their code does not do (Q7, suggestion 6; Q12).
++- P6. components: `review`'s same-name leads should follow `count_extra_dirs` (Q10).
++- P7. components: `changed` should say when its base is behind its remote (Q13), and
++  offer a way to mark an entry reread (Q15).
++- P8. components: a way for `--check --strict` to refuse a baseline (Q14).
++
++## Refactoring review
++
++Each phase record answers for its own phase. The close confirms that every refactor a
++phase saw and deferred has a row above with a named owner:
++
++| Record | Its answer | Deferred | Row |
++|---|---|---|---|
++| `002-phase-1.md` | None executed; one deferred | The machine-readable ignored inventory | Q3, carried to the owner as P2 |
++| `003-phase-2.md` | None executed; no candidate | none | -- |
++| `004-phase-3.md` | None executed; the phase changed no code | `REVIEW.md`'s suggestions | Q7, carried to the owner |
++| `005-phase-3-reread.md` | Three helpers added to `handoff.py` with the repair | none | -- |
++| `006-phase-4.md` | None needed | Two product questions | Q13 and Q14, carried to the owner |
++
++## Residuals the close accepts
++
++- **Phase 1, in the reviewers' terms** (`002-phase-1.md`): a note written before 0.1.4
++  whose ignored path holds a newline that prints as complete valid bullets can still read
++  as ready. No writer since 0.1.4 prints such a note.
++- The uncommitted list of a hand-off note is written escaped since `22d6258`, and no test
++  names a file with a line break to pin it (Q11).
++- With `count_extra_dirs` absent, an absolute `package_dir` gives `draft` stubs where the
++  earlier version, by reading, exits 1. It was not run, and no test pins it
++  (`003-phase-2.md`).
++- The index's descriptions are as true as the reread of 2026-11-22 and the two later
++  rereads beside a diff. The test checks coverage and the generated pages, not what an
++  entry says.
++- Every test ran on macOS only.
++
++## Boundary -- what this close does NOT establish
++
++- That 0.1.4 and 0.1.5 are released. Neither is tagged: `release_plugins.py status` says
++  `released: 0.1.2`. Tagging is the owner's.
++- Anything about #34 and #35 beyond their effect on this milestone's files. They are not
++  this milestone's work, and no round of it reviewed them.
++- That one reviewer's reading is more than that. All sixteen rounds had Codex in the one
++  seat, read-only, so no round ran the test suite.
++- That the proposed issues are wanted. They are proposals.
++
++## Owner actions that remain
++
++- Tag `plugins-v0.1.4` and `plugins-v0.1.5`, or one tag for what `main` now holds.
++- Rule on the proposed issues P1 to P8.
++- Merge the pull request that carries this record.
+diff --git a/.planning/milestones/component-index/README.md b/.planning/milestones/component-index/README.md
+index e6837a6..1b31b9d 100644
+--- a/.planning/milestones/component-index/README.md
++++ b/.planning/milestones/component-index/README.md
+@@ -36,4 +36,9 @@ note did not list is missing.
+   [005-phase-3-reread.md](005-phase-3-reread.md): every entry read in full, and the
+   third review rounds of phases 1 and 2;
+   [006-phase-4.md](006-phase-4.md): the test that keeps the index current, the gate rows
+-  and the pages.
++  and the pages;
++  [007-close.md](007-close.md): the close, with the sweep of Q1 to Q15 and the plan
++  repairs.
++- **Closed** on 2026-11-23, by delegated approval (auto=true), after a close review that
++  approved with no findings. Phase 4 is vasiloglou/dev-tools#36, merged `811b4a3`. Still
++  the owner's: the release tags, and the eight issues the close proposes.
+diff --git a/.planning/milestones/component-index/notes/component-index-plan.md b/.planning/milestones/component-index/notes/component-index-plan.md
+index 8068931..51adb2c 100644
+--- a/.planning/milestones/component-index/notes/component-index-plan.md
++++ b/.planning/milestones/component-index/notes/component-index-plan.md
+@@ -60,6 +60,12 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
+   from phase 1's branch tip, and its pull request names phase 1's branch as its base
+   (section 8, "Branches"). The phases still run one at a time and release one version
+   each. Recorded in `003-phase-2.md`. The amended bytes are not reviewed.
++- **Amendment c1, 2026-11-23, at the close: delegated approval (auto=true).** The plan
++  repairs that the phase records deferred to the close, each marked `(c1)` at its site
++  with the record that raised it. The earlier wording is kept beside each. Recorded in
++  `007-close.md`.
++- **Closed, 2026-11-23.** Phases 1 to 4 are merged into `main` (vasiloglou/dev-tools#29,
++  #30, #32 and #36). The close is `007-close.md`.
+ 
+ **Done when** (the completion predicates; each is a gate with an exit code, or a ruling):
+ 
+@@ -74,14 +80,18 @@ one is refused by a gate this repository runs. On the way, the milestone fixes i
+   or no hit that matches more than one word.
+ - C3. `uv run --no-project --with pytest python -m pytest tests -q` exits 0, except for
+   the known GND `synth` case (section 6, R5). The suite includes a test that fails while
+-  the index is stale.
++  the index is stale. *(c1, from `004-phase-3.md`: the `synth` case was a property of how
++  GND was installed on this machine, not of the code. Since 2026-11-21 it passes, and C3
++  is judged as "exits 0".)*
+ - C4. `.devtools/project.md` names the index, its folder and its two gates. The
+   documentation that describes dev-tools' own use names the index.
+ - C5. `handoff.takeover` returns `ready: false` when any ignored path the note was written
+   with, other than a key file, is absent, including one after the 25th. A missing key file
+   is reported in `missing_keys` and does not block, as today (r1 F1). The tests T1 to T10 of
+   `notes/phase-1-spec.md` exit as that spec lists, and the pull request says
+-  `Fixes #28`.
++  `Fixes #28`. *(c1, from `002-phase-1.md`, Q4: the spec's list grew with each review
++  round, up to T20, with T10b, T14b and T16b. C5 is judged by the exit of
++  `tests/test_handoff.py`, which holds them.)*
+ - C6. A close record, after the close review.
+ 
+ ## 0. Binding design rules
+@@ -235,6 +245,10 @@ cannot see:
+ 
+ The subsystems' flows state these in `notes:`.
+ 
++*(c1, from `004-phase-3.md`: there are five, not three. `rules_check.py` also runs
++`components_index.py facts`, and `phase_tool.py` runs `coder_pool.py`. The three
++subsystems of the index state all five.)*
++
+ ### Artifact homes
+ 
+ | Artifact | Home |
+@@ -269,7 +283,10 @@ The subsystems' flows state these in `notes:`.
+ - the tests in `tests/test_handoff.py`;
+ - one sentence each in `skills/dev-handoff/references/handoff.md` and
+   `docs/handoff.html`;
+-- `release_plugins.py bump`, to 0.1.4;
++- `release_plugins.py bump`, to 0.1.4 *(c1, from `002-phase-1.md` and `006-phase-4.md`:
++  0.1.3 was never tagged, though installs of it exist. And vasiloglou/dev-tools#34 took
++  0.1.4 on `main` first, so 0.1.4 is that change and this phase together; in the same
++  way 0.1.5 is phase 2 and vasiloglou/dev-tools#35)*;
+ - `.gitignore` line 7 anchored to `/notes/`, so the milestone's planning files can be
+   committed with it (a2);
+ - a pull request with `Fixes #28`.
+@@ -297,7 +314,9 @@ its `package_dir`. The default is unchanged.
+ - the tests in `tests/test_tools.py`;
+ - the setting described in `skills/components/SKILL.md`, `references/build.md`,
+   `docs/components.html` and `examples/phase-project.devtools.toml`;
+-- the retaken `docs/adopt.html` capture (that spec's D2);
++- the retaken `docs/adopt.html` capture (that spec's D2) *(c1, from `003-phase-2.md`: it
++  was not retaken. The capture is kept as taken on 2026-11-05 and its caption says what
++  0.1.5 prints besides: D2 (d), which the owner ruled on 2026-11-22)*;
+ - `release_plugins.py bump`, to 0.1.5.
+ 
+ *Criteria:*
+@@ -336,6 +355,11 @@ modules, the subsystems, and the generated pages.
+ *Reading:* about 10,800 lines, roughly one reader's share by `build.md`'s measure. The
+ driving agent reads it, and no readers are fanned out.
+ 
++*(c1, from `005-phase-3-reread.md`: that was not enough. The first build read ten of the
++twelve modules in part, and four entries then said something false. The reread used four
++readers, each reading whole modules and returning a table of every definition; no entry
++is marked `checked: partial` now.)*
++
+ ### Phase 4: keep it current
+ 
+ *Outcome:* a change that leaves the index stale is caught, by a test and a gate.
+@@ -346,7 +370,8 @@ driving agent reads it, and no readers are fanned out.
+   repository root (D3);
+ - `.devtools/project.md`: the index's folder in "What runs here", and two rows in "Gates"
+   (`changed --base main` before a pull request, and `--check --strict` when a phase
+-  closes);
++  closes) *(c1, from `006-phase-4.md`: the row names `origin/main`, after a fetch. In a
++  worktree the local `main` is moved by nothing and was eight days old)*;
+ - one line in `AGENTS.md`: search the index before writing a module or a function;
+ - a row naming `.devtools/components/` in `README.md` and `docs/milestone.html#own-use`,
+   and a pointer to it on `docs/components.html` as an example of a built index.
+@@ -393,6 +418,9 @@ repairs, and the close record (C6).
+ 
+ - Import resolution across several source folders: the graph stays within `package_dir`.
+   The scripts have no static imports of each other, so it would show nothing here.
++  *(c1, from `003-phase-2.md`, Q6: not quite. The module graph already holds a module
++  outside `package_dir` when the catalog names it, before phase 2 and after. What stays
++  out of scope is resolving imports between source folders.)*
+ - Splitting or merging scripts, or consolidating shared helpers (R0.1). `REVIEW.md` lists
+   them; nothing is done about them.
+ - How many ignored paths a note lists for a reader (the 25).
+@@ -414,7 +442,10 @@ repairs, and the close record (C6).
+   request is open, the next branch is cut from that branch's tip and its pull request
+   names that branch as its base. Once the previous phase merges, the branch is rebased
+   onto main and the base changed to main. The prior wording, above, stands for every
+-  other case.
++  other case. *(c1, from `006-phase-4.md`: no branch was rebased. When `main` moved,
++  `main` was merged into phase 1, phase 1 into phase 2 and phase 2 into phase 3, and each
++  pull request's base was changed to `main` just before its merge. A rebase would have
++  rewritten commits the records name.)*
+ - **Reviews.** The review helper (`review_tool.py`), with the other tool as reviewer:
+   - `--subject plan` over this plan, before the plan gate (the project's plan-review bar);
+   - `--subject phase` over each phase's diff (process-phase step 4);
+@@ -454,6 +485,9 @@ abbreviated (r1 F7). In a search row, `<words>` is the query of one case of
+ | 4 | `uv run --no-project --with pytest python -m pytest tests/test_own_index.py -q` | exits 0; exits 1 with one module path removed (P4.2), and with a baseline present (P4.3) | Every contributor: the full suite now checks the index |
+ | 4 | `INDEX changed --base main` | exits 0 on the phase's head | Same |
+ 
++*(c1: the two "1 failure, the R5 case" rows above now expect exit 0, as C3 says; and the
++phase 4 row's `changed --base main` is run against `origin/main`, as section 4 says.)*
++
+ `12/12` is the value expected at write time. If phase 2 changes which files count, phase
+ 3's spec states the count, and C1 is judged by the exit code, not by the number.
+ 
+diff --git a/.planning/milestones/component-index/notes/reviews/close-r1/BRIEF.md b/.planning/milestones/component-index/notes/reviews/close-r1/BRIEF.md
+new file mode 100644
+index 0000000..a3e6839
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/reviews/close-r1/BRIEF.md
+@@ -0,0 +1,70 @@
++# Review brief: the milestone close
++
++You are an independent reviewer, working in a different tool from the one that produced
++this work. Nothing here asks you to agree with it. Answer from the files themselves, not
++from any summary of them, including this brief's.
++
++## The question
++
++The component-index milestone is at its close. 007-close.md is the draft close record; its Close ruling and Review sections are marked PENDING and are written after you answer. Is the milestone ready to close as that record says, and where can the claims below be shown false, by the files or a command?
++
++## Claims to test
++
++The author claims what follows. For each, try to show where it is false: a claim is
++met only if you looked for the case that breaks it and did not find one.
++
++- C1. Each completion predicate C1 to C5 of notes/component-index-plan.md holds at this commit, as 007-close.md measures it.
++- C2. The open-questions sweep of 007-close.md misses no question that records 001 to 006 or plan section 10 raise, and each disposition is true: a row marked closed is closed by what it cites, and a row marked carried names who takes it.
++- C3. Every refuted premise in records 001 to 006 that names a plan repair is repaired in the plan at a site marked (c1), the repair says what the cited record shows, and the earlier wording is kept beside it.
++- C4. skills/dev-handoff/scripts/handoff.py at this commit: takeover never reports ready while an ignored path the note was written with, other than a key file, is missing from the checkout. Its last repairs (commit 22d6258: _one_line, checking each path before redaction, a rest line without its cut line, doctor not raising on an over-long name) were never reviewed.
++- C5. Every statement in the sections Since record 006, Residuals the close accepts and Boundary of 007-close.md is true of the repository at this commit.
++
++## The change under review
++
++The files below, as they stand at `811b4a3ef993` with uncommitted changes.
++
++## What to read
++
++Paths are relative to the repository root, the directory you start in. Before you rely
++on a file, check its SHA-256 (`shasum -a 256 <path>`); if one differs, say so first in
++your answer: you are not reading the bytes this brief names.
++
++| File | SHA-256 |
++|---|---|
++| `.planning/milestones/component-index/007-close.md` | `2207e2d76851c9c97cd9c5980870c821c5d1600268a8d1889041931630220103` |
++| `.planning/milestones/component-index/notes/component-index-plan.md` | `9684c846e59bf116b706aa3c64dc5d4710486572a20f73cf581d11a188132f31` |
++| `.planning/milestones/component-index/001-plan.md` | `5efa7b890a4036186851c8a7e32a51dd3a4e17f816eddc06567dedf20b7c0b74` |
++| `.planning/milestones/component-index/002-phase-1.md` | `c522ddb42eccb62b94f19480211ea46a821e1fd3190e76858b5b112f47bfcf03` |
++| `.planning/milestones/component-index/003-phase-2.md` | `b8aa7fba44e8a384390ebd06329fec6b99409d5cd48c28dba030bce83acedf19` |
++| `.planning/milestones/component-index/004-phase-3.md` | `fc7445dd41398c3d6e21e139669fd7d7a156aa87b6f30b652bb487fb5d11f9c0` |
++| `.planning/milestones/component-index/005-phase-3-reread.md` | `f2e6b7c0c7f39760a5969ce5f5044c4715b938e010d1f8514bc3a3639bf4c9ad` |
++| `.planning/milestones/component-index/006-phase-4.md` | `66f696e67adb095ff06b9bbccf0055ce6ce946de238404fd59b60331a617aa75` |
++| `.planning/milestones/component-index/README.md` | `b5930774a74c8054339c7e33ae299639a9576b7a27b338ff1178df7855e2d7bf` |
++| `.planning/milestones/component-index/notes/phase-4-spec.md` | `a629877e7cb50f16ee231c243fa13932adb309ca832fcbb04310ba14515721f7` |
++| `.devtools/project.md` | `1e485b868fde627032c65f9bf311899d4cb18d8a5a0ba91c8ffec8b9de54ff3e` |
++| `.devtools/components/COMPONENTS.md` | `33b6da675aa123e43bb1ce610c583ddcc6c326e22bbade8aad8eb650a7e8a099` |
++| `.devtools/components/search-cases.md` | `876fab2dc57cca4dca143346783934556b2caadaf0b3d4415aa1caab616a5453` |
++| `.devtools/components/REVIEW.md` | `821c841181d8bd82b95cfc4019e461381d03c5589a12cf53f012f09cf6d390e7` |
++| `skills/dev-handoff/scripts/handoff.py` | `e891bdb31f0a48089a9db0a117ed5aad12486d34d536dc3fa35f049dc3e16a35` |
++| `skills/dev-handoff/references/handoff.md` | `4ab09c9621c60c1f7afdef00aa1eba4d4626d6490cf39fa8bc3222ec55a85629` |
++| `tests/test_handoff.py` | `e8096c363a107043e284b4ed041870230c0ff3e340a2e4f2a67eb4121a98c5ab` |
++| `tests/test_own_index.py` | `20eb2fa283b4ece497665e188eceecea50581193c7119b729fcc0b7b69e9f405` |
++
++You may read anything else in the repository that helps you answer.
++
++## Rules
++
++- Read only. Do not edit, create, stage, commit, push or post anything.
++- Do not open `.env` files, keys, tokens, `auth.json` or any other credential file, and do
++  not print environment variables. If you need one, name it and go on without it.
++- A finding names its file and line and the consequence someone would observe. Run what
++  you can to show it; where you only read, say so.
++
++## What to return
++
++1. Findings, each with an id (F1, F2, ...), file and line, what is wrong, the observable
++   consequence, and how to reproduce it. A finding with no observable consequence is
++   style: label it so.
++2. What you checked and found true.
++3. What you could not check, and why.
++4. A last line: `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`.
+diff --git a/.planning/milestones/component-index/notes/reviews/close-r1/FINDINGS.md b/.planning/milestones/component-index/notes/reviews/close-r1/FINDINGS.md
+new file mode 100644
+index 0000000..d7a29b6
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/reviews/close-r1/FINDINGS.md
+@@ -0,0 +1,23 @@
++# Findings ledger: close-r1
++
++One row per finding the review returned, under the reviewer's own id. Fill every cell:
++
++- Reproduced: yes or no. A finding is believed only once it is reproduced against the bytes.
++- Class: blocking, hardening or completeness, assigned here, not by the reviewer
++  (review-convergence.md).
++- Disposition: fixed, deferred, rejected or open.
++- Repaired at: for a fixed finding, the commit or tag that holds the repaired bytes. Those
++  bytes are unreviewed until a later round reads them; `review_tool.py status` says which.
++- Notes: the regression test for a fixed finding, the target for a deferred one, the reason
++  for a rejected one.
++
++If the review returned no findings, replace the table with the line: No findings.
++
++No findings.
++
++Convergence: 0 findings, `VERDICT: APPROVE`. The reviewer read 18 files at the brief's
++hashes, among them the draft close record at SHA-256
++`2207e2d76851c9c97cd9c5980870c821c5d1600268a8d1889041931630220103`, ran the strict index check, the nine search cases and the build
++check, and probed the hand-off writer and reader in memory. It did not run pytest, by the
++read-only rule, and did not check the live state of issue 28 or of pull request 29. There
++is no second round: the first found nothing.
+diff --git a/.planning/milestones/component-index/notes/reviews/close-r1/brief.json b/.planning/milestones/component-index/notes/reviews/close-r1/brief.json
+new file mode 100644
+index 0000000..43a4dd8
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/reviews/close-r1/brief.json
+@@ -0,0 +1,94 @@
++{
++  "base": null,
++  "claims": [
++    "Each completion predicate C1 to C5 of notes/component-index-plan.md holds at this commit, as 007-close.md measures it.",
++    "The open-questions sweep of 007-close.md misses no question that records 001 to 006 or plan section 10 raise, and each disposition is true: a row marked closed is closed by what it cites, and a row marked carried names who takes it.",
++    "Every refuted premise in records 001 to 006 that names a plan repair is repaired in the plan at a site marked (c1), the repair says what the cited record shows, and the earlier wording is kept beside it.",
++    "skills/dev-handoff/scripts/handoff.py at this commit: takeover never reports ready while an ignored path the note was written with, other than a key file, is missing from the checkout. Its last repairs (commit 22d6258: _one_line, checking each path before redaction, a rest line without its cut line, doctor not raising on an over-long name) were never reviewed.",
++    "Every statement in the sections Since record 006, Residuals the close accepts and Boundary of 007-close.md is true of the repository at this commit."
++  ],
++  "created": "2026-11-23T19:42:07.427424+00:00",
++  "deleted": [],
++  "dirty": true,
++  "files": [
++    {
++      "path": ".planning/milestones/component-index/007-close.md",
++      "sha256": "2207e2d76851c9c97cd9c5980870c821c5d1600268a8d1889041931630220103"
++    },
++    {
++      "path": ".planning/milestones/component-index/notes/component-index-plan.md",
++      "sha256": "9684c846e59bf116b706aa3c64dc5d4710486572a20f73cf581d11a188132f31"
++    },
++    {
++      "path": ".planning/milestones/component-index/001-plan.md",
++      "sha256": "5efa7b890a4036186851c8a7e32a51dd3a4e17f816eddc06567dedf20b7c0b74"
++    },
++    {
++      "path": ".planning/milestones/component-index/002-phase-1.md",
++      "sha256": "c522ddb42eccb62b94f19480211ea46a821e1fd3190e76858b5b112f47bfcf03"
++    },
++    {
++      "path": ".planning/milestones/component-index/003-phase-2.md",
++      "sha256": "b8aa7fba44e8a384390ebd06329fec6b99409d5cd48c28dba030bce83acedf19"
++    },
++    {
++      "path": ".planning/milestones/component-index/004-phase-3.md",
++      "sha256": "fc7445dd41398c3d6e21e139669fd7d7a156aa87b6f30b652bb487fb5d11f9c0"
++    },
++    {
++      "path": ".planning/milestones/component-index/005-phase-3-reread.md",
++      "sha256": "f2e6b7c0c7f39760a5969ce5f5044c4715b938e010d1f8514bc3a3639bf4c9ad"
++    },
++    {
++      "path": ".planning/milestones/component-index/006-phase-4.md",
++      "sha256": "66f696e67adb095ff06b9bbccf0055ce6ce946de238404fd59b60331a617aa75"
++    },
++    {
++      "path": ".planning/milestones/component-index/README.md",
++      "sha256": "b5930774a74c8054339c7e33ae299639a9576b7a27b338ff1178df7855e2d7bf"
++    },
++    {
++      "path": ".planning/milestones/component-index/notes/phase-4-spec.md",
++      "sha256": "a629877e7cb50f16ee231c243fa13932adb309ca832fcbb04310ba14515721f7"
++    },
++    {
++      "path": ".devtools/project.md",
++      "sha256": "1e485b868fde627032c65f9bf311899d4cb18d8a5a0ba91c8ffec8b9de54ff3e"
++    },
++    {
++      "path": ".devtools/components/COMPONENTS.md",
++      "sha256": "33b6da675aa123e43bb1ce610c583ddcc6c326e22bbade8aad8eb650a7e8a099"
++    },
++    {
++      "path": ".devtools/components/search-cases.md",
++      "sha256": "876fab2dc57cca4dca143346783934556b2caadaf0b3d4415aa1caab616a5453"
++    },
++    {
++      "path": ".devtools/components/REVIEW.md",
++      "sha256": "821c841181d8bd82b95cfc4019e461381d03c5589a12cf53f012f09cf6d390e7"
++    },
++    {
++      "path": "skills/dev-handoff/scripts/handoff.py",
++      "sha256": "e891bdb31f0a48089a9db0a117ed5aad12486d34d536dc3fa35f049dc3e16a35"
++    },
++    {
++      "path": "skills/dev-handoff/references/handoff.md",
++      "sha256": "4ab09c9621c60c1f7afdef00aa1eba4d4626d6490cf39fa8bc3222ec55a85629"
++    },
++    {
++      "path": "tests/test_handoff.py",
++      "sha256": "e8096c363a107043e284b4ed041870230c0ff3e340a2e4f2a67eb4121a98c5ab"
++    },
++    {
++      "path": "tests/test_own_index.py",
++      "sha256": "20eb2fa283b4ece497665e188eceecea50581193c7119b729fcc0b7b69e9f405"
++    }
++  ],
++  "head": "811b4a3ef993aa7a9b7a9ff108a3b56c43a1440d",
++  "left_out": [],
++  "notes": [],
++  "pr": null,
++  "question": "The component-index milestone is at its close. 007-close.md is the draft close record; its Close ruling and Review sections are marked PENDING and are written after you answer. Is the milestone ready to close as that record says, and where can the claims below be shown false, by the files or a command?",
++  "subject": "close",
++  "version": 1
++}
+diff --git a/.planning/milestones/component-index/notes/reviews/close-r1/review.md b/.planning/milestones/component-index/notes/reviews/close-r1/review.md
+new file mode 100644
+index 0000000..843fa4d
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/reviews/close-r1/review.md
+@@ -0,0 +1,21 @@
++1. **Findings:** None. I found no counterexample requiring a change before closure, within the record’s stated boundaries and accepted residuals.
++
++2. **Checked and found true:**
++
++   - All 18 files match the brief’s SHA-256 hashes.
++   - The strict index check exits 0, coverage is 12/12, and no baseline exists.
++   - All nine search cases return the expected first component; the negative case matches nothing.
++   - `build_plugins.py --check` exits 0.
++   - In-memory probes reject an uncovered module, a removed catalog assignment and a stale generated page.
++   - The hand-off writer and reader pass 516 in-memory scenarios covering paths before and after the 25th, control characters, backticks and missing-key handling. Additional probes cover forged snapshot lines and a missing cut line.
++   - The sweep accounts for Q1–Q15 from the plan and records. The earlier ledgers contain the claimed 40 findings: 39 fixed, one rejected.
++
++3. **Could not check:**
++
++   - I did not rerun pytest because its fixtures create files, contrary to the brief’s read-only rule. The reported 350/103/8 passing results remain recorded evidence.
++   - I did not independently verify live GitHub issue status or PR #29’s description. Local history contains `Fixes #28`.
++   - Filesystem probes were simulated in memory; other operating systems remain unverified.
++
++No files were changed.
++
++VERDICT: APPROVE
+\ No newline at end of file
+diff --git a/.planning/milestones/component-index/notes/reviews/close-r1/run.json b/.planning/milestones/component-index/notes/reviews/close-r1/run.json
+new file mode 100644
+index 0000000..0fa477a
+--- /dev/null
++++ b/.planning/milestones/component-index/notes/reviews/close-r1/run.json
+@@ -0,0 +1,31 @@
++{
++  "argv": [
++    "codex",
++    "exec",
++    "--ephemeral",
++    "-c",
++    "model_reasoning_effort=\"high\"",
++    "--sandbox",
++    "read-only",
++    "--color",
++    "never",
++    "--skip-git-repo-check",
++    "--add-dir",
++    "{dir}",
++    "-o",
++    "{dir}/review.md",
++    "Read {dir}/BRIEF.md and follow it."
++  ],
++  "brief_sha256": "d83e92c4dd7d101a14c5df9ca2915afb060b6486b16c83b4ed08661e08f00d0e",
++  "effort": "high",
++  "exit": 0,
++  "finished": "2026-11-23T19:45:57+00:00",
++  "model": "codex default",
++  "pid": 71907,
++  "review_sha256": "f9b5999d89f2cd75d18f581197057138dd3c161e9cb3b74621539d393e436695",
++  "reviewer": "codex",
++  "started": "2026-11-23T19:42:07+00:00",
++  "state": "done",
++  "stdout": "review.log",
++  "timeout_minutes": 60
++}

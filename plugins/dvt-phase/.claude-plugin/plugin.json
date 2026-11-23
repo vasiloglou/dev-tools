@@ -1,6 +1,6 @@
 {
   "name": "dvt-phase",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
   "author": {
     "name": "vasiloglou",

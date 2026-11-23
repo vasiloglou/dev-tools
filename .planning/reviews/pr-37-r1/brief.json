@@ -1,0 +1,60 @@
+{
+  "base": null,
+  "claims": [
+    "The pull request changes planning files only, under .planning/milestones/component-index/: no code, skill, page or plugin file.",
+    "On main at 811b4a3 the plan's five measurable completion predicates hold: the index check exits 0 at 12 of 12 modules, with no baseline file; each of the 9 search cases puts its component first, and the negative case matches nothing; the full suite exits 0 with 350 passed, and includes the test that fails while the index is out of date; .devtools/project.md and the pages that describe dev-tools' own use name the index; tests/test_handoff.py exits 0, and issue 28 is closed.",
+    "The sweep of the milestone's 15 open questions: 6 closed, 8 carried to the owner, 1 partly closed. Two of the carried ones are #33, already filed.",
+    "notes/component-index-plan.md, repaired at ten sites as amendment c1. Each repair keeps the earlier wording beside it and names the record that showed it wrong.",
+    "Codex reviewed the close, read-only: 18 files, among them handoff.py with the round 4 fixes (22d6258) that no earlier round had read. It approved with no findings. It did not run pytest; the test counts are the author's runs. The record's Review and Close ruling sections were written after that review read the record, so they are unreviewed."
+  ],
+  "created": "2026-11-23T19:54:18.508319+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-37-r1/diff.patch",
+      "sha256": "872d35908704e7900fe224639fcfb1b9d29fa5c3ec2287ee1780915aafa5a55d"
+    },
+    {
+      "path": ".planning/milestones/component-index/001-plan.md",
+      "sha256": "5efa7b890a4036186851c8a7e32a51dd3a4e17f816eddc06567dedf20b7c0b74"
+    },
+    {
+      "path": ".planning/milestones/component-index/002-phase-1.md",
+      "sha256": "c522ddb42eccb62b94f19480211ea46a821e1fd3190e76858b5b112f47bfcf03"
+    },
+    {
+      "path": ".planning/milestones/component-index/003-phase-2.md",
+      "sha256": "b8aa7fba44e8a384390ebd06329fec6b99409d5cd48c28dba030bce83acedf19"
+    },
+    {
+      "path": ".planning/milestones/component-index/004-phase-3.md",
+      "sha256": "fc7445dd41398c3d6e21e139669fd7d7a156aa87b6f30b652bb487fb5d11f9c0"
+    },
+    {
+      "path": ".planning/milestones/component-index/005-phase-3-reread.md",
+      "sha256": "f2e6b7c0c7f39760a5969ce5f5044c4715b938e010d1f8514bc3a3639bf4c9ad"
+    },
+    {
+      "path": ".planning/milestones/component-index/006-phase-4.md",
+      "sha256": "66f696e67adb095ff06b9bbccf0055ce6ce946de238404fd59b60331a617aa75"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "1e485b868fde627032c65f9bf311899d4cb18d8a5a0ba91c8ffec8b9de54ff3e"
+    }
+  ],
+  "head": "6650e455e1ad2d37acddd51e12e8374573c08d46",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "811b4a3ef993aa7a9b7a9ff108a3b56c43a1440d",
+    "head": "6650e455e1ad2d37acddd51e12e8374573c08d46",
+    "number": 37,
+    "title": "Close the component-index milestone",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/37"
+  },
+  "question": "This pull request closes the component-index milestone with a close record, an amended plan and a close review round. Does it do what it sets out to do, and where is what it says untrue of the repository?",
+  "subject": "pr",
+  "version": 1
+}
