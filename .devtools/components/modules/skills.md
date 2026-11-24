@@ -8,82 +8,83 @@ Generate and search the component catalog using source ASTs, never package impor
 
 | Symbol | Kind | Line | Summary |
 | --- | --- | --- | --- |
-| `load_settings(path) -> dict` | function | 79 | (no docstring) |
-| `plugin_root(script)` | function | 94 | The plugin install that holds this script, or None. A plugin keeps it in |
-| `checkout_root() -> Path` | function | 103 | The git checkout that holds the working directory, or the working directory. |
-| `catalog(root) -> Path` | function | 158 | (no docstring) |
-| `external_config(root) -> dict` | function | 165 | Libraries to index, from the optional external.toml. |
-| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 171 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
-| `read_components(root) -> list[dict]` | function | 197 | Read component headings and single-line fields, retaining duplicate ids. |
-| `parse_components(text) -> list[dict]` | function | 202 | (no docstring) |
-| `values(entry, key) -> list[str]` | function | 216 | (no docstring) |
-| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 221 | A `modules:` value as (the files it names, the folders it names). |
-| `covers(entry, path) -> bool` | function | 227 | (no docstring) |
-| `sources(root, directory)` | function | 232 | (no docstring) |
-| `counted_modules(root) -> list[str]` | function | 240 | The repo-relative paths every module must have a component for: the package's, and |
-| `counted_dirs() -> str` | function | 250 | (no docstring) |
-| `coverage(root, entries) -> tuple[list[str], int]` | function | 254 | (no docstring) |
-| `validate(root, entries, external_names) -> list[str]` | function | 259 | (no docstring) |
-| `validate_subsystem(entry, entries) -> list[str]` | function | 305 | (no docstring) |
-| `docstring(node) -> str` | function | 318 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
-| `summary(node) -> str` | function | 323 | (no docstring) |
-| `shorten(text, length) -> str` | function | 327 | (no docstring) |
-| `signature(node, name) -> str` | function | 331 | (no docstring) |
-| `tool_kind(node) -> str` | function | 350 | (no docstring) |
-| `symbols(tree, prefix, methods, private, hidden)` | function | 359 | Public definitions in source order; never descend into function bodies. |
-| `parse(path) -> ast.Module` | function | 387 | (no docstring) |
-| `parse_source(data, name) -> ast.Module` | function | 391 | (no docstring) |
-| `cell(text) -> str` | function | 406 | (no docstring) |
-| `table(rows) -> list[str]` | function | 410 | (no docstring) |
-| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 417 | The generated module pages and one search hit per module. |
-| `file_facts(root, relative, trust) -> list` | function | 457 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
-| `top_level(rows) -> list[dict]` | function | 490 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
-| `cache_path(root) -> Path` | function | 495 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
-| `cache_stamp() -> list` | function | 501 | What the kept facts depend on besides the content of a file. |
-| `cache_state(root) -> dict` | function | 507 | What earlier runs kept for this checkout, read once per run. |
-| `save_caches() -> None` | function | 528 | (no docstring) |
-| `write_cache(root, state) -> None` | function | 535 | (no docstring) |
-| `external_source(dist, dotted) -> Path` | function | 553 | Locate metadata-owned source first, or probe only the top-level package spec. |
-| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 575 | (no docstring) |
-| `verb_block(entries) -> str` | function | 610 | (no docstring) |
-| `subsystem(entry) -> bool` | function | 621 | (no docstring) |
-| `import_nodes(tree)` | function | 625 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
-| `raw_imports(tree) -> list` | function | 637 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
-| `text_imports(text, name) -> list` | function | 645 | The imports of source that is not a file here (a file as it was at another commit). |
-| `resolve_imports(tree, path, available) -> set[str]` | function | 650 | Resolve only the project's own modules; from-import symbols fall back to their base. |
-| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 676 | The files of the package, optionally at a base revision: the components that hold each |
-| `component_graph(root, entries, overrides, files) -> dict` | function | 700 | Map component pairs to sorted module evidence, optionally at a base revision. |
-| `private(path) -> bool` | function | 713 | Whether a package file is private by its name: the file, or a folder above it inside the |
-| `relations(entries, edges) -> dict` | function | 720 | (no docstring) |
-| `direct_edges(edges) -> dict` | function | 735 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
-| `cycle_groups(pairs) -> list[list[str]]` | function | 740 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
-| `listing(ids, cap) -> str` | function | 775 | (no docstring) |
-| `rewrite(text, entries, edges) -> str` | function | 782 | Replace only generated fields, preserving the authored catalog content. |
-| `graph_text(entries, edges) -> str` | function | 804 | (no docstring) |
-| `components_text(root, entries, edges) -> str` | function | 822 | (no docstring) |
-| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 833 | (no docstring) |
-| `tokens(text) -> set[str]` | function | 843 | (no docstring) |
-| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 851 | Search the recorded catalog even without the dependency installed. |
-| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 872 | The hits that share a word with the query, best first, each with its ``matched`` words. |
-| `coverage_line(root, entries) -> str` | function | 912 | (no docstring) |
-| `generated_paths(root) -> set[str]` | function | 919 | (no docstring) |
-| `external_skips(root) -> dict[str, str]` | function | 924 | Explain recorded inventories that cannot be reproduced by this installation. |
-| `stale_files(root, files) -> list[str]` | function | 941 | Return sorted stale or missing index paths without writing or printing. |
-| `write_or_check(root, check, strict) -> int` | function | 951 | (no docstring) |
-| `git(root, *args, check) -> str` | function | 980 | Output of a git command run in `root`; '' when it fails and `check` is off. |
-| `files_at(root, commit, paths) -> dict[str, str]` | function | 992 | The text each path (relative to `root`) had at a commit, read with one git process. |
-| `package_imports(root) -> dict[str, set[str]]` | function | 1014 | Each package module -> the package modules it imports at run time. |
-| `draft(root, entries, only, by_importers) -> list[str]` | function | 1020 | Stub entries for the modules no component covers: a starting point, never a catalog. |
-| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict]` | function | 1079 | The checkout as it was at the merge base with `base`. |
-| `changed(root, base, strict) -> int` | function | 1106 | Check the index against the files that differ from the merge base with `base`. |
-| `facts(root, base, modules) -> dict` | function | 1192 | The catalog and the import graph as rows of facts, for a rule checker. |
-| `entry_commits(root) -> dict[str, tuple[str, int]]` | function | 1256 | Component id -> (commit, time) of the newest line of its description (does, verbs, flow). |
-| `is_retired(entry) -> bool` | function | 1280 | (no docstring) |
-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1284 | Package module -> the files in tests/ and the extra source directories that import it. |
-| `some(items, cap) -> str` | function | 1302 | (no docstring) |
-| `review(root, areas, everything) -> list[str]` | function | 1307 | Leads for a review of the index. Each one is a place to look, not a finding. |
-| `show(root, name) -> list[str]` | function | 1488 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
-| `main(argv) -> int` | function | 1531 | (no docstring) |
+| `load_settings(path) -> dict` | function | 82 | (no docstring) |
+| `plugin_root(script)` | function | 98 | The plugin install that holds this script, or None. A plugin keeps it in |
+| `checkout_root() -> Path` | function | 107 | The git checkout that holds the working directory, or the working directory. |
+| `catalog(root) -> Path` | function | 162 | (no docstring) |
+| `external_config(root) -> dict` | function | 169 | Libraries to index, from the optional external.toml. |
+| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 175 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
+| `read_components(root) -> list[dict]` | function | 201 | Read component headings and single-line fields, retaining duplicate ids. |
+| `parse_components(text) -> list[dict]` | function | 206 | (no docstring) |
+| `values(entry, key) -> list[str]` | function | 220 | (no docstring) |
+| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 225 | A `modules:` value as (the files it names, the folders it names). |
+| `covers(entry, path) -> bool` | function | 231 | (no docstring) |
+| `sources(root, directory)` | function | 236 | (no docstring) |
+| `counted_modules(root) -> list[str]` | function | 244 | The repo-relative paths every module must have a component for: the package's, and |
+| `counted_dirs() -> str` | function | 254 | (no docstring) |
+| `coverage(root, entries) -> tuple[list[str], int]` | function | 258 | (no docstring) |
+| `validate(root, entries, external_names) -> list[str]` | function | 263 | (no docstring) |
+| `validate_subsystem(entry, entries) -> list[str]` | function | 309 | (no docstring) |
+| `docstring(node) -> str` | function | 322 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
+| `summary(node) -> str` | function | 327 | (no docstring) |
+| `shorten(text, length) -> str` | function | 331 | (no docstring) |
+| `signature(node, name) -> str` | function | 335 | (no docstring) |
+| `tool_kind(node) -> str` | function | 354 | (no docstring) |
+| `symbols(tree, prefix, methods, private, hidden)` | function | 363 | Public definitions in source order; never descend into function bodies. |
+| `parse(path) -> ast.Module` | function | 391 | (no docstring) |
+| `parse_source(data, name) -> ast.Module` | function | 395 | (no docstring) |
+| `cell(text) -> str` | function | 410 | (no docstring) |
+| `table(rows) -> list[str]` | function | 414 | (no docstring) |
+| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 421 | The generated module pages and one search hit per module. |
+| `file_facts(root, relative, trust) -> list` | function | 461 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
+| `top_level(rows) -> list[dict]` | function | 494 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
+| `cache_path(root) -> Path` | function | 499 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
+| `cache_stamp() -> list` | function | 505 | What the kept facts depend on besides the content of a file. |
+| `cache_state(root) -> dict` | function | 511 | What earlier runs kept for this checkout, read once per run. |
+| `save_caches() -> None` | function | 532 | (no docstring) |
+| `write_cache(root, state) -> None` | function | 539 | (no docstring) |
+| `external_source(dist, dotted) -> Path` | function | 557 | Locate metadata-owned source first, or probe only the top-level package spec. |
+| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 579 | (no docstring) |
+| `verb_block(entries) -> str` | function | 614 | (no docstring) |
+| `subsystem(entry) -> bool` | function | 625 | (no docstring) |
+| `import_nodes(tree)` | function | 629 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
+| `raw_imports(tree) -> list` | function | 641 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
+| `text_imports(text, name) -> list` | function | 649 | The imports of source that is not a file here (a file as it was at another commit). |
+| `resolve_imports(tree, path, available) -> set[str]` | function | 654 | Resolve only the project's own modules; from-import symbols fall back to their base. |
+| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 680 | The files of the package, optionally at a base revision: the components that hold each |
+| `component_graph(root, entries, overrides, files) -> dict` | function | 704 | Map component pairs to sorted module evidence, optionally at a base revision. |
+| `private(path) -> bool` | function | 717 | Whether a package file is private by its name: the file, or a folder above it inside the |
+| `relations(entries, edges) -> dict` | function | 724 | (no docstring) |
+| `direct_edges(edges) -> dict` | function | 739 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
+| `cycle_groups(pairs) -> list[list[str]]` | function | 744 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
+| `listing(ids, cap) -> str` | function | 779 | (no docstring) |
+| `rewrite(text, entries, edges) -> str` | function | 786 | Replace only generated fields, preserving the authored catalog content. |
+| `graph_text(entries, edges) -> str` | function | 808 | (no docstring) |
+| `components_text(root, entries, edges) -> str` | function | 826 | (no docstring) |
+| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 837 | (no docstring) |
+| `tokens(text) -> set[str]` | function | 847 | (no docstring) |
+| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 855 | Search the recorded catalog even without the dependency installed. |
+| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 876 | The hits that share a word with the query, best first, each with its ``matched`` words. |
+| `coverage_line(root, entries) -> str` | function | 916 | (no docstring) |
+| `generated_paths(root) -> set[str]` | function | 923 | (no docstring) |
+| `external_skips(root) -> dict[str, str]` | function | 928 | Explain recorded inventories that cannot be reproduced by this installation. |
+| `stale_files(root, files) -> list[str]` | function | 945 | Return sorted stale or missing index paths without writing or printing. |
+| `write_or_check(root, check, strict) -> int` | function | 955 | (no docstring) |
+| `git(root, *args, check) -> str` | function | 988 | Output of a git command run in `root`; '' when it fails and `check` is off. |
+| `files_at(root, commit, paths) -> dict[str, str]` | function | 1000 | The text each path (relative to `root`) had at a commit, read with one git process. |
+| `package_imports(root) -> dict[str, set[str]]` | function | 1022 | Each package module -> the package modules it imports at run time. |
+| `draft(root, entries, only, by_importers) -> list[str]` | function | 1028 | Stub entries for the modules no component covers: a starting point, never a catalog. |
+| `resolve_base(root, base) -> tuple[str, str]` | function | 1087 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
+| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1113 | The checkout as it was at the merge base with `base`. |
+| `changed(root, base, strict) -> int` | function | 1135 | Check the index against the files that differ from the merge base with `base`. |
+| `facts(root, base, modules, notes) -> dict` | function | 1221 | The catalog and the import graph as rows of facts, for a rule checker. |
+| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1290 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+| `is_retired(entry) -> bool` | function | 1320 | (no docstring) |
+| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1324 | Package module -> the files in tests/ and the extra source directories that import it. |
+| `some(items, cap) -> str` | function | 1342 | (no docstring) |
+| `review(root, areas, everything) -> list[str]` | function | 1347 | Leads for a review of the index. Each one is a place to look, not a finding. |
+| `show(root, name) -> list[str]` | function | 1532 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+| `main(argv) -> int` | function | 1575 | (no docstring) |
 
 ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
 Components: components.rules
@@ -104,31 +105,31 @@ Check the project's own rules about its components. Optional: it needs GND insta
 | `named_facts(value) -> set` | function | 375 | Every fact type a rule names, wherever in it. |
 | `run(command, what, **options) -> subprocess.CompletedProcess` | function | 382 | (no docstring) |
 | `read_facts(root, base, modules) -> dict` | function | 389 | (no docstring) |
-| `features(gnd, command, flags) -> set` | function | 403 | Which flags of GND 0.3.1 this one has, read from `gnd <command> --help`. |
-| `judge(gnd, folder, head, base, diagnose) -> dict` | function | 409 | The report of `gnd check` on the head facts, against the base facts when given. With `diagnose`, |
-| `findings(report, rules) -> tuple[list, list]` | function | 438 | What is broken, as (level, rule, binding, new), and the rules gnd could not decide, as (level, rule, why). |
-| `silent(report, rules) -> list[str]` | function | 465 | `reread:` notes for the rules a report shows judged nothing: an antecedent that no binding gets |
-| `outside(report, built, rules) -> list[str]` | function | 482 | `reread:` notes for a literal in a rule that no fact of its kind can hold, from GND's warnings. |
-| `hidden(comparison) -> list[str]` | function | 508 | `reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code. |
-| `base_rules(root, revision) -> list[dict] \| None` | function | 535 | The rules about components as `rules.json` held them at a commit, or None when it had none. |
-| `compare(gnd, folder, head_model, base_model) -> dict` | function | 549 | `gnd check` of today's facts under today's rules, against the base edition of the rules. |
-| `used_pair(rule, binding) -> tuple \| None` | function | 561 | The (caller, callee) a broken rule is about: what its first `component_uses` atom binds. |
-| `describe(binding) -> str` | function | 570 | (no docstring) |
-| `changed_rules(root, commit) -> list[str]` | function | 576 | The rules files that differ from a commit, untracked ones included. |
-| `check(root, base, strict, require, as_json) -> int` | function | 587 | (no docstring) |
-| `read_plan_facts(root, phase) -> dict` | function | 660 | What the plans of a phase say, from the phase tool. |
-| `names(entry, path) -> bool` | function | 680 | Whether an entry of a task's files (a path, a folder ending in /, or a pattern with *) names a file. |
-| `plans_with_components(root, code, plans) -> dict` | function | 685 | One set of facts from the two: the component facts, the plan facts, and the JOINED ones. |
-| `bindings(report) -> dict` | function | 724 | {rule id: how many bindings its antecedent had}, for the guarded rules GND counted. |
-| `check_phase(root, phase, strict, require, as_json) -> int` | function | 732 | Judge the rules about plans over the plans of one phase. No base: a plan is judged as written. |
-| `vocabulary(root) -> dict` | function | 786 | Every fact type a rule can name: the component facts, the file facts, and, where the phase tool is |
-| `generated(gnd, types, rules, noted) -> list[tuple]` | function | 804 | What `gnd synth --guarded-cases` finds about the rules as written: a rule it could build no failing, |
-| `test(root, require, as_json) -> int` | function | 830 | Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set |
-| `joined(gnd, head) -> dict` | function | 905 | GND's guarded-join discovery over the component facts: the report of `gnd discover`. |
-| `area_pair(constraint) -> tuple \| None` | function | 928 | (source area, target area) of a forbidden pair GND proposes: a use from the one never reaches the other. |
-| `suggest(root, require, form) -> int` | function | 940 | Rules about areas the code already keeps, and the near misses, from GND's guarded-join discovery. |
-| `init(root, show) -> int` | function | 1016 | (no docstring) |
-| `main(argv) -> int` | function | 1031 | (no docstring) |
+| `features(gnd, command, flags) -> set` | function | 406 | Which flags of GND 0.3.1 this one has, read from `gnd <command> --help`. |
+| `judge(gnd, folder, head, base, diagnose) -> dict` | function | 412 | The report of `gnd check` on the head facts, against the base facts when given. With `diagnose`, |
+| `findings(report, rules) -> tuple[list, list]` | function | 441 | What is broken, as (level, rule, binding, new), and the rules gnd could not decide, as (level, rule, why). |
+| `silent(report, rules) -> list[str]` | function | 468 | `reread:` notes for the rules a report shows judged nothing: an antecedent that no binding gets |
+| `outside(report, built, rules) -> list[str]` | function | 485 | `reread:` notes for a literal in a rule that no fact of its kind can hold, from GND's warnings. |
+| `hidden(comparison) -> list[str]` | function | 511 | `reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code. |
+| `base_rules(root, revision) -> list[dict] \| None` | function | 538 | The rules about components as `rules.json` held them at a commit, or None when it had none. |
+| `compare(gnd, folder, head_model, base_model) -> dict` | function | 552 | `gnd check` of today's facts under today's rules, against the base edition of the rules. |
+| `used_pair(rule, binding) -> tuple \| None` | function | 564 | The (caller, callee) a broken rule is about: what its first `component_uses` atom binds. |
+| `describe(binding) -> str` | function | 573 | (no docstring) |
+| `changed_rules(root, commit) -> list[str]` | function | 579 | The rules files that differ from a commit, untracked ones included. |
+| `check(root, base, strict, require, as_json) -> int` | function | 590 | (no docstring) |
+| `read_plan_facts(root, phase) -> dict` | function | 663 | What the plans of a phase say, from the phase tool. |
+| `names(entry, path) -> bool` | function | 683 | Whether an entry of a task's files (a path, a folder ending in /, or a pattern with *) names a file. |
+| `plans_with_components(root, code, plans) -> dict` | function | 688 | One set of facts from the two: the component facts, the plan facts, and the JOINED ones. |
+| `bindings(report) -> dict` | function | 727 | {rule id: how many bindings its antecedent had}, for the guarded rules GND counted. |
+| `check_phase(root, phase, strict, require, as_json) -> int` | function | 735 | Judge the rules about plans over the plans of one phase. No base: a plan is judged as written. |
+| `vocabulary(root) -> dict` | function | 789 | Every fact type a rule can name: the component facts, the file facts, and, where the phase tool is |
+| `generated(gnd, types, rules, noted) -> list[tuple]` | function | 807 | What `gnd synth --guarded-cases` finds about the rules as written: a rule it could build no failing, |
+| `test(root, require, as_json) -> int` | function | 833 | Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set |
+| `joined(gnd, head) -> dict` | function | 908 | GND's guarded-join discovery over the component facts: the report of `gnd discover`. |
+| `area_pair(constraint) -> tuple \| None` | function | 931 | (source area, target area) of a forbidden pair GND proposes: a use from the one never reaches the other. |
+| `suggest(root, require, form) -> int` | function | 943 | Rules about areas the code already keeps, and the near misses, from GND's guarded-join discovery. |
+| `init(root, show) -> int` | function | 1019 | (no docstring) |
+| `main(argv) -> int` | function | 1034 | (no docstring) |
 
 ## skills.dev-handoff.scripts.handoff — `skills/dev-handoff/scripts/handoff.py`
 Components: handoff.notes

@@ -394,6 +394,9 @@ def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
                 *(['--modules'] if modules else [])], 'the index script')
     if done.returncode:
         raise Problem(f'{SETTINGS["index_script"]} facts: {(done.stderr or done.stdout).strip()}')
+    for line in done.stderr.splitlines():  # which base the facts are of, when it is not the one asked for
+        if line.startswith('note: '):
+            print(line, file=sys.stderr)
     doc = json.loads(done.stdout)
     if doc.get('format') != 'devtools-facts/1':
         raise Problem(f'{SETTINGS["index_script"]} facts wrote format {doc.get("format")!r}; this script reads devtools-facts/1')

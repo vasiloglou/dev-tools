@@ -1973,3 +1973,298 @@ def test_plain_pytest_leaves_out_phases_that_are_not_complete(project):
     assert run().startswith("2 passed, 1 deselected")
     assert run("--phase", "2").startswith("1 passed, 2 deselected")
     assert run("tests/acceptance/p02_later/test_p02_later.py").startswith("1 passed")
+
+
+# --- The index tool: a baseline a project refuses, a base that is behind, a reread entry, the counted folders.
+
+INDEX_SETTINGS = "scripts/components_index.settings.json"
+
+
+def index_settings(project, **values):
+    path = project / INDEX_SETTINGS
+    path.write_text(json.dumps(dict(json.loads(path.read_text()), **values)))
+
+
+def run_index(project, *args, script=INDEX, env=None):
+    """Run a script of the project with its standard output and standard error kept apart."""
+    env = {**os.environ, "XDG_CACHE_HOME": str(project.parent / "cache"), **(env or {})}
+    return subprocess.run([sys.executable, script, *args], cwd=project, capture_output=True, text=True, env=env)
+
+
+def git_in(project, *args):
+    done = subprocess.run([GIT, "-c", "user.name=t", "-c", "user.email=t@example.com", *args], cwd=project,
+                          capture_output=True, text=True, check=True)
+    return done.stdout.strip()
+
+
+def test_strict_check_refuses_a_baseline_when_the_setting_says_so(project):
+    (project / "src/widget/loose.py").write_text('"""Loose."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    assert tool(project, "stats", "--write-baseline", script=INDEX)[0] == 0
+    assert "src/widget/loose.py" in (project / "docs/components/unassigned-baseline.txt").read_text().split()
+    assert tool(project, "--check", "--strict", script=INDEX)[0] == 0, "by default a baseline excuses its modules"
+
+    index_settings(project, allow_baseline=False)
+    code, out = tool(project, "--check", "--strict", script=INDEX)
+    assert code == 1, out
+    assert ("baseline refused: docs/components/unassigned-baseline.txt exists and allow_baseline is false "
+            "(give its modules a component, then delete the file)\n") in out
+    assert "no component: src/widget/loose.py" in out, "the file excuses nothing"
+    code, out = tool(project, "--check", script=INDEX)
+    assert code == 0 and "baseline refused" not in out and "no component" not in out, out
+
+    catalog(project, entry("core.all", "Hold every module", "src/widget/"))
+    (project / "docs/components/unassigned-baseline.txt").unlink()
+    code, out = tool(project, "--check", "--strict", script=INDEX)
+    assert code == 0, out
+
+
+def test_no_baseline_is_written_when_the_setting_refuses_one(project):
+    (project / "src/widget/loose.py").write_text('"""Loose."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    index_settings(project, allow_baseline=False)
+    code, out = tool(project, "stats", "--write-baseline", script=INDEX)
+    assert code == 1 and "allow_baseline is false: this project keeps no baseline; give each module a component" in out
+    assert not (project / "docs/components/unassigned-baseline.txt").exists()
+    code, out = tool(project, "stats", script=INDEX)
+    assert code == 0 and "src/widget/loose.py" in out
+
+
+def test_allow_baseline_must_be_a_boolean(project):
+    index_settings(project, allow_baseline="no")
+    code, out = tool(project, "stats", script=INDEX)
+    assert code != 0 and "allow_baseline must be true or false" in out
+
+
+def behind(project):
+    """A remote under tmp_path; `main` tracks origin/main and is one commit behind it; the work is on a
+    branch cut from origin/main. Returns the commits of main and of origin/main."""
+    catalog(project, entry("core.all", "Hold every module", "src/widget/"))
+    commit(project)
+    first = git_in(project, "rev-parse", "HEAD")
+    origin = project.parent / "origin.git"
+    git_in(project.parent, "clone", "-q", "--bare", str(project), str(origin))
+    git_in(project, "remote", "add", "origin", str(origin))
+    (project / "src/widget/later.py").write_text('"""Added upstream."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    git_in(project, "push", "-q", "origin", "main")
+    git_in(project, "fetch", "-q", "origin")
+    git_in(project, "branch", "-q", "-u", "origin/main", "main")
+    git_in(project, "checkout", "-q", "-b", "work")
+    git_in(project, "branch", "-q", "-f", "main", first)
+    return first, git_in(project, "rev-parse", "origin/main")
+
+
+def summary(out):
+    return next(line for line in out.splitlines() if line.startswith("changed against "))
+
+
+def test_changed_compares_with_the_upstream_of_a_base_that_is_behind(project):
+    first, upstream = behind(project)
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0, out
+    lines = out.splitlines()
+    note = ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7]))
+    assert note in lines and lines.index(note) == lines.index(summary(out)) - 1, out
+    assert summary(out) == summary(tool(project, "changed", "--base", "origin/main", script=INDEX)[1])
+    assert summary(out).startswith("changed against origin/main (%s): " % upstream[:7])
+
+
+@pytest.mark.parametrize("state", ["level", "ahead", "diverged", "no upstream", "commit", "origin/main given",
+                                   "only the remote has it"])
+def test_changed_reads_every_other_base_as_it_is(project, state):
+    first, upstream = behind(project)
+    base, named = "main", "main"
+    if state == "level":
+        git_in(project, "branch", "-q", "-f", "main", upstream)
+    elif state in ("ahead", "diverged"):
+        git_in(project, "branch", "-q", "-f", "main", upstream if state == "ahead" else first)
+        git_in(project, "checkout", "-q", "main")
+        git_in(project, "commit", "-q", "--allow-empty", "-m", state)
+        git_in(project, "checkout", "-q", "work")
+    elif state == "no upstream":
+        git_in(project, "branch", "-q", "--unset-upstream", "main")
+    elif state == "commit":
+        base = named = first
+    elif state == "origin/main given":
+        base = named = "origin/main"
+    else:
+        git_in(project, "branch", "-q", "-D", "main")
+        named = "origin/main"
+    code, out = tool(project, "changed", "--base", base, script=INDEX)
+    assert code == 0, out
+    assert "note:" not in out, out
+    assert summary(out).startswith("changed against %s (" % named), out
+
+
+def test_no_command_of_the_index_fetches(project):
+    behind(project)
+    folder = project.parent / "recording-git"
+    folder.mkdir()
+    log = project.parent / "git-calls.txt"
+    (folder / "git").write_text('#!/bin/sh\necho "$@" >> %s\nexec %s "$@"\n' % (log, GIT))
+    (folder / "git").chmod(0o755)
+    env = {"PATH": "%s%s%s" % (folder, os.pathsep, os.environ["PATH"])}
+    for args in (("changed", "--base", "main"), ("facts", "--base", "main")):
+        assert run_index(project, *args, env=env).returncode == 0
+    calls = log.read_text().splitlines()
+    assert calls, "the recording git was not the one run"
+    assert not [call for call in calls if {"fetch", "pull", "push", "remote"} & set(call.split())], calls
+
+
+def test_facts_follow_the_same_base_and_stay_one_json_document(project):
+    first, upstream = behind(project)
+    done = run_index(project, "facts", "--base", "main")
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == json.loads(run_index(project, "facts", "--base", "origin/main").stdout)
+    assert done.stderr == ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main\n"
+                           % (first[:7], upstream[:7]))
+    out = project.parent / "facts.json"
+    assert run_index(project, "facts", "--base", "main", "--out", str(out)).returncode == 0
+    assert json.loads(out.read_text()) == json.loads(done.stdout)
+
+
+def test_the_rule_check_says_which_base_it_judged_against(project):
+    layered(project)
+    first, upstream = behind(project)
+    fake_gnd(project)
+    done = run_index(project, "check", "--base", "main", script=RULES)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7])) in done.stderr, done.stderr
+    # The summary names the base as it was asked for, and the commit the facts were read at: origin/main's.
+    assert done.stdout.endswith("rules against main (%s): 5 rule(s); 0 to fix, 0 warning(s), 0 standing\n"
+                                % upstream[:7]), done.stdout
+    other = run_index(project, "check", "--base", "origin/main", script=RULES)
+    assert done.stdout == other.stdout.replace("rules against origin/main (", "rules against main ("), other.stdout
+
+
+def reread_entry(project, text):
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- modules: src/widget/sizes.py\n",
+                                             "- modules: src/widget/sizes.py\n- reread: %s\n" % text))
+
+
+def older_than_code(project):
+    out = tool(project, "review", script=INDEX)[1]
+    return [line for line in out.split("## Descriptions older than their code")[1].split("\n## ")[0].splitlines()[1:]
+            if line.strip()]
+
+
+def test_a_reread_line_brings_an_entrys_date_forward(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since ") and lead.endswith(
+        ", when its does and verbs were last edited"), lead
+
+    reread_entry(project, "2026-11-23, read beside the rewrite, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    assert tool(project, "--check", script=INDEX)[0] == 0
+    assert older_than_code(project) == [], "a reread line not committed yet counts as now"
+    commit(project)
+    assert older_than_code(project) == []
+    assert "- reread: 2026-11-23, read beside the rewrite, still accurate" in (
+        project / "docs/components/COMPONENTS.md").read_text(), "write keeps the line"
+
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten again."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since ") and lead.endswith(
+        ", when it was last marked as reread"), lead
+
+
+def test_a_reread_line_committed_in_the_same_second_still_counts(project, monkeypatch):
+    # Commit times have a resolution of one second; a tie is settled by history, not by the clock.
+    for name in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(name, "2026-11-23T12:00:00+00:00")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert len(older_than_code(project)) == 1
+    reread_entry(project, "2026-11-23, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert older_than_code(project) == [], "the reread line's commit is the newer one, though the clock ties"
+
+
+def test_a_reread_line_written_twice_is_refused(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    reread_entry(project, "once")
+    reread_entry(project, "twice")
+    code, out = tool(project, "--check", script=INDEX)
+    assert code == 1 and "core.sizes: reread appears twice" in out, out
+
+
+def test_changed_takes_a_reread_line_as_an_edit_of_the_entry(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "reread: core.sizes (entry not edited): src/widget/sizes.py" in out, out
+    reread_entry(project, "2026-11-23, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "reread:" not in out, out
+
+
+def section(out, title):
+    """The lines of one group of `review`, its heading included."""
+    start = out.index("## " + title)
+    return out[start:out.index("\n\n", start)].splitlines()
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_reads_the_counted_folders_for_names_and_docstrings(project, count):
+    extra_tools(project, count=count)
+    (project / "tools/bare.py").write_text("def unnamed():\n    return 1\n")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef report(rows):\n    """Print rows."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"),
+            entry("tools.report", "Print a size report", "tools/"))
+    commit(project)
+    out = tool(project, "review", script=INDEX)[1]
+    same = section(out, "The same public name in two or three components")
+    bare = section(out, "Modules with no docstring")
+    if count:
+        assert [line for line in same[1:] if line.startswith("report")
+                and "src/widget/sizes.py (core.sizes)" in line and "tools/report.py (tools.report)" in line], same
+        assert "tools/bare.py" in bare, bare
+        assert "from 3 component(s) and 4 module(s)" in out, out.splitlines()[-1]
+    else:
+        assert same == ["## The same public name in two or three components (a duplicate?) (0)"], same
+        assert "tools/bare.py" not in bare, bare
+        assert "from 3 component(s) and 2 module(s)" in out, out.splitlines()[-1]
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_sizes_a_component_by_its_counted_modules(project, count):
+    extra_tools(project, count=count)
+    for number in range(12):
+        (project / ("tools/part%d.py" % number)).write_text('"""Part %d."""\n' % number)
+    catalog(project, entry("tools.report", "Print a size report", "tools/"))
+    commit(project)
+    rows = section(tool(project, "review", script=INDEX)[1], "Components that cover more than 12 modules")
+    assert bool([line for line in rows[1:] if line.startswith("tools.report: 13 modules")]) == count, rows
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_labels_an_entry_point_in_a_counted_folder(project, count):
+    extra_tools(project, count=count)
+    (project / "tools/cli.py").write_text('"""Command line."""\n\n\ndef main():\n    """Run."""\n')
+    catalog(project, entry("tools.cli", "Run the report from the command line", "tools/cli.py"))
+    commit(project)
+    rows = section(tool(project, "review", script=INDEX)[1], "Components nothing in the package imports")
+    assert ("tools.cli (defines main)" in rows) == count and ("tools.cli" in rows) != count, rows

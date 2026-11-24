@@ -414,4 +414,63 @@ reading of the spec.
 
 ## Implementation findings, recorded as they were found
 
-(None yet.)
+All on 2026-11-23, on the phase's base `361b2cc`.
+
+- **J1. Red first (S0.3).** Before any code: 11 of the new tests failed, each for the
+  reason it names (the missing `baseline refused:` line; the missing refusal message; the
+  missing settings error; `changed against main (…): 2 file(s) differ` with no `note:`;
+  two different `facts` documents; no `note:` on the rule check's standard error; the
+  entry still listed after its `reread:` line; no `reread appears twice`; and the three
+  `review` groups at `(0)` or without the label). The rest passed before, as pins: B2's
+  seven cases, C3, and the `count_extra_dirs: false` half of D1 to D3.
+- **J2. B3 cannot fail before the change, and the spec said it would.** Today's code
+  fetches nothing, so the test of "nothing fetches" passes on the base. Section 8 listed
+  it among the tests seen red; that was wrong. It is held instead by a negative control:
+  a build whose `resolve_base` runs `git fetch` made B3 fail (`assert not ['-C … fetch
+  --quiet']`). B2 likewise: a build that took any upstream that differs, ignoring
+  "strictly behind", failed its `ahead` and `diverged` cases. Both builds were the
+  script with one line changed, restored byte for byte after (same SHA-256).
+- **J3. A defect of this phase's own, caught by B2.** `base_snapshot` named the stale-base
+  line `line`; the loop over `git diff` lines below it reuses that name, so on any base
+  with a differing file the line printed as `note: A	src/widget/later.py`. Renamed
+  `said`. B1 had passed, because nothing differed in its state.
+- **J4. B5's expectation was wrong.** `rules_check.py check --base main` prints its
+  summary as `rules against main (<commit>)`: it names the base as given, and the commit
+  the facts were read at, which is origin/main's. The spec expected standard output equal
+  to that of `--base origin/main`, which names `origin/main`. The test now asserts the
+  note on standard error, the commit in the summary, and that the outputs differ only in
+  that name. Making `rules_check.py` print the resolved name would mean parsing its
+  sibling's message; not done. An open question for the close.
+- **J5. D1's expected module count was wrong.** The fixture has four counted modules, not
+  five; a counting error in the test, corrected.
+- **J6. dev-tools' own tests needed the rebuild first (K6, as the plan foresaw).** With
+  `allow_baseline` in `.devtools/components_index.settings.json`, the built copy under
+  `plugins/` still refused the key until `release_plugins.py bump` rebuilt it (0.1.7).
+- **J7. What `review` says in dev-tools now (O10).** The same-name group went from
+  `(0)` over 4 modules to `(13)` over 12, and its title says `4 name(s) defined in four
+  or more modules are left out`: the three names issue 44 named, and a fourth, are
+  conventions, counted and not listed, as the plan's premise said. The 13 listed are
+  leads for a review of the index (`cell`, `find_root`, `read_json`, `Stop`, …), not
+  failures; this phase settles none of them. `review` exits 0.
+- **J8. Entries reread (D6).** `components.rules` and `subsystem.rule_check`, whose code
+  this phase changed, and `migrate.from_gsd`, which `review` listed after phase 1's
+  change: each read beside the commits concerned, each still true, each given a
+  `reread:` line. `components.index` was edited instead (its `does` and `verbs` gained
+  the three behaviours). `sync.copies` and `handoff.notes` stay listed: not reread here.
+- **J9. The by-hand gate.** In this worktree, whose local `main` is 99 commits behind:
+  `changed --base main` printed `note: main (b685e82) is 99 commit(s) behind origin/main
+  (cecebc6): comparing with origin/main` and `changed against origin/main (cecebc6): 36
+  file(s) differ`, the count `--base origin/main` gives. Before the change it judged 263
+  files.
+- **J10. A defect of this phase's own, found by the full suite.** The first full run
+  after the work printed `1 failed, 494 passed`: C1 failed about two runs in three. The
+  dating compares commit times with a strict `>`, and a `reread:` line committed in the
+  same second as the entry's `does` line lost the tie, so the entry stayed listed. The
+  commit `ed88315` was first made with a message that said the suite had passed; that
+  message was written before the output was read, and was corrected before anything
+  else was built on the commit. Repaired: `entry_commits` breaks a tie by history (the
+  commit that has the other in its history is newer). Regression test:
+  `test_a_reread_line_committed_in_the_same_second_still_counts`, which fixes every
+  commit's time to one second and failed on three of three runs before the repair.
+  Rule 3 of the order of `entry_commits` is now: newest by commit time, ties settled by
+  ancestry.

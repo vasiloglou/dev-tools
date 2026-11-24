@@ -79,7 +79,7 @@ coverage: 4/4 src/shelf modules assigned to components; external: none</pre></di
     <div>
       <span class="num">Kept honest</span>
       <h3>It notices when the code moves on</h3>
-      <p>Add a file and the check fails: first because the index no longer matches the source, and then, in its strict form, for as long as no component has claimed the file. Closing a phase runs the strict check, so the map is complete at the start of the next phase. The check counts the package's files; a project whose code also sits in other folders (scripts, tools) lists them in <code>extra_source_dirs</code> and sets <code>count_extra_dirs</code> to true (default false; plugin 0.1.5 or newer), and their files are then counted the same way.</p>
+      <p>Add a file and the check fails: first because the index no longer matches the source, and then, in its strict form, for as long as no component has claimed the file. Closing a phase runs the strict check, so the map is complete at the start of the next phase. The check counts the package's files; a project whose code also sits in other folders (scripts, tools) lists them in <code>extra_source_dirs</code> and sets <code>count_extra_dirs</code> to true (default false; plugin 0.1.5 or newer), and their files are then counted the same way. A project that has given every file a component sets <code>allow_baseline</code> to false (plugin 0.1.7 or newer), and the strict check then refuses a list of files left for later.</p>
     </div>
     <div>
 <div class="term"><div class="bar"><i></i><i></i><i></i><b>shelf · a new file appears</b><em>captured</em></div>
@@ -226,7 +226,7 @@ rules against develop (f8ca93c): 4 rule(s); 1 to fix, 2 warning(s), 4 standing
       <span class="num">Review</span>
       <h3>From time to time, the whole index against the code</h3>
       <p>Checks keep the form right. They do not notice that two components do the same job, that something is no longer used, or that a description has drifted. A review does.</p>
-      <p>It starts from a list of leads the tool can see: descriptions older than their code, the same name written in two places, components that import each other, retired code that is still called. Each lead is a place to look, not a finding.</p>
+      <p>It starts from a list of leads the tool can see: descriptions older than their code, the same name written in two places, components that import each other, retired code that is still called. Each lead is a place to look, not a finding. An entry reread beside its code and found true gets a <code>reread:</code> line, which takes it off the first list until its code moves again.</p>
       <p>Then the agent rereads every entry beside its code, repairs the index, and writes down the code changes it would suggest, each one checked in the code, sized, and with what could break. It changes no code. You decide which suggestions become work.</p>
     </div>
     <div>

@@ -25,8 +25,8 @@ project belongs in the shared skill under `skills/`, not here.
     `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py`.
   - Not the copy under `skills/`: it reads its settings from beside itself, inside the
     product.
-  - Not an installed plugin older than 0.1.5: it refuses the settings file with
-    `unknown setting(s): count_extra_dirs`.
+  - Not an installed plugin older than 0.1.7: it refuses the settings file with
+    `unknown setting(s): allow_baseline` (older than 0.1.5: `count_extra_dirs`).
   - After a change to a module of `devtools/` or `skills/`: rebuild the plugins, run that
     script's `write`, and commit `.devtools/components/` with the change. The generated
     pages hold each definition's line number, so most changes to a module move them.
@@ -58,7 +58,7 @@ Run from the repository root, with Python 3.11 or newer.
 | One test file (a focused gate) | `uv run --no-project --with pytest python -m pytest tests/<file>.py -q` |
 | The plugins match the skills | `python3 devtools/build_plugins.py --check` |
 | Whether a release is due | `python3 devtools/release_plugins.py status` |
-| The component index is current (when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
+| The component index is current, and no baseline is kept (`allow_baseline` is false here; when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
 | The index against what a change touched (before a pull request, after `git fetch origin`) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main` |
 
 There is no lint command and no CI: the tests run on the machine that makes the change.

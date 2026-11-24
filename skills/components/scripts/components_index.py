@@ -68,6 +68,9 @@ DEFAULT_SETTINGS = {
     'extra_source_dirs': [],
     # Whether coverage, --check --strict, draft, changed and review count the modules of extra_source_dirs too.
     'count_extra_dirs': False,
+    # Whether <docs_dir>/unassigned-baseline.txt may excuse modules from --check --strict. False: a project
+    # that keeps no baseline; the strict check then fails while the file exists, and stats refuses to write it.
+    'allow_baseline': True,
     'docs_dir': 'docs/components',
     'script_path': 'scripts/components_index.py',
     # Which verbs the generated list at the top of the catalog holds: 'all', 'shared'
@@ -86,8 +89,9 @@ def load_settings(path: Path) -> dict:
         settings.update(loaded)
     if settings['verb_list'] not in {'all', 'shared', 'none'}:
         raise SystemExit(f'{path}: verb_list must be all, shared or none')
-    if not isinstance(settings['count_extra_dirs'], bool):
-        raise SystemExit(f'{path}: count_extra_dirs must be true or false')
+    for key in ('count_extra_dirs', 'allow_baseline'):
+        if not isinstance(settings[key], bool):
+            raise SystemExit(f'{path}: {key} must be true or false')
     return settings
 
 
@@ -127,7 +131,7 @@ VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
 GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
 # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
 CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
-                     'duplicates', 'external', 'distinct_from'})
+                     'duplicates', 'external', 'distinct_from', 'reread'})
 LARGE = 12  # `review` names a component that covers more modules than this
 SYMBOLS_SHOWN = 5  # how many matching symbols `search` lists under one module hit
 STOPWORDS = frozenset('a an the to of for and or in on from with into by is it its end'.split())
@@ -959,11 +963,15 @@ def write_or_check(root: Path, check: bool, strict: bool = False) -> int:
         for error in errors:
             print(error)
         baseline = root / BASE / 'unassigned-baseline.txt'
-        tolerated = set(baseline.read_text(encoding='utf-8').split()) if baseline.is_file() else set()
+        refused = strict and baseline.is_file() and not SETTINGS['allow_baseline']
+        if refused:
+            print(f'baseline refused: {BASE}unassigned-baseline.txt exists and allow_baseline is false '
+                  f'(give its modules a component, then delete the file)')
+        tolerated = set(baseline.read_text(encoding='utf-8').split()) if baseline.is_file() and not refused else set()
         unassigned = [p for p in coverage(root, read_components(root))[0] if p not in tolerated] if strict else []
         for path in unassigned:
             print(f'no component: {path} (add it to the modules of an entry in {BASE}COMPONENTS.md)')
-        return int(bool(stale or errors or unassigned))
+        return int(bool(stale or errors or unassigned or refused))
     if errors:
         for error in errors:
             print(error, file=sys.stderr)
@@ -1076,20 +1084,41 @@ def draft(root: Path, entries: list[dict], only: str = '', by_importers: bool = 
     return lines
 
 
-def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], dict]:
+def resolve_base(root: Path, base: str) -> tuple[str, str]:
+    """The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise).
+
+    In this order: a name that is no commit is read as origin/<name>, or refused when that is none
+    either. A local branch strictly behind its configured upstream (they differ, and their merge
+    base is the local branch) is read as that upstream, and the line says so. Anything else is read
+    as given: a branch level with, ahead of or diverged from its upstream, a branch with no
+    upstream, a remote-tracking branch, a tag, a commit. Every git command here only reads.
+    """
+    def commit(ref):
+        return git(root, 'rev-parse', '--verify', '--quiet', ref + '^{commit}', check=False).strip()
+
+    if not commit(base):
+        if not commit('origin/' + base):
+            raise ValueError(f'no branch or commit named {base}: pass --base <the branch this change will merge into>')
+        return 'origin/' + base, ''
+    local = commit('refs/heads/' + base)
+    upstream = git(root, 'rev-parse', '--abbrev-ref', '--verify', '--quiet', base + '@{upstream}', check=False).strip()
+    ahead = commit(upstream) if local and upstream else ''
+    if not ahead or ahead == local or git(root, 'merge-base', local, ahead, check=False).strip() != local:
+        return base, ''
+    count = git(root, 'rev-list', '--count', f'{local}..{ahead}', check=False).strip()
+    return upstream, (f'{base} ({local[:7]}) is {count} commit(s) behind {upstream} ({ahead[:7]}): '
+                      f'comparing with {upstream}')
+
+
+def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], dict, str]:
     """The checkout as it was at the merge base with `base`.
 
-    Returns the name `base` resolved to, the merge-base commit, {path that differs: its git
-    status letter}, the catalog entries there, and for each .py file that differs its text
-    there (None when it did not exist): the `overrides` of `component_graph`.
+    Returns the name `base` resolved to (`resolve_base`), the merge-base commit, {path that
+    differs: its git status letter}, the catalog entries there, for each .py file that differs
+    its text there (None when it did not exist): the `overrides` of `component_graph`, and the
+    line `resolve_base` gave ('' when there is none).
     """
-    def exists(ref):
-        return bool(git(root, 'rev-parse', '--verify', '--quiet', ref + '^{commit}', check=False).strip())
-
-    if not exists(base):
-        if not exists('origin/' + base):
-            raise ValueError(f'no branch or commit named {base}: pass --base <the branch this change will merge into>')
-        base = 'origin/' + base
+    base, said = resolve_base(root, base)
     anchor = git(root, 'merge-base', base, 'HEAD').strip()
     status = {}
     for line in git(root, 'diff', '--name-status', '--no-renames', '--relative', anchor).splitlines():
@@ -1100,12 +1129,12 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
     overrides.update(files_at(root, anchor, [p for p in overrides if status[p] != 'A']))
-    return base, anchor, status, old_entries, overrides
+    return base, anchor, status, old_entries, overrides, said
 
 
 def changed(root: Path, base: str, strict: bool) -> int:
     """Check the index against the files that differ from the merge base with `base`."""
-    base, anchor, status, old_entries, overrides = base_snapshot(root, base)
+    base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
     entries = read_components(root)
     files, fails = build_index(root)
     fails = list(fails)
@@ -1156,7 +1185,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
             rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
 
-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads)):
+    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
         for row in rows:
             print(f'{prefix}: {row}')
     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
@@ -1189,7 +1218,7 @@ MODULE_FACTS = {
 }
 
 
-def facts(root: Path, base: str = '', modules: bool = False) -> dict:
+def facts(root: Path, base: str = '', modules: bool = False, notes: list | None = None) -> dict:
     """The catalog and the import graph as rows of facts, for a rule checker.
 
     With `base`, the catalog and the code are those of the merge base with it; the ranks
@@ -1200,12 +1229,17 @@ def facts(root: Path, base: str = '', modules: bool = False) -> dict:
     With `modules`, the files come in as well, for rules that name one: which file each
     component holds, which file imports which (both held by a component), and which files
     are private by their name. A renamed file is then a new fact.
+
+    When `notes` is a list, the line `resolve_base` gives for `base` is added to it: the
+    caller prints it apart from the facts.
     """
     entries = read_components(root)
     ranks, forbidden = layers_config(root, {e['id'].split('.')[0] for e in entries if not subsystem(e)})
     overrides = None
     if base:
-        _, revision, _, entries, overrides = base_snapshot(root, base)
+        _, revision, _, entries, overrides, said = base_snapshot(root, base)
+        if said and notes is not None:
+            notes.append(said)
     else:
         try:
             revision = git(root, 'rev-parse', 'HEAD', check=False).strip()
@@ -1253,8 +1287,13 @@ def facts(root: Path, base: str = '', modules: bool = False) -> dict:
     }
 
 
-def entry_commits(root: Path) -> dict[str, tuple[str, int]]:
-    """Component id -> (commit, time) of the newest line of its description (does, verbs, flow)."""
+def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
+    """Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and
+    reread, which says the entry was read against its code and found true without being edited."""
+    def descends(commit, other):
+        # Commit times have a resolution of one second: on a tie the commit that has the other in its history is newer.
+        return git(root, 'rev-list', '--count', f'{commit}..{other}', check=False).strip() == '0'
+
     blame = git(root, 'blame', '--line-porcelain', '--', BASE + 'COMPONENTS.md', check=False)
     newest, commit, stamp, current = {}, '', 0, None
     for line in blame.splitlines():
@@ -1268,12 +1307,13 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int]]:
             if text.startswith('### '):
                 current = text[4:].strip()
             field = re.match(r'- ([a-z_]+):', text)
-            if not current or not (field and field[1] in {'does', 'verbs', 'flow'}):
+            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
                 continue
+            earlier = newest.get(current, ('', -1, ''))
             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
-                newest[current] = ('', float('inf'))
-            elif stamp > newest.get(current, ('', -1))[1]:
-                newest[current] = (commit, stamp)
+                newest[current] = ('', float('inf'), field[1])
+            elif stamp > earlier[1] or (stamp == earlier[1] and commit != earlier[0] and descends(commit, earlier[0])):
+                newest[current] = (commit, stamp, field[1])
     return newest
 
 
@@ -1315,23 +1355,27 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
     edges = component_graph(root, entries)
     links = relations(entries, edges)
     package = [p.relative_to(root).as_posix() for p in sources(root, PACKAGE_DIR)]
-    owners = {p: sorted(e['id'] for e in components if covers(e, p)) for p in package}
+    # The import graph stays within the package; the groups read from the modules themselves (names,
+    # docstrings, size, entry points) cover every counted module, so count_extra_dirs reaches them too.
+    counted = counted_modules(root)
+    owners = {p: sorted(e['id'] for e in components if covers(e, p)) for p in counted}
     groups = []
 
     stale, dated, asked = [], entry_commits(root), []
-    for name, (commit, stamp) in dated.items():
+    for name, (commit, stamp, field) in dated.items():
         entry = next((e for e in components if e['id'] == name), None)
         paths = [p for p in values(entry, 'modules') if (root / p).exists()] if entry else []
         if commit and paths:
-            asked.append((name, commit, stamp, paths))
+            asked.append((name, commit, stamp, paths, field))
     with ThreadPoolExecutor(8) as pool:  # one git call per entry; no call needs another's answer
         counts = list(pool.map(lambda row: int(git(root, 'rev-list', '--count', f'{row[1]}..HEAD', '--', *row[3],
                                                    check=False) or 0), asked))
-    for (name, commit, stamp, _), count in zip(asked, counts):
+    for (name, commit, stamp, _, field), count in zip(asked, counts):
         if count:
             day = time.strftime('%Y-%m-%d', time.gmtime(stamp))
+            when = 'when it was last marked as reread' if field == 'reread' else 'when its does and verbs were last edited'
             stale.append((-count, [name], f'{name}: {count} commit(s) to its modules since {commit[:7]} ({day}), '
-                                          f'when its does and verbs were last edited'))
+                                          f'{when}'))
     title = 'Descriptions older than their code'
     if not dated:
         title += ' (not computed: the catalog has no git history here)'
@@ -1359,7 +1403,7 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
         for group in cycle_groups(edge for edge, pairs in direct.items() if pairs) if len(group) > 2]))
 
     names, undocumented, public, mains, entry_points = {}, [], {}, set(), set()
-    for path in package:
+    for path in counted:
         _, described, rows, _, _, _ = file_facts(root, path)
         public[path] = rows = top_level(rows)
         if rows and not described:
@@ -1393,7 +1437,7 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
     retired = {e['id'] for e in components if is_retired(e)}
     settled = set()
     for entry in components:
-        for path in package:
+        for path in counted:
             if any(path == d or (d.endswith('/') and path.startswith(d)) for d in values(entry, 'duplicates')):
                 settled.update((entry['id'], other) for other in owners[path])
         settled.update((entry['id'], other) for other in values(entry, 'distinct_from'))
@@ -1425,7 +1469,7 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
 
     large = []
     for entry in components:
-        covered = [p for p in package if covers(entry, p)]
+        covered = [p for p in counted if covers(entry, p)]
         if len(covered) > LARGE:
             count = sum(len(public[p]) for p in covered)
             large.append((-len(covered), [entry['id']],
@@ -1481,7 +1525,7 @@ def review(root: Path, areas: tuple = (), everything: bool = False) -> list[str]
         lines.append('')
     scope = f' for {", ".join(areas)}' if areas else ''
     lines.append(f'review{scope}: {total} lead(s) in {filled} group(s), from {len(components)} component(s) and '
-                 f'{len(package)} module(s); each is a place to look in the code, not a finding')
+                 f'{len(counted)} module(s); each is a place to look in the code, not a finding')
     return lines
 
 
@@ -1614,6 +1658,8 @@ def main(argv: list[str] | None = None) -> int:
             print(coverage_line(args.root, entries))
             print('\n'.join(unassigned))
             if args.write_baseline:
+                if not SETTINGS['allow_baseline']:
+                    raise ValueError('allow_baseline is false: this project keeps no baseline; give each module a component')
                 target = args.root / BASE / 'unassigned-baseline.txt'
                 known = set(target.read_text(encoding='utf-8').split()) if target.is_file() else None
                 added = [p for p in unassigned if known is not None and p not in known]
@@ -1640,7 +1686,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == 'changed':
             return changed(args.root, args.base, args.strict_changed)
         if args.command == 'facts':
-            text = json.dumps(facts(args.root, args.base, args.modules), indent=1, sort_keys=True) + '\n'
+            notes = []
+            text = json.dumps(facts(args.root, args.base, args.modules, notes), indent=1, sort_keys=True) + '\n'
+            for line in notes:  # on standard error: standard output, or the file, holds the document only
+                print(f'note: {line}', file=sys.stderr)
             if args.out:
                 args.out.write_text(text, encoding='utf-8')
             else:
