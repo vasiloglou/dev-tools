@@ -9,7 +9,7 @@ The pool comes from two TOML files of the same shape: the team's, checked in, an
 developer's own, gitignored. Tables merge; a scalar or a list in the developer's file
 replaces the team's. A linked git worktree with no file of its own reads the main
 checkout's. Only coders found on PATH are kept, and with none left the pool is the
-Claude Code coder.
+Claude Code coder when ``claude`` is on PATH, and empty otherwise (read the warnings).
 
     [roles]
     coders = ["codex", "gemini"]     # in preference order

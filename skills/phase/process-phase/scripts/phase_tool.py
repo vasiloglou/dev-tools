@@ -21,7 +21,8 @@ envelope with ``--format json`` or a short human summary with ``--format md`` (d
     phase_tool.py facts --phase NN
 
 Common options: --format json|md, --root DIR.
-Exit codes: 0 ok, 1 domain failure, 2 usage error. ``status`` always exits 0.
+Exit codes: 0 ok, 1 domain failure, 2 usage error or a settings file it cannot use.
+``status`` exits 0 unless the settings file cannot be used.
 """
 
 from __future__ import annotations
@@ -97,17 +98,34 @@ RECEIPT = ".devtools-receipt.json"  # written by the sync; lists every file it d
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
+    """The settings; ValueError with the reason for a file this script cannot use."""
     settings = dict(DEFAULT_SETTINGS)
     if path.is_file():
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            raise ValueError("%s: not valid JSON: %s" % (path, exc))
+        if not isinstance(loaded, dict):
+            raise ValueError("%s: the settings must be a JSON object" % path)
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+            raise ValueError("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
         settings.update(loaded)
+    if settings["skill_check"] not in ("all", "synced"):
+        raise ValueError("%s: skill_check must be all or synced" % path)
+    if not isinstance(settings["shared_files"], list) or not all(isinstance(p, str) and p for p in settings["shared_files"]):
+        raise ValueError("%s: shared_files must be a list of paths" % path)
+    if settings["gated_from"] not in ("context_approved", "tests_approved", "plan_approved"):
+        raise ValueError("%s: gated_from must be context_approved, tests_approved or plan_approved" % path)
     return settings
 
 
-SETTINGS = load_settings()
+# A settings file that cannot be used does not stop the load: the constants below take the defaults,
+# so a caller that only reads this module's tables is not stopped, and main() refuses every command.
+try:
+    SETTINGS, SETTINGS_ERROR = load_settings(), ""
+except ValueError as exc:
+    SETTINGS, SETTINGS_ERROR = dict(DEFAULT_SETTINGS), str(exc)
 PLANNING = SETTINGS["planning_dir"]
 PACKAGE_PREFIX = SETTINGS["package_prefix"] + "." if SETTINGS["package_prefix"] else ""
 
@@ -143,12 +161,6 @@ ARTIFACTS = [
     ("verified", "{nn}-VERIFICATION.md", "{nn}-VERIFICATION.md"),
 ]
 GATED_FROM = SETTINGS["gated_from"]
-if SETTINGS["skill_check"] not in ("all", "synced"):
-    raise SystemExit("%s: skill_check must be all or synced" % SETTINGS_FILE)
-if not isinstance(SETTINGS["shared_files"], list) or not all(isinstance(p, str) and p for p in SETTINGS["shared_files"]):
-    raise SystemExit("%s: shared_files must be a list of paths" % SETTINGS_FILE)
-if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
-    raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
 IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
 IGNORED_SUFFIXES = (".pyc", ".pyo")
 DEC_ID = re.compile(r"^DEC-\d{3}$")
@@ -2028,6 +2040,11 @@ def main(argv=None) -> int:
         or "--format=json" in argv else "md"
     cmd = next((a for a in argv if a in COMMANDS), "usage")
     env = {"ok": True, "tool": "phase_tool." + cmd, "version": VERSION, "data": {}}
+    if SETTINGS_ERROR:  # one envelope, and exit 2 for every command, status too
+        env.update(ok=False, error={"code": "SETTINGS", "message": SETTINGS_ERROR,
+                                    "hint": "fix or remove the settings file"})
+        print(json.dumps(env, indent=2, sort_keys=False) if fmt == "json" else render_md(env))
+        return 2
     code = 0
     try:
         args = build_parser().parse_args(argv)

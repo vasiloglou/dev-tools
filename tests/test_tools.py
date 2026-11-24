@@ -479,7 +479,7 @@ def test_two_plans_of_one_wave_do_not_name_the_same_file(project):
     assert second_plan(folder) == [together + "src/widget/scan.py"], "which excuse nothing else"
     setting(project, shared_files="tests/unit/")
     code, out = tool(project, "check", "--plans", "1")
-    assert code == 1 and "shared_files must be a list of paths" in out
+    assert code == 2 and "shared_files must be a list of paths" in out
 
 
 def test_a_plan_depends_only_on_plans_that_come_before_it(project):
@@ -2298,3 +2298,72 @@ def test_review_labels_an_entry_point_in_a_counted_folder(project, count):
     commit(project)
     rows = section(tool(project, "review", script=INDEX)[1], "Components nothing in the package imports")
     assert ("tools.cli (defines main)" in rows) == count and ("tools.cli" in rows) != count, rows
+
+
+# --- Starter rules where there is no phase tool, and settings files a script cannot use.
+
+PHASE_TOOL = ".claude/skills/process-phase/scripts/phase_tool.py"
+
+
+def test_a_rule_about_plans_is_skipped_where_the_phase_tool_is_not(project):
+    rules_without_examples(project)
+    (project / PHASE_TOOL).unlink()
+    seen = fake_gnd(project, cases={"schema_version": "gnd-guarded-cases/1", "rules": []})
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("skip: %s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py is not here "
+            "(it is judged where the phase tool is installed)\n" % PLAN_RULE) in out
+    assert out.rstrip().endswith("; 1 rule(s) about plans skipped"), out
+    assert rule_ids(json.loads((seen / "synth-model.json").read_text())) == STARTER_IDS, "not given to gnd synth"
+    code, out = tool(project, "test", "--format", "json", script=RULES)
+    assert {"level": "skip", "text": "%s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py "
+            "is not here (it is judged where the phase tool is installed)" % PLAN_RULE} in json.loads(out)["results"]
+
+
+def test_a_rule_that_is_not_about_plans_still_names_only_known_facts(project):
+    layered(project)
+    (project / PHASE_TOOL).unlink()
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    rules["rules"].append({"id": "tasks_are_planned", "level": "should", "type": "guarded",
+                           "antecedent": [{"fact_type": "component_is_listed", "bind": {"component": "$a"}}],
+                           "consequent": {"atom": {"fact_type": "component_is_listed", "bind": {"component": "$a"}}},
+                           "examples": {"fails": {"task_in_plan": [{"task": "01-01-T1", "plan": "01-01"}]}}})
+    path.write_text(json.dumps(rules))
+    fake_gnd(project)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1, out
+    assert "wrong: tasks_are_planned: the failing example 1 names task_in_plan, which no fact type of this project is" in out
+
+
+@pytest.mark.parametrize("script, settings", [
+    (INDEX, INDEX_SETTINGS), (RULES, RULES_SETTINGS), (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"))])
+@pytest.mark.parametrize("text, says", [('{"no_such_setting": 1}', "unknown setting(s): no_such_setting"),
+                                         ("{", "not valid JSON"), ("[]", "the settings must be a JSON object")])
+def test_a_settings_file_the_script_cannot_use_exits_2(project, script, settings, text, says):
+    (project / settings).write_text(text)
+    args = {INDEX: ("--check",), RULES: ("test",), PHASE_TOOL: ("status",)}[script]
+    done = run_index(project, *args, script=script)
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert says in done.stdout + done.stderr and settings.rsplit("/", 1)[1] in done.stdout + done.stderr
+    assert "Traceback" not in done.stderr, done.stderr
+
+
+@pytest.mark.parametrize("args", [("status",), ("check", "--roadmap"), ("roadmap", "list")])
+def test_phase_tool_reports_a_bad_settings_file_in_one_envelope(project, args):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    done = run_index(project, "--format", "json", *args, script=PHASE_TOOL)
+    assert done.returncode == 2, done.stdout + done.stderr
+    envelope = json.loads(done.stdout)  # one JSON object, nothing before or after it
+    assert envelope["ok"] is False and envelope["error"]["code"] == "SETTINGS", envelope
+    assert "phase_tool.settings.json: unknown setting(s): planing_dir" in envelope["error"]["message"]
+    assert envelope["tool"] == "phase_tool." + args[0]
+
+
+def test_the_phase_tool_can_be_loaded_with_a_bad_settings_file(project, monkeypatch):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    monkeypatch.chdir(project)
+    spec = importlib.util.spec_from_file_location("phase_tool_loaded", project / PHASE_TOOL)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # no SystemExit: a caller that reads its fact types is not stopped
+    assert module.FACT_TYPES and "unknown setting(s): planing_dir" in module.SETTINGS_ERROR

@@ -314,4 +314,39 @@ reading of the spec.
 
 ## Implementation findings, recorded as they were found
 
-(None yet.)
+All on 2026-11-23, on the phase's base `a247f4d`.
+
+- **K1. Red first (S0.3).** Before any code, 17 of the new or changed cases failed, each
+  for the reason it names: with dvt-milestone `2 wrong` and exit 1 (with the `gnd synth`
+  note about undeclared fact types the plan's baseline recorded); no `skip:` line;
+  exit 1, not 2, for every settings case, and a traceback for `{` and `[]`; no envelope
+  from `phase_tool.py`; `SystemExit` when loading it. T3 and the dvt-phase case of T1
+  passed before, as pins.
+- **K2. The lint gate caught this phase's own lines.** `ruff` 0.16.2 with the
+  configuration of pull request 34 reported 9 findings over the three scripts and their
+  plugin copies: an implicit string concatenation in a tuple (`ISC004`) in
+  `rules_check.py`, and two `str.format` calls in `handoff.py` (`UP032`). Fixed in the
+  sources and rebuilt; the gate then printed `All checks passed!`. Without P3.6 (plan
+  review r1 F2) these would have reached the projects that lint their synced copies.
+- **K3. The `skip:` line names the phase tool as the settings name it.** In a plugin
+  install that is the absolute path of the plugin's own `phase_tool.py`, as `rules_check.py`
+  computes it (`rules_check.py`, the plugin defaults); in a synced project it is the
+  relative path. Kept: it says where the script looked.
+- **K4. By hand** (P3.5), in scratch projects:
+  - issue 33's three commands: dvt-milestone `rules test: 5 rule(s), 10 example(s); 0
+    wrong; 1 rule(s) about plans skipped`, exit 0; dvt-phase `rules test: 6 rule(s), 12
+    example(s); 0 wrong`, exit 0;
+  - `phase_tool.py --format json status` with an unknown key: one envelope, `"code":
+    "SETTINGS"`, exit 2;
+  - `review_tool.py status .` with an unknown key: `error: …: unknown setting(s): nope`,
+    exit 2;
+  - `coder_pool.py show --json` with `PATH=/usr/bin:/bin`: `pool []`, `effective_tracks
+    0`, the warning `no coder on PATH; ask the user before Implement`, exit 0;
+  - `from_gsd.py` builds only `rev-parse`, `symbolic-ref`, `ls-files` and `check-ignore`.
+- **K5. Index entries.** The notes of `migrate.from_gsd`, `review.rounds` and
+  `phase.state` quoted the wrong docstrings or the old exit; corrected. Six entries whose
+  module changed were read beside this phase's diff and given or updated a `reread:`
+  line: `components.rules`, `components.index`, `review.rounds`, `phase.state`,
+  `phase.coder_pool`, `migrate.from_gsd`. `handoff.notes` was not: it is listed as older
+  than its code for four earlier commits this phase did not read, and a `reread:` line
+  would claim otherwise.

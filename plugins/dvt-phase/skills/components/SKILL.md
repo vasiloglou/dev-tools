@@ -25,8 +25,10 @@ Paths below assume the default settings (`docs_dir` = `docs/components`, script 
 (`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `allow_baseline`,
 `docs_dir`, `script_path`, `verb_list`). `count_extra_dirs` (true or false, default false;
 from plugin 0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a
-project whose code sits in more than one folder. `allow_baseline` (true or false, default
-true; from plugin 0.1.7) set to false is for a project where every module has a component:
+project whose code sits in more than one folder. A settings file the script cannot use (an unknown
+key, a wrong value, text that is not a JSON object) stops it with the reason and exit 2.
+`allow_baseline` (true or false, default true; from plugin 0.1.7) set to false is for a
+project where every module has a component:
 `--check --strict` then fails while `unassigned-baseline.txt` exists, and `stats
 --write-baseline` refuses to write one.
 

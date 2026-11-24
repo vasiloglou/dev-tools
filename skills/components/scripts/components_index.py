@@ -79,19 +79,37 @@ DEFAULT_SETTINGS = {
 }
 
 
+def settings_error(message: str):
+    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
+    that could not run."""
+    print(message, file=sys.stderr)
+    raise SystemExit(2)
+
+
+def read_settings_file(path: Path) -> dict:
+    """The settings a file holds, or `settings_error` when it is not a JSON object."""
+    try:
+        loaded = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        settings_error(f'{path}: not valid JSON: {exc}')
+    if not isinstance(loaded, dict):
+        settings_error(f'{path}: the settings must be a JSON object')
+    return loaded
+
+
 def load_settings(path: Path) -> dict:
     settings = dict(DEFAULT_SETTINGS)
     if path.is_file():
-        loaded = json.loads(path.read_text(encoding='utf-8'))
+        loaded = read_settings_file(path)
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
+            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
         settings.update(loaded)
     if settings['verb_list'] not in {'all', 'shared', 'none'}:
-        raise SystemExit(f'{path}: verb_list must be all, shared or none')
+        settings_error(f'{path}: verb_list must be all, shared or none')
     for key in ('count_extra_dirs', 'allow_baseline'):
         if not isinstance(settings[key], bool):
-            raise SystemExit(f'{path}: {key} must be true or false')
+            settings_error(f'{path}: {key} must be true or false')
     return settings
 
 

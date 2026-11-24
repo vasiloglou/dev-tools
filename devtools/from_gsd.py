@@ -14,7 +14,8 @@ so the phase folders stay as they are. What differs is the format of three files
 missing ones (never overwriting a file that exists) and writes a record of every choice
 it made. The folder of a finished phase is left as it is. In the folder of a phase GSD
 had not finished, GSD's plans, summaries and verification move into a ``gsd/`` folder, so
-that the steps of the new process do not take them for their own. It never calls git.
+that the steps of the new process do not take them for their own. It never calls git to
+change anything: every git command it runs only reads.
 ``skills/move-from-gsd/SKILL.md`` is the guide that uses it. Python 3.11 or newer.
 """
 from __future__ import annotations

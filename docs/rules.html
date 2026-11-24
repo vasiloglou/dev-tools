@@ -208,7 +208,7 @@ rules against main (cf2e89d): 5 rule(s); 0 to fix, 1 warning(s), 2 standing
       <span class="num">Testing a rule</span>
       <h3>A rule that never fires is caught, not trusted</h3>
       <p>A rule that never fires looks exactly like a rule the code obeys. One misspelt word turns a rule that reports two components into one that reports nothing, and a plain check stays green.</p>
-      <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. This works with GND 0.3.0.</p>
+      <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. A rule about plans is left out, with a <code>skip:</code> line, where the phase tool is not installed: its facts come from that tool. This works with GND 0.3.0.</p>
       <p>GND 0.3.1 adds three lines to the ordinary check: a rule whose antecedent matched nothing, a value no fact of its kind can hold, and, when a change edits the rules, what the edit stops reporting on today's code. On 0.3.0 the check works as before.</p>
     </div>
     <div>
