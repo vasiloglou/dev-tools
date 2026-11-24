@@ -433,7 +433,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - members_uses: (none)
 - flow: components.rules -> phase.state -> components.index
 - notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
-- reread: 2026-11-23, issue-sweep phase 2: its members changed (check --base relays a note:; changed and facts --base read a stale base's upstream); the flow and the calls are as described
+- reread: 2026-11-23, issue-sweep phase 3: its members changed (rules_check test skips a rule about plans without the phase tool; a settings file a script cannot use exits 2); the flow and the calls are as described
 
 ### subsystem.phase_status
 - does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
@@ -443,3 +443,4 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - members_uses: (none)
 - flow: phase.state -> phase.coder_pool
 - notes: A run-time call, which the import graph cannot see: for a wave of more than one plan, phase_tool.py runs coder_pool.py show --json as a subprocess, reads effective_tracks and warns when more plans can start at once.
+- reread: 2026-11-23, issue-sweep phase 3: its members changed (a phase_tool.py settings file it cannot use is one envelope, exit 2; coder_pool.py's docstring only); the flow and the call are as described
