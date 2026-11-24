@@ -40,9 +40,6 @@ def problems(root: Path) -> list[str]:
     if run.returncode:
         found.append(f"components_index.py --check --strict exited {run.returncode}")
         found.extend(line for line in (run.stdout + run.stderr).splitlines() if line.strip())
-    if (root / BASELINE).exists():
-        # --check --strict excuses every module a baseline names, so it cannot show there is none.
-        found.append(f"{BASELINE} exists: every module has a component here, so no baseline is kept")
     return found
 
 
@@ -91,12 +88,22 @@ def test_a_module_no_entry_lists_is_named(checkout):
 
 
 def test_a_baseline_is_refused(checkout):
+    # allow_baseline is false here: every module has a component, and the strict check keeps it so.
     path = add_module(checkout)
     assert index(checkout, "write").returncode == 0
-    assert index(checkout, "stats", "--write-baseline").returncode == 0
-    assert (checkout / BASELINE).read_text(encoding="utf-8").split() == [path]
-    assert index(checkout, "--check", "--strict").returncode == 0  # the script excuses the module
-    assert problems(checkout) == [f"{BASELINE} exists: every module has a component here, so no baseline is kept"]
+    (checkout / BASELINE).write_text(path + "\n", encoding="utf-8")
+    assert problems(checkout) == [
+        "components_index.py --check --strict exited 1",
+        f"baseline refused: {BASELINE} exists and allow_baseline is false (give its modules a component, then delete the file)",
+        f"no component: {path} (add it to the modules of an entry in {INDEX}/COMPONENTS.md)"]
+
+
+def test_no_baseline_can_be_written_here(checkout):
+    add_module(checkout)
+    assert index(checkout, "write").returncode == 0
+    run = index(checkout, "stats", "--write-baseline")
+    assert run.returncode == 1 and "allow_baseline is false" in run.stderr, run.stderr
+    assert not (checkout / BASELINE).exists()
 
 
 def test_a_new_module_is_named(checkout):

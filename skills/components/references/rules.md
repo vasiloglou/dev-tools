@@ -20,7 +20,7 @@ no rule.
 |---|---|---|
 | `docs/components/layers.toml` | A rank for each area and the forbidden pairs of areas | By hand |
 | `docs/components/rules.json` | The rules. `init` writes four starter rules | By hand |
-| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` |
+| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` A file the script cannot use (an unknown key, not a JSON object) stops it with exit 2 |
 
 Both files live beside the catalog, in the index script's `docs_dir`; a project that
 moved the catalog finds them there.
@@ -233,8 +233,10 @@ python3 .claude/skills/components/scripts/rules_check.py test
 judges each rule alone on each set. `wrong:` a failing set that does not break the rule, a
 passing set that does, or a set naming a fact type that does not exist. `note:` a passing set
 the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
-`no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
-2 when it could not run. Rules without examples are listed. Every starter rule has one
+`no_import_inside_a_loop`, which reports every import inside a loop. `skip:` a rule about
+plans where the phase tool is not installed: its fact types come from that tool, so it is
+left out here, of what `gnd synth` is given too, and judged where the tool is. Exit 1 on a
+`wrong:`, 2 when it could not run. Rules without examples are listed. Every starter rule has one
 example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs
 0.3.1.
 

@@ -216,13 +216,36 @@ class Problem(Exception):
     """The check could not run."""
 
 
+def settings_error(message: str):
+    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
+    that could not run."""
+    print(message, file=sys.stderr)
+    raise SystemExit(2)
+
+
+def read_settings_file(path: Path) -> dict:
+    """The settings a file holds, or `settings_error` when it is not a JSON object."""
+    try:
+        loaded = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, UnicodeDecodeError, ValueError) as exc:
+        settings_error(f'{path}: not valid JSON: {exc}')
+    if not isinstance(loaded, dict):
+        settings_error(f'{path}: the settings must be a JSON object')
+    return loaded
+
+
 def load_settings(path: Path) -> dict:
     settings = dict(DEFAULT_SETTINGS)
     if path.is_file():
-        loaded = json.loads(path.read_text(encoding='utf-8'))
+        loaded = read_settings_file(path)
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
+            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                settings_error(f'{path}: {key} must be ' + {str: 'a string', bool: 'true or false',
+                                                            int: 'a whole number', list: 'a list of strings'}[kind])
         settings.update(loaded)
     return settings
 
@@ -394,6 +417,9 @@ def read_facts(root: Path, base: str = '', modules: bool = False) -> dict:
                 *(['--modules'] if modules else [])], 'the index script')
     if done.returncode:
         raise Problem(f'{SETTINGS["index_script"]} facts: {(done.stderr or done.stdout).strip()}')
+    for line in done.stderr.splitlines():  # which base the facts are of, when it is not the one asked for
+        if line.startswith('note: '):
+            print(line, file=sys.stderr)
     doc = json.loads(done.stdout)
     if doc.get('format') != 'devtools-facts/1':
         raise Problem(f'{SETTINGS["index_script"]} facts wrote format {doc.get("format")!r}; this script reads devtools-facts/1')
@@ -840,6 +866,14 @@ def test(root: Path, require: bool, as_json: bool) -> int:
     diagnose = '--guarded-diagnostics' in features(gnd)
     types = vocabulary(root)
     results, without, count, typos = [], [], 0, set()
+    if not (root / SETTINGS['phase_script']).is_file():
+        # Their fact types come from the phase tool: judged where it is installed, and left out here.
+        skipped = [rule['id'] for rule in rules if rule.get('about') == 'plans']
+        rules = [rule for rule in rules if rule.get('about') != 'plans']
+        results.extend(('skip', (f'{name}: a rule about plans, and {SETTINGS["phase_script"]} is not here '
+                                 f'(it is judged where the phase tool is installed)')) for name in skipped)
+    else:
+        skipped = []
     for rule in rules:
         sets = example_sets(rule) or []
         if not sets:
@@ -889,7 +923,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
     wrong = sum(level == 'wrong' for level, _ in results)
     summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
-               + (f'; {len(without)} rule(s) without examples' if without else ''))
+               + (f'; {len(without)} rule(s) without examples' if without else '')
+               + (f'; {len(skipped)} rule(s) about plans skipped' if skipped else ''))
     if as_json:
         print(json.dumps({'results': [{'level': level, 'text': text} for level, text in results],
                           'without_examples': without, 'summary': summary}, indent=1))

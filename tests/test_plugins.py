@@ -185,3 +185,21 @@ def test_every_skill_a_project_syncs_is_in_its_workflows_plugin(example, plugin)
     assert synced
     assert synced <= set(build_plugins.PLUGINS[plugin]["skills"].values()), synced - set(
         build_plugins.PLUGINS[plugin]["skills"].values())
+
+
+@pytest.mark.skipif(not (shutil.which("gnd") or __import__("os").environ.get("GND_COMMAND")),
+                    reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
+@pytest.mark.parametrize("plugin", PLUGINS)
+def test_starter_rules_pass_their_own_test_in_each_plugin(installed, plugin):
+    copy, project = installed(plugin)
+    (project / "src/app").mkdir(parents=True)
+    (project / "src/app/__init__.py").write_text('"""App."""\n')
+    gnd = __import__("os").environ.get("GND_COMMAND") or shutil.which("gnd")
+    (project / ".devtools/rules_check.settings.json").write_text(json.dumps({"gnd_command": gnd}))
+    scripts = copy / "skills/components/scripts"
+    assert run(project, scripts / "components_index.py", "init").returncode == 0
+    assert run(project, scripts / "rules_check.py", "init").returncode == 0
+    done = run(project, scripts / "rules_check.py", "test")
+    assert done.returncode == 0 and " 0 wrong" in done.stdout, done.stdout + done.stderr
+    skipped = "skip: plan_names_the_components_it_touches: a rule about plans"
+    assert (skipped in done.stdout) == (plugin == "dvt-milestone"), done.stdout

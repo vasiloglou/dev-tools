@@ -364,7 +364,13 @@ def test_settings_choose_the_model_and_an_unknown_setting_is_an_error(project):
     assert "-o reviews/plan-r1/review.md 'Read reviews/plan-r1/BRIEF.md and follow it.'" in out
     settings.write_text(json.dumps({"reviewr": "codex"}))
     code, out = review(project, "run", "reviews/plan-r1", "--dry-run")
-    assert code == 1 and "unknown setting(s): reviewr" in out
+    assert code == 2 and "unknown setting(s): reviewr" in out, "a settings file it cannot use: the command could not run"
+    settings.write_text("{")
+    code, out = review(project, "status", "reviews")
+    assert code == 2 and "review_tool.settings.json: not valid JSON" in out and "Traceback" not in out, out
+    settings.write_text(json.dumps({"codex_model": 7}))
+    code, out = review(project, "status", "reviews")
+    assert code == 2 and "codex_model must be a string" in out and "Traceback" not in out, out
 
 
 # Regression tests for the findings of the first review of this helper (F1 to F6).

@@ -6,5 +6,6 @@
   ],
   "count_extra_dirs": true,
   "docs_dir": ".devtools/components",
-  "script_path": "plugins/dvt-milestone/skills/components/scripts/components_index.py"
+  "script_path": "plugins/dvt-milestone/skills/components/scripts/components_index.py",
+  "allow_baseline": false
 }

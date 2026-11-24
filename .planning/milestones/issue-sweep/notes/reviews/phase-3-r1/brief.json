@@ -1,0 +1,161 @@
+{
+  "base": "a247f4d",
+  "claims": [
+    "P3.1. In a new project, rules_check.py init then test exits 0 and prints 0 wrong with the copy of either plugin; with dvt-milestone's it prints one skip: line naming the rule about plans.",
+    "P3.2. A rule that names a fact type nobody has and is not about plans is still wrong, with or without the phase tool.",
+    "P3.3. With the phase tool present, rules_check.py test prints and exits exactly as before this diff, and gnd synth is given the same rules.",
+    "P3.4. A settings file that rules_check.py, components_index.py, review_tool.py or handoff.py cannot use, for any command, exits 2 with the reason on standard error and no traceback; a working settings file changes nothing.",
+    "P3.4b. phase_tool.py with such a file prints exactly one envelope with ok false and error code SETTINGS, exit 2, for every command including status, and the module can still be loaded by a caller that reads its tables.",
+    "P3.5. Each changed docstring sentence says what the code does.",
+    "P3.6. rules_check.py, review_tool.py and handoff.py and their copies under plugins/ have no finding under ruff 0.16.2 with the configuration pull request 34 names.",
+    "coder_pool.py is left at exit 1 for a settings file, and the spec's reason for that (D1) is true of its code and docstring."
+  ],
+  "created": "2026-11-24T00:41:14.125110+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/issue-sweep/notes/reviews/phase-3-r1/diff.patch",
+      "sha256": "a18f64b4cc2c0a01d567b7b6ab1fd91bc8a927ee2bc808d3c30f26e2908bb658"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "7a1192f316ac3663cd1238046cc2de3b244ab5a96ff9a0935427f76a601ba805"
+    },
+    {
+      "path": ".devtools/components/modules/_root.md",
+      "sha256": "fbebb4ca441f4e8548a615fd9426fdcae3ecf2ff0366ffb0a52ca899ee889664"
+    },
+    {
+      "path": ".devtools/components/modules/skills.md",
+      "sha256": "5388364738e740bf67bc23c5613e7e8233cd024d462ff5c76958ee97e4c95867"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/phase-3-spec.md",
+      "sha256": "8b62d2e510f0ce2b0b2e4c585030229f8d71686978a033fb136b5979a7f015b3"
+    },
+    {
+      "path": "devtools/from_gsd.py",
+      "sha256": "fcb719f18739b87ab41b2b88478bf75db98c4e57347073849896facdb7ebc2cb"
+    },
+    {
+      "path": "docs/rules.html",
+      "sha256": "a9c7d68d9747f5543b7959c177384f1f027dcc54803f1a20a7905a34767a9069"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/SKILL.md",
+      "sha256": "5e9816ec30b83458eb145d4efceace78ab122e1309b9d9321b0cefd69a6a4c6c"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/references/rules.md",
+      "sha256": "6821b54cb1c189cd3ae95c0678f4531dee186fb06b47fe782234a9490fc82efb"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/components_index.py",
+      "sha256": "5419276cad7033df23a600b10e236edd488e3c4d55b80309622584c4a24f51e7"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/rules_check.py",
+      "sha256": "141c8d6dffb3e12910aa6a698821db11c6c78f1e203f2d3c2bd878a6552c1396"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "7779a0c7ab109a1856b643f85b4d28840c0732957951f356b542ec731787a9a2"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/process-phase/scripts/review_tool.py",
+      "sha256": "5fade2fcb3ce3b7ba4089c8e0ef038829c6c7fca078e5a061170fee6b3cbe4c5"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/SKILL.md",
+      "sha256": "801608a3fedb56830e6213f3b6cab70bbd7a5346d5b50d847c3806bff8b51fa8"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/references/rules.md",
+      "sha256": "6821b54cb1c189cd3ae95c0678f4531dee186fb06b47fe782234a9490fc82efb"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/components_index.py",
+      "sha256": "5419276cad7033df23a600b10e236edd488e3c4d55b80309622584c4a24f51e7"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/rules_check.py",
+      "sha256": "141c8d6dffb3e12910aa6a698821db11c6c78f1e203f2d3c2bd878a6552c1396"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py",
+      "sha256": "7779a0c7ab109a1856b643f85b4d28840c0732957951f356b542ec731787a9a2"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/process-phase/scripts/coder_pool.py",
+      "sha256": "3f23de0f51ca2d96df305c550c50ff839ab93b48fb1a46611bf6183abd99f585"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/process-phase/scripts/phase_tool.py",
+      "sha256": "7714ffc3c3bddc7e95b60204f55ea354f745d415efb8523610b19bfb1efae10a"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "a973c10a32f2a83ff88096a1d2bdd5882db39bf17a034d58784ba044fe25dbcc"
+    },
+    {
+      "path": "skills/components/references/rules.md",
+      "sha256": "ef9f5fbc1a5334f27ac06c9c65cb151b70e2cf9c2b9c9e404c691777deaade3d"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "5419276cad7033df23a600b10e236edd488e3c4d55b80309622584c4a24f51e7"
+    },
+    {
+      "path": "skills/components/scripts/rules_check.py",
+      "sha256": "141c8d6dffb3e12910aa6a698821db11c6c78f1e203f2d3c2bd878a6552c1396"
+    },
+    {
+      "path": "skills/dev-handoff/scripts/handoff.py",
+      "sha256": "7779a0c7ab109a1856b643f85b4d28840c0732957951f356b542ec731787a9a2"
+    },
+    {
+      "path": "skills/milestone/process-phase/scripts/review_tool.py",
+      "sha256": "5fade2fcb3ce3b7ba4089c8e0ef038829c6c7fca078e5a061170fee6b3cbe4c5"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/coder_pool.py",
+      "sha256": "3f23de0f51ca2d96df305c550c50ff839ab93b48fb1a46611bf6183abd99f585"
+    },
+    {
+      "path": "skills/phase/process-phase/scripts/phase_tool.py",
+      "sha256": "7714ffc3c3bddc7e95b60204f55ea354f745d415efb8523610b19bfb1efae10a"
+    },
+    {
+      "path": "tests/test_handoff.py",
+      "sha256": "2dab9b61a1d8c8447fcf9453ef06a90551e669fb0554b2d5947e71d4b199ff84"
+    },
+    {
+      "path": "tests/test_plugins.py",
+      "sha256": "e2e0ba102658956ca00137be472d44d07f130801e1a68a4760604c3d2740a936"
+    },
+    {
+      "path": "tests/test_review_tool.py",
+      "sha256": "c061ad86eee63048d58e8e412b6b5402451411e2b7b1c06f46a81d8c8fd2475c"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "1f17a02ab780c0f227abe1fbe097a527d8422f155afa4482f8db307c4ce115f5"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issue-sweep-plan.md",
+      "sha256": "309c6e556ac85f24e71f3c63f79356421392e570cdf143472b02f1acd90481a4"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issues-2026-11-23.md",
+      "sha256": "7584fec3d861c1113450fa58207fbc671f1ad9e77f2db673d6b1df1f575dc84c"
+    }
+  ],
+  "head": "6c2ada571c8a901319eb01e200c805065f7dbf56",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this diff do what the phase 3 spec says for issues 33 and 43, does a working settings file see the lines and exits it saw before, and can each new test fail when the behaviour it names is wrong?",
+  "subject": "phase",
+  "version": 1
+}

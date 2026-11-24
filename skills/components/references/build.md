@@ -122,7 +122,9 @@ python3 scripts/components_index.py stats --write-baseline
 This records the modules still without a component in
 `docs/components/unassigned-baseline.txt`. From then on `--check --strict` accepts those
 and rejects any new one, and the list is only allowed to shrink. Tell the user how many
-are in it and which folders they are in.
+are in it and which folders they are in. Once the last module has a component, delete the
+file and set `allow_baseline` to false, so the strict check refuses a baseline from then
+on.
 
 ## 6. Add the end-to-end flows
 

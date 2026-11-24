@@ -42,7 +42,8 @@ ledger) and posts it only with ``--yes``, which the owner's approval supplies.
 before they are committed, and says so at the top of ``review.md``.
 
 Exit codes: 0 ok, 1 a check found something (a changed file, an unfinished ledger, a
-failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git).
+failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git, a
+settings file it cannot use).
 
 Settings live beside this script, in review_tool.settings.json; when the script runs from a
 plugin install, in the project's .devtools/review_tool.settings.json.
@@ -145,15 +146,26 @@ class Stop(Exception):
 
 
 def load_settings(path: Path = SETTINGS_FILE) -> dict:
+    """The settings, or `Stop` (exit 2: the command could not run) for a file this script cannot use."""
     settings = dict(DEFAULT_SETTINGS)
     if path.is_file():
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            raise Stop(f"{path}: not valid JSON: {exc}")
+        if not isinstance(loaded, dict):
+            raise Stop(f"{path}: the settings must be a JSON object")
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+            raise Stop("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                raise Stop(f"{path}: {key} must be " + {str: "a string", bool: "true or false", int: "a whole number",
+                                                          list: "a list of strings"}[kind])
         settings.update(loaded)
     if settings["reviewer"] not in ("auto", "codex", "claude"):
-        raise SystemExit(f"{path}: reviewer must be auto, codex or claude")
+        raise Stop(f"{path}: reviewer must be auto, codex or claude")
     return settings
 
 

@@ -1,0 +1,511 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index 1b84ac5..4766f3d 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -298,7 +298,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - uses: (none)
+ - used_by: (none)
+ - tests: tests/test_sync.py
+-- duplicates: devtools/from_gsd.py
++- distinct_from: migrate.from_gsd
+ - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed, 5 check --strict with something to report (milestone sync-reports). unit_report returns the rows and report_lines prints them; the receipt's shipped list is what makes a unit new. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
+ 
+ ### migrate.from_gsd
+@@ -310,7 +310,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - used_by: (none)
+ - tests: tests/test_from_gsd.py
+ - distinct_from: plugins.release, plugins.build
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins.
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins. Loads sync.py by path for its list of other planning tools (OTHER_PLANS, other_plans); the index cannot see that load.
+ 
+ ## The component index
+ 
+@@ -400,7 +400,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - modules: skills/phase/pytest/phase_selection.py
+ - uses: (none)
+ - used_by: (none)
+-- notes: No test in tests/ runs it (REVIEW.md).
++- tests: tests/test_tools.py, tests/test_phase_selection.py
++- notes: tests/test_tools.py runs it as the sync delivers it (test_plain_pytest_leaves_out_phases_that_are_not_complete); tests/test_phase_selection.py holds its other branches.
+ 
+ ## Where one script runs another
+ 
+diff --git a/.devtools/components/modules/_root.md b/.devtools/components/modules/_root.md
+index ebd58f6..518417b 100644
+--- a/.devtools/components/modules/_root.md
++++ b/.devtools/components/modules/_root.md
+@@ -23,54 +23,54 @@ Move a project's planning folder from GSD to the dev-tools phase workflow.
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `Stop` | class(Exception) | 71 | The project cannot be converted as it stands; the message says what to do. |
+-| `norm(value) -> str` | function | 75 | (no docstring) |
+-| `key(nn) -> tuple` | function | 80 | (no docstring) |
+-| `shown(nn) -> str` | function | 85 | The id as a roadmap heading writes it: 7, 7.1. |
+-| `read(path) -> str` | function | 91 | (no docstring) |
+-| `frontmatter(text) -> dict` | function | 95 | (no docstring) |
+-| `plain(text) -> str` | function | 107 | (no docstring) |
+-| `slugify(text) -> str` | function | 112 | (no docstring) |
+-| `cell(text) -> str` | function | 116 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
+-| `sections(text, level) -> dict` | function | 121 | {heading: body} for the headings of one level, in order. |
+-| `parked(text, section) -> str` | function | 136 | The word by which a line says its phase is put off, or ''. |
+-| `phase_numbers(text) -> list` | function | 147 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
+-| `dependencies(text) -> tuple` | function | 163 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
+-| `same_phase(one, other) -> bool` | function | 179 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
+-| `runs(found) -> list` | function | 188 | Split phases in file order into numbering runs: a run ends where a number comes back |
+-| `one_run(groups) -> dict` | function | 201 | Every run read as one: the owner said the repeated numbers are the same phases. |
+-| `read_roadmap(text) -> tuple` | function | 212 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
+-| `read_folders(planning) -> tuple` | function | 261 | (no docstring) |
+-| `left_by_gsd(folder) -> str` | function | 287 | What GSD had done on a phase it did not finish, in words. |
+-| `read_requirements(planning) -> dict` | function | 298 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
+-| `out_of_scope(text) -> list` | function | 330 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
+-| `named_ids(text, defined) -> list` | function | 344 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
+-| `row_cells(line) -> list` | function | 366 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
+-| `read_decisions(section) -> list` | function | 386 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
+-| `read_project(planning, fallback) -> dict` | function | 409 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
+-| `git(project, *args) -> str` | function | 428 | (no docstring) |
+-| `tool_folders(project) -> list` | function | 436 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
+-| `gsd_entries(text) -> tuple` | function | 450 | (calls, permissions) in a settings file: the strings that name GSD outside its |
+-| `hook_files(project) -> list` | function | 473 | Settings files that still name GSD: its hooks and status line are wired there, and the |
+-| `other_plans(project) -> list` | function | 489 | Other planning tools whose files are in the project. The move does not read them. |
+-| `gsd_pointer(state, text) -> str` | function | 499 | The phase GSD's STATE.md names as the current one, or ''. |
+-| `installed(project) -> list` | function | 506 | GSD's own files inside the project, one entry per tool folder that has any. |
+-| `default_branch(project) -> tuple` | function | 531 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
+-| `plan_ignored(project, planning_dir)` | function | 547 | True when git would ignore a file the move writes; None outside a git work tree. |
+-| `read_workstreams(root) -> dict` | function | 559 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
+-| `code_summary(project, planning_dir)` | function | 577 | What the project is written in, from the files git tracks; None outside a git work tree. |
+-| `map_ids(names) -> dict` | function | 598 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
+-| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 621 | (no docstring) |
+-| `roadmap_text(model) -> str` | function | 932 | (no docstring) |
+-| `requirements_text(model) -> str` | function | 986 | (no docstring) |
+-| `state_text(model, base, release, today) -> str` | function | 1027 | (no docstring) |
+-| `decisions_text(model, owner, today) -> str` | function | 1064 | (no docstring) |
+-| `manifesto_text(model, template) -> str` | function | 1086 | (no docstring) |
+-| `readme_text(model, template) -> str` | function | 1098 | (no docstring) |
+-| `record_text(model, written, kept, merged, today) -> str` | function | 1115 | (no docstring) |
+-| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1165 | (no docstring) |
+-| `survey_lines(model) -> list` | function | 1254 | (no docstring) |
+-| `main(argv) -> int` | function | 1351 | (no docstring) |
++| `Stop` | class(Exception) | 73 | The project cannot be converted as it stands; the message says what to do. |
++| `norm(value) -> str` | function | 77 | (no docstring) |
++| `key(nn) -> tuple` | function | 82 | (no docstring) |
++| `shown(nn) -> str` | function | 87 | The id as a roadmap heading writes it: 7, 7.1. |
++| `read(path) -> str` | function | 93 | (no docstring) |
++| `frontmatter(text) -> dict` | function | 97 | (no docstring) |
++| `plain(text) -> str` | function | 109 | (no docstring) |
++| `slugify(text) -> str` | function | 114 | (no docstring) |
++| `cell(text) -> str` | function | 118 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
++| `sections(text, level) -> dict` | function | 123 | {heading: body} for the headings of one level, in order. |
++| `parked(text, section) -> str` | function | 138 | The word by which a line says its phase is put off, or ''. |
++| `phase_numbers(text) -> list` | function | 149 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
++| `dependencies(text) -> tuple` | function | 165 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
++| `same_phase(one, other) -> bool` | function | 181 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
++| `runs(found) -> list` | function | 190 | Split phases in file order into numbering runs: a run ends where a number comes back |
++| `one_run(groups) -> dict` | function | 203 | Every run read as one: the owner said the repeated numbers are the same phases. |
++| `read_roadmap(text) -> tuple` | function | 214 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
++| `read_folders(planning) -> tuple` | function | 263 | (no docstring) |
++| `left_by_gsd(folder) -> str` | function | 289 | What GSD had done on a phase it did not finish, in words. |
++| `read_requirements(planning) -> dict` | function | 300 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
++| `out_of_scope(text) -> list` | function | 332 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
++| `named_ids(text, defined) -> list` | function | 346 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
++| `row_cells(line) -> list` | function | 368 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
++| `read_decisions(section) -> list` | function | 388 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
++| `read_project(planning, fallback) -> dict` | function | 411 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
++| `git(project, *args) -> str` | function | 430 | (no docstring) |
++| `tool_folders(project) -> list` | function | 438 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
++| `gsd_entries(text) -> tuple` | function | 452 | (calls, permissions) in a settings file: the strings that name GSD outside its |
++| `hook_files(project) -> list` | function | 475 | Settings files that still name GSD: its hooks and status line are wired there, and the |
++| `other_plans(project) -> list` | function | 491 | Other planning tools whose files are in the project. The move does not read them. |
++| `gsd_pointer(state, text) -> str` | function | 496 | The phase GSD's STATE.md names as the current one, or ''. |
++| `installed(project) -> list` | function | 503 | GSD's own files inside the project, one entry per tool folder that has any. |
++| `default_branch(project) -> tuple` | function | 528 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
++| `plan_ignored(project, planning_dir)` | function | 544 | True when git would ignore a file the move writes; None outside a git work tree. |
++| `read_workstreams(root) -> dict` | function | 556 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
++| `code_summary(project, planning_dir)` | function | 574 | What the project is written in, from the files git tracks; None outside a git work tree. |
++| `map_ids(names) -> dict` | function | 595 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
++| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 618 | (no docstring) |
++| `roadmap_text(model) -> str` | function | 929 | (no docstring) |
++| `requirements_text(model) -> str` | function | 983 | (no docstring) |
++| `state_text(model, base, release, today) -> str` | function | 1024 | (no docstring) |
++| `decisions_text(model, owner, today) -> str` | function | 1061 | (no docstring) |
++| `manifesto_text(model, template) -> str` | function | 1083 | (no docstring) |
++| `readme_text(model, template) -> str` | function | 1095 | (no docstring) |
++| `record_text(model, written, kept, merged, today) -> str` | function | 1112 | (no docstring) |
++| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1162 | (no docstring) |
++| `survey_lines(model) -> list` | function | 1251 | (no docstring) |
++| `main(argv) -> int` | function | 1348 | (no docstring) |
+ 
+ ## devtools.release_plugins — `devtools/release_plugins.py`
+ Components: plugins.release
+diff --git a/.planning/milestones/issue-sweep/notes/phase-1-spec.md b/.planning/milestones/issue-sweep/notes/phase-1-spec.md
+index 5014bcf..3454686 100644
+--- a/.planning/milestones/issue-sweep/notes/phase-1-spec.md
++++ b/.planning/milestones/issue-sweep/notes/phase-1-spec.md
+@@ -385,4 +385,59 @@ names it for this phase, so it runs.
+ 
+ ## Implementation findings, recorded as they were found
+ 
+-(None yet.)
++All on 2026-11-23, at the phase's base `dd0e7a1` unless said.
++
++- **I1. T1 and T2 cannot use the starter rules as they are.** The stand-in for `gnd`
++  prints one prepared report and judges nothing, so with the starter rules' examples in
++  place `rules_check.py test` calls every failing example `wrong` and exits 1, whatever
++  `synth` does. The spec's T1 and T2 expected exit 0. The tests take the examples out of
++  the rules first (`rules_without_examples`), as the existing test of generated cases
++  does (`tests/test_tools.py`, the `rule.pop("examples")` loop). The spec's expectation
++  was wrong about the fixture, not about the guard; section 8's rows are otherwise as
++  written.
++- **I2. The by-hand command of D4 did not test what it claimed.** `uvx --from
++  get-nick-done==0.4.0 gnd` reuses the environment of the GND that `uv tool install`
++  put on this machine, extra included: 22 tests passed and none was skipped, and
++  `find_spec("faker")` was true there. With `uvx --isolated` the extra is absent
++  (`faker` not found). The gate was rerun as
++  `GND_COMMAND="uvx -q --isolated --from get-nick-done==0.4.0 gnd"`. The first run would
++  have been read as "the guard never fires" by anyone who had not checked the control.
++- **I3. Issue 31 is reproduced.** With that isolated GND, in a scratch worktree at
++  `dd0e7a1`: `test_suggestions_and_generated_cases_with_newer_gnd` exits 1,
++  `1 failed`, with the note `gnd synth --guarded-cases built no cases (exit 5): ERROR:
++  the synthetic-value generator needs the optional 'synth' extra. Install it with
++  \`pip install get-nick-done[synth]\`, or \`uv sync --extra synth\` in a checkout.`
++  On the changed tree the same command prints `SKIPPED [1] tests/test_tools.py:1358:
++  this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'` and
++  `1 skipped`. The plan's Q2 is answered: GND's sentence is as the issue quotes it, with
++  an install hint after it, and the guard matches it.
++- **I4. The plugin has no defect the new tests can show.** `tests/test_phase_selection.py`
++  (9 functions, 15 cases) passed on the unchanged plugin on its first complete run, so D3
++  does not apply and no plugin file changes. B8, B10 to B12 and B14 to B18, which the
++  spec listed as not tried, behave as the docstring says.
++- **I5. Seen to fail (S0.3).**
++  - T1, T2 and the edited T3, before the guard and the fake's refusal existed: 6 failed,
++    5 with `TypeError: fake_gnd() got an unexpected keyword argument 'synth_exit'` and 1
++    with `NameError: name 'skip_without_synth_extra' is not defined`.
++  - G1, before `from_gsd.py` changed: `AttributeError: module 'from_gsd' has no
++    attribute 'sync'`. G2 passed, as a pin does.
++  - The plugin's tests, against ten scratch copies of the plugin with one line changed
++    each (`PHASE_SELECTION_PLUGIN`), where the spec planned five. Failed cases of 15:
++
++    | Break | Failed | Among them |
++    |---|---|---|
++    | open phases kept in a plain run | 8 | S1, S3, S5, S6, S7, S8, S9 |
++    | `--phase` ignored | 6 | S2 (all three), S3 |
++    | named paths ignored | 4 | S4 (all four) |
++    | the "inside the acceptance folder" filter dropped | 11 | S5, S1, S2 |
++    | no phase ever complete | 6 | S1, S3, S9 |
++    | the `.1` of an inserted phase lost | 2 | S3, S9 |
++    | `phase_planning_dir` ignored | 1 | S7 |
++    | `--phase` not normalised | 4 | S2 with `2` |
++    | `phase_acceptance_dir` ignored | 1 | S7 |
++    | no plugin at all | 12 | S8 and most others |
++
++    No break left every case passing. The copies were not committed.
++- **I6. `review` after the index edits** prints 0 for "Components with no tests listed"
++  and for "The same public name in two or three components", as the spec's section 6.4
++  expected: `distinct_from` settles what `duplicates` did.
+diff --git a/devtools/from_gsd.py b/devtools/from_gsd.py
+index 83289e5..d6e8e67 100644
+--- a/devtools/from_gsd.py
++++ b/devtools/from_gsd.py
+@@ -21,6 +21,7 @@ from __future__ import annotations
+ 
+ import argparse
+ import datetime
++import importlib.util
+ import json
+ import re
+ import shutil
+@@ -42,10 +43,11 @@ INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"]
+ # Folders at the top of a project that are never a coding tool's own.
+ NOT_A_TOOL = {".git", ".planning", ".venv", ".tox", ".idea", ".vscode", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
+ HOOK_FILES = ["settings.json", "settings.local.json", "hooks.json"]
+-# Signs of a plan kept by another tool: (what to look for, the tool).
+-OTHER_PLANS = [(".specify", "Spec Kit"), ("specs/*/spec.md", "Spec Kit"), ("openspec", "OpenSpec"),
+-               (".kiro/specs", "Kiro"), (".bmad-core", "BMAD"), ("bmad", "BMAD"), (".taskmaster", "Task Master"),
+-               (".agent-os", "Agent OS")]
++# The signs of a plan kept by another tool are sync.py's (OTHER_PLANS): one list, read by both scripts.
++# Loaded by path, as release_plugins.py loads build_plugins.py: these scripts are run from a checkout.
++_SYNC = importlib.util.spec_from_file_location("sync", Path(__file__).resolve().with_name("sync.py"))
++sync = importlib.util.module_from_spec(_SYNC)
++_SYNC.loader.exec_module(sync)
+ 
+ HEAD = re.compile(r"^(#{2,4})\s+(?:[^\w\s]+\s+)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\s*$")
+ ITEM = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(\*\*)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+)$")
+@@ -488,12 +490,7 @@ def hook_files(project: Path) -> list:
+ 
+ def other_plans(project: Path) -> list:
+     """Other planning tools whose files are in the project. The move does not read them."""
+-    found = {}
+-    for pattern, tool in OTHER_PLANS:
+-        hit = next(iter(sorted(project.glob(pattern))), None)
+-        if hit is not None:
+-            found.setdefault(tool, hit.relative_to(project).as_posix() + ("/" if hit.is_dir() else ""))
+-    return [{"tool": tool, "sign": sign} for tool, sign in found.items()]
++    return [{"tool": tool, "sign": sign} for sign, tool in sync.other_plans(project)]
+ 
+ 
+ def gsd_pointer(state: dict, text: str) -> str:
+diff --git a/tests/test_from_gsd.py b/tests/test_from_gsd.py
+index 4136ffe..a35e975 100644
+--- a/tests/test_from_gsd.py
++++ b/tests/test_from_gsd.py
+@@ -791,3 +791,21 @@ def test_a_plan_of_another_tool_is_named_and_not_sent_to_setup(tmp_path):
+     assert "Spec Kit keeps a plan here (.specify/)" in out and "phase_tool.py setup" not in out
+     write(tmp_path / "bare", ".planning/notes.txt", "x")
+     assert "starts with 'phase_tool.py setup'" in run("survey", "--project", str(tmp_path / "bare"))[1]
++
++
++def test_one_list_of_other_planning_tools_serves_both_scripts(project, monkeypatch):
++    # from_gsd.py holds no list of its own: it reads the one in the sync.py it loads.
++    monkeypatch.setattr(gsd.sync, "OTHER_PLANS", [(".newtool", "New Tool")])
++    (project / ".newtool").mkdir()
++    (project / ".specify").mkdir()
++    assert gsd.other_plans(project) == [{"tool": "New Tool", "sign": ".newtool/"}]
++    assert gsd.sync.other_plans(project) == [(".newtool/", "New Tool")]
++
++
++def test_other_plans_keeps_its_rows_and_their_order(project):
++    for folder in (".taskmaster", "openspec", "specs/a", ".specify"):
++        (project / folder).mkdir(parents=True)
++    (project / "specs/a/spec.md").write_text("# Spec\n")
++    assert gsd.other_plans(project) == [{"tool": "Spec Kit", "sign": ".specify/"},
++                                        {"tool": "OpenSpec", "sign": "openspec/"},
++                                        {"tool": "Task Master", "sign": ".taskmaster/"}]
+diff --git a/tests/test_phase_selection.py b/tests/test_phase_selection.py
+new file mode 100644
+index 0000000..91d63d8
+--- /dev/null
++++ b/tests/test_phase_selection.py
+@@ -0,0 +1,120 @@
++"""Tests for the pytest plugin that selects acceptance tests by phase
++(skills/phase/pytest/phase_selection.py). Each test makes a small project with the plugin as its
++conftest.py, runs pytest there as a project would, and checks which tests were kept.
++
++tests/test_tools.py has one more test of the plugin, as the sync delivers it
++(test_plain_pytest_leaves_out_phases_that_are_not_complete); this file holds its other branches.
++"""
++import os
++import re
++import subprocess
++import sys
++from pathlib import Path
++
++import pytest
++
++ROOT = Path(__file__).resolve().parents[1]
++# PHASE_SELECTION_PLUGIN names another copy of the plugin. It is for one check only: showing that these
++# tests fail on a copy with a line broken.
++PLUGIN = Path(os.environ.get("PHASE_SELECTION_PLUGIN") or ROOT / "skills/phase/pytest/phase_selection.py")
++TESTS = {"tests/acceptance/p01_done/test_done.py": "test_done",
++         "tests/acceptance/p02_open/test_open.py": "test_open",
++         "tests/acceptance/p06_1_inserted/test_inserted.py": "test_inserted",
++         "tests/unit/test_unit.py": "test_unit"}
++
++
++class Project:
++    """A project with a complete phase 1, an open phase 2, an inserted phase 6.1 that is open, and a unit test."""
++
++    def __init__(self, root: Path):
++        self.root = root
++        self.write("conftest.py", PLUGIN.read_text())
++        for path, name in TESTS.items():
++            self.write(path, "def %s():\n    assert True\n" % name)
++        self.complete("1")
++
++    def write(self, path: str, text: str) -> None:
++        target = self.root / path
++        target.parent.mkdir(parents=True, exist_ok=True)
++        target.write_text(text)
++
++    def complete(self, phases: str, planning: str = ".planning") -> None:
++        self.write(planning + "/STATE.md", "current_phase: 2\ncompleted_phases: %s\n" % phases)
++
++    def pytest(self, *args: str) -> subprocess.CompletedProcess:
++        env = {key: value for key, value in os.environ.items() if key != "PYTEST_ADDOPTS"}
++        return subprocess.run([sys.executable, "-m", "pytest", "-p", "no:cacheprovider", *args],
++                              cwd=self.root, capture_output=True, text=True, env=env)
++
++    def kept(self, *args: str) -> set:
++        """The names of the tests pytest would run: with --collect-only it lists a test only when the plugin kept it."""
++        done = self.pytest("--collect-only", "-q", *args)
++        assert done.returncode in (0, 5), done.stdout + done.stderr  # 5: nothing was collected
++        return {line.rsplit("::", 1)[1] for line in done.stdout.splitlines() if "::" in line}
++
++
++@pytest.fixture
++def selection(tmp_path):
++    return Project(tmp_path / "widget")
++
++
++def test_plain_pytest_leaves_out_the_phases_that_are_not_complete(selection):
++    assert selection.kept() == {"test_done", "test_unit"}
++
++
++@pytest.mark.parametrize("phase, expected", [("02", {"test_open"}), ("2", {"test_open"}), ("01", {"test_done"})])
++def test_phase_option_runs_that_phase_only(selection, phase, expected):
++    assert selection.kept("--phase", phase) == expected, "complete or not, and nothing outside the acceptance folder"
++
++
++def test_an_inserted_phase(selection):
++    assert selection.kept("--phase", "6.1") == {"test_inserted"}
++    selection.complete("01, 6.1")
++    assert selection.kept() == {"test_done", "test_inserted", "test_unit"}
++
++
++@pytest.mark.parametrize("args", [
++    ("tests/acceptance/p02_open/test_open.py",),
++    ("tests/acceptance/p02_open",),
++    ("tests/acceptance/p02_open/test_open.py::test_open",),
++    ("tests/acceptance/p02_open/test_open.py", "--phase", "01"),
++])
++def test_a_named_acceptance_path_always_runs(selection, args):
++    assert selection.kept(*args) == {"test_open"}, "its phase is not complete, and --phase names another"
++
++
++def test_naming_the_acceptance_folder_itself_keeps_the_selection(selection):
++    assert selection.kept("tests/acceptance") == {"test_done"}
++
++
++@pytest.mark.parametrize("state", [None, "current_phase: 2\n"])
++def test_no_state_means_no_phase_is_complete(selection, state):
++    path = selection.root / ".planning/STATE.md"
++    path.unlink() if state is None else path.write_text(state)
++    assert selection.kept() == {"test_unit"}
++
++
++def test_the_two_folders_can_be_configured(selection):
++    (selection.root / "pytest.ini").write_text("[pytest]\nphase_planning_dir = plan\nphase_acceptance_dir = checks\n")
++    (selection.root / "tests/acceptance").rename(selection.root / "checks")
++    (selection.root / ".planning/STATE.md").unlink()
++    selection.complete("1", planning="plan")
++    assert selection.kept() == {"test_done", "test_unit"}
++    assert selection.kept("--phase", "2") == {"test_open"}
++
++
++def test_the_plugin_beside_a_conftest_that_names_it(selection):
++    (selection.root / "conftest.py").rename(selection.root / "phase_selection.py")
++    (selection.root / "conftest.py").write_text('pytest_plugins = ["phase_selection"]\n')
++    assert selection.kept() == {"test_done", "test_unit"}
++    assert selection.kept("--phase", "2") == {"test_open"}
++
++
++def test_a_real_run_counts_what_it_left_out(selection):
++    done = selection.pytest("-q")
++    assert done.returncode == 0, done.stdout + done.stderr
++    assert re.search(r"^2 passed, 2 deselected in ", done.stdout, re.M), done.stdout
++    selection.complete("1, 2, 6.1")
++    done = selection.pytest("-q")
++    assert done.returncode == 0, done.stdout + done.stderr
++    assert re.search(r"^4 passed in ", done.stdout, re.M) and "deselected" not in done.stdout, done.stdout
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index ea2bc18..f120d58 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -892,11 +892,13 @@ def layered(project, cli_imports_sizes=True):
+     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
+ 
+ 
+-def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None):
++def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None,
++             synth_exit=0, synth_stderr=""):
+     """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it.
+     `check --help` names the flags of a GND newer than 0.3.0 when `newer`; with `--baseline-model` it keeps the
+     base edition and prints `comparison`. With `discovery`, `gnd discover` has the guarded-join family and
+-    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest."""
++    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest, unless `synth_exit` is not 0:
++    then it writes `synth_stderr` to standard error and exits with that code, leaving no manifest."""
+     folder = project.parent / "fake-gnd"
+     folder.mkdir(exist_ok=True)
+     script = folder / "gnd"
+@@ -911,6 +913,9 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
+         "    if sys.argv[1] == 'discover':\n"
+         "        Path(sys.argv[sys.argv.index('--report') + 1]).write_text((here / 'discovery.json').read_text())\n"
+         "    else:\n"
++        "        refusal = int((here / 'synth-exit.txt').read_text())\n"
++        "        if refusal:\n"
++        "            sys.stderr.write((here / 'synth-stderr.txt').read_text()); sys.exit(refusal)\n"
+         "        out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir()\n"
+         "        (out / 'guarded-cases.json').write_text((here / 'cases.json').read_text())\n"
+         "    sys.exit(0)\n"
+@@ -930,6 +935,8 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
+     (folder / "comparison.json").write_text(json.dumps(comparison or {}))
+     (folder / "discovery.json").write_text(json.dumps(discovery or {}))
+     (folder / "cases.json").write_text(json.dumps(cases or {}))
++    (folder / "synth-exit.txt").write_text(str(synth_exit))
++    (folder / "synth-stderr.txt").write_text(synth_stderr)
+     (folder / "base-model.json").unlink(missing_ok=True)
+     (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
+     (folder / "exit.txt").write_text(str(exit_code))
+@@ -1335,6 +1342,65 @@ def offered(command, flag):
+                                                      capture_output=True, text=True).stdout
+ 
+ 
++SYNTH_EXTRA = "needs the optional 'synth' extra"
++
++
++def without_synth_extra(out: str) -> bool:
++    """Whether `rules_check.py test` reported that GND built no cases for want of its synth extra."""
++    return any(line.startswith("note: gnd synth --guarded-cases built no cases (exit 5): ") and SYNTH_EXTRA in line
++               for line in out.splitlines())
++
++
++def skip_without_synth_extra(out: str) -> None:
++    """Skip the running test when GND lists --guarded-cases and cannot run it: the flag is in `gnd synth --help`
++    with or without the extra, so `offered` cannot tell. Any other failure of `gnd synth` skips nothing."""
++    if without_synth_extra(out):
++        pytest.skip("this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'")
++
++
++EXTRA_MISSING = "ERROR: the synthetic-value generator needs the optional 'synth' extra.\n"  # what GND 0.4.0 prints
++
++
++def rules_without_examples(project):
++    """The starter rules with their examples taken out: the stand-in for gnd judges nothing, so `test` is left
++    with what `gnd synth` says."""
++    layered(project)
++    path = project / "docs/components/rules.json"
++    rules = json.loads(path.read_text())
++    for rule in rules["rules"]:
++        rule.pop("examples")
++    path.write_text(json.dumps(rules))
++
++
++def test_a_gnd_without_its_synth_extra_is_a_note_and_the_guard_skips(project):
++    # A GND installed without [synth] lists --guarded-cases and refuses only when the command runs.
++    rules_without_examples(project)
++    fake_gnd(project, cases={}, synth_exit=5, synth_stderr=EXTRA_MISSING)
++    code, out = tool(project, "test", script=RULES)
++    assert code == 0, out
++    assert ("note: gnd synth --guarded-cases built no cases (exit 5): ERROR: the synthetic-value generator needs "
++            "the optional 'synth' extra.\n") in out
++    assert without_synth_extra(out)
++    with pytest.raises(pytest.skip.Exception, match="lacks its synth extra"):
++        skip_without_synth_extra(out)
++
++
++@pytest.mark.parametrize("synth_exit, synth_stderr, cases", [
++    (3, EXTRA_MISSING, {}),                                          # the extra's sentence, another exit
++    (5, "ERROR: no solver\n", {}),                                   # exit 5, another reason
++    (3, "ERROR: model validation failed: $.constraints[5]\n", {}),   # a model GND refuses
++    (0, "", {"schema_version": "gnd-guarded-cases/1", "rules": []}),  # the cases were built
++])
++def test_the_guard_skips_for_the_missing_extra_only(project, synth_exit, synth_stderr, cases):
++    rules_without_examples(project)
++    fake_gnd(project, cases=cases, synth_exit=synth_exit, synth_stderr=synth_stderr)
++    code, out = tool(project, "test", script=RULES)
++    assert code == 0, out
++    assert ("built no cases (exit %d)" % synth_exit in out) == bool(synth_exit), out
++    assert not without_synth_extra(out)
++    assert skip_without_synth_extra(out) is None
++
++
+ @pytest.mark.skipif(not offered("discover", "--joined-relation") or not offered("synth", "--guarded-cases"),
+                     reason="needs a GND newer than 0.3.0 (gnd discover guarded-join, gnd synth --guarded-cases)")
+ def test_suggestions_and_generated_cases_with_newer_gnd(project):
+@@ -1364,6 +1430,7 @@ def test_suggestions_and_generated_cases_with_newer_gnd(project):
+                            "consequent": {"atom": {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}}})
+     path.write_text(json.dumps(rules))
+     code, out = tool(project, "test", script=RULES)
++    skip_without_synth_extra(out)
+     assert code == 1 and "wrong: cannot_fail can never fail" in out, out
+     assert out.endswith("7 rule(s), 12 example(s); 1 wrong; 1 rule(s) without examples\n"), out
+ 

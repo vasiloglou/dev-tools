@@ -21,7 +21,7 @@ Common options: --base REF, --repo DIR, --json, --max-mb N.
 Stdlib only; runs on the system python3 (3.9) with git. Nothing is committed, pushed or deleted,
 and no key is read or printed. ``carry`` and ``pull`` are dry runs until ``--yes``.
 Exit codes: 0; ``check`` exits 1 while a critical or major finding stands, and ``write`` when the
-file in the note's place is not a note; 2 usage error.
+file in the note's place is not a note; 2 usage error or a settings file it cannot use.
 """
 
 from __future__ import annotations
@@ -83,13 +83,30 @@ DEFAULT_SETTINGS = {
 }
 
 
+def settings_error(message: str):
+    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
+    that could not run."""
+    print(message, file=sys.stderr)
+    raise SystemExit(2)
+
+
 def load_settings(path=SETTINGS_FILE) -> dict:
     settings = dict(DEFAULT_SETTINGS)
     if path is not None and path.is_file():
-        loaded = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, ValueError) as exc:
+            settings_error(f"{path}: not valid JSON: {exc}")
+        if not isinstance(loaded, dict):
+            settings_error(f"{path}: the settings must be a JSON object")
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+            settings_error("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                settings_error(f"{path}: {key} must be " + {str: "a string", bool: "true or false", int: "a whole number",
+                                                          list: "a list of strings"}[kind])
         settings.update(loaded)
     return settings
 

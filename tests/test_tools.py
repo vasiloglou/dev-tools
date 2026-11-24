@@ -223,7 +223,7 @@ def test_phase_numbers_above_99_work_like_any_other(project):
     assert list(env["data"]["files"]) == ["tests/acceptance/p122_1_deck_fix/test_p122_1_deck_fix.py"]
 
     def run(*args):
-        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--color=no", *args],
                               cwd=project, capture_output=True, text=True)
         return proc.stdout.strip().splitlines()[-1]
 
@@ -479,7 +479,7 @@ def test_two_plans_of_one_wave_do_not_name_the_same_file(project):
     assert second_plan(folder) == [together + "src/widget/scan.py"], "which excuse nothing else"
     setting(project, shared_files="tests/unit/")
     code, out = tool(project, "check", "--plans", "1")
-    assert code == 1 and "shared_files must be a list of paths" in out
+    assert code == 2 and "shared_files must be a list of paths" in out
 
 
 def test_a_plan_depends_only_on_plans_that_come_before_it(project):
@@ -892,11 +892,13 @@ def layered(project, cli_imports_sizes=True):
     (project / "docs/components/layers.toml").write_text('[[forbid]]\nfrom = "cli"\nto = "core"\n')
 
 
-def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None):
+def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparison=None, discovery=None, cases=None,
+             synth_exit=0, synth_stderr=""):
     """A stand-in for gnd: it keeps the model and the facts it is given and prints the report prepared for it.
     `check --help` names the flags of a GND newer than 0.3.0 when `newer`; with `--baseline-model` it keeps the
     base edition and prints `comparison`. With `discovery`, `gnd discover` has the guarded-join family and
-    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest."""
+    writes that report; with `cases`, `gnd synth --guarded-cases` writes that manifest, unless `synth_exit` is not 0:
+    then it writes `synth_stderr` to standard error and exits with that code, leaving no manifest."""
     folder = project.parent / "fake-gnd"
     folder.mkdir(exist_ok=True)
     script = folder / "gnd"
@@ -911,6 +913,9 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
         "    if sys.argv[1] == 'discover':\n"
         "        Path(sys.argv[sys.argv.index('--report') + 1]).write_text((here / 'discovery.json').read_text())\n"
         "    else:\n"
+        "        refusal = int((here / 'synth-exit.txt').read_text())\n"
+        "        if refusal:\n"
+        "            sys.stderr.write((here / 'synth-stderr.txt').read_text()); sys.exit(refusal)\n"
         "        out = Path(sys.argv[sys.argv.index('--out') + 1]); out.mkdir()\n"
         "        (out / 'guarded-cases.json').write_text((here / 'cases.json').read_text())\n"
         "    sys.exit(0)\n"
@@ -930,6 +935,8 @@ def fake_gnd(project, report=None, exit_code=0, stderr="", newer=False, comparis
     (folder / "comparison.json").write_text(json.dumps(comparison or {}))
     (folder / "discovery.json").write_text(json.dumps(discovery or {}))
     (folder / "cases.json").write_text(json.dumps(cases or {}))
+    (folder / "synth-exit.txt").write_text(str(synth_exit))
+    (folder / "synth-stderr.txt").write_text(synth_stderr)
     (folder / "base-model.json").unlink(missing_ok=True)
     (folder / "report.json").write_text(report if isinstance(report, str) else json.dumps(report or gnd_report()))
     (folder / "exit.txt").write_text(str(exit_code))
@@ -1335,6 +1342,79 @@ def offered(command, flag):
                                                      capture_output=True, text=True).stdout
 
 
+SYNTH_EXTRA = "needs the optional 'synth' extra"
+
+
+def without_synth_extra(code: int, out: str) -> bool:
+    """Whether `rules_check.py test` found nothing wrong (exit 0) and reported that GND built no cases for want
+    of its synth extra. With anything wrong the answer is no: the refusal is then not the only thing to see."""
+    return code == 0 and any(
+        line.startswith("note: gnd synth --guarded-cases built no cases (exit 5): ") and SYNTH_EXTRA in line
+        for line in out.splitlines())
+
+
+def skip_without_synth_extra(code: int, out: str) -> None:
+    """Skip the running test when GND lists --guarded-cases and cannot run it: the flag is in `gnd synth --help`
+    with or without the extra, so `offered` cannot tell. Any other failure of `gnd synth`, and any rule or
+    example `test` calls wrong, skips nothing."""
+    if without_synth_extra(code, out):
+        pytest.skip("this GND lacks its synth extra: uv tool install --force 'get-nick-done[synth]'")
+
+
+EXTRA_MISSING = "ERROR: the synthetic-value generator needs the optional 'synth' extra.\n"  # what GND 0.4.0 prints
+
+
+def rules_without_examples(project):
+    """The starter rules with their examples taken out: the stand-in for gnd judges nothing, so `test` is left
+    with what `gnd synth` says."""
+    layered(project)
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    for rule in rules["rules"]:
+        rule.pop("examples")
+    path.write_text(json.dumps(rules))
+
+
+def test_a_gnd_without_its_synth_extra_is_a_note_and_the_guard_skips(project):
+    # A GND installed without [synth] lists --guarded-cases and refuses only when the command runs.
+    rules_without_examples(project)
+    fake_gnd(project, cases={}, synth_exit=5, synth_stderr=EXTRA_MISSING)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("note: gnd synth --guarded-cases built no cases (exit 5): ERROR: the synthetic-value generator needs "
+            "the optional 'synth' extra.\n") in out
+    assert without_synth_extra(code, out)
+    with pytest.raises(pytest.skip.Exception, match="lacks its synth extra"):
+        skip_without_synth_extra(code, out)
+
+
+def test_the_guard_does_not_hide_a_rule_that_is_wrong(project):
+    # The refusal is one line of the output; an example that is wrong is another, and still a failure.
+    layered(project)  # the starter rules with their examples: the stand-in judges nothing, so each is "wrong"
+    fake_gnd(project, cases={}, synth_exit=5, synth_stderr=EXTRA_MISSING)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1 and "wrong: no_forbidden_area_use: the failing example 1 does not break the rule" in out, out
+    assert "note: gnd synth --guarded-cases built no cases (exit 5): " in out and SYNTH_EXTRA in out
+    assert not without_synth_extra(code, out)
+    assert skip_without_synth_extra(code, out) is None
+
+
+@pytest.mark.parametrize("synth_exit, synth_stderr, cases", [
+    (3, EXTRA_MISSING, {}),                                          # the extra's sentence, another exit
+    (5, "ERROR: no solver\n", {}),                                   # exit 5, another reason
+    (3, "ERROR: model validation failed: $.constraints[5]\n", {}),   # a model GND refuses
+    (0, "", {"schema_version": "gnd-guarded-cases/1", "rules": []}),  # the cases were built
+])
+def test_the_guard_skips_for_the_missing_extra_only(project, synth_exit, synth_stderr, cases):
+    rules_without_examples(project)
+    fake_gnd(project, cases=cases, synth_exit=synth_exit, synth_stderr=synth_stderr)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("built no cases (exit %d)" % synth_exit in out) == bool(synth_exit), out
+    assert not without_synth_extra(code, out)
+    assert skip_without_synth_extra(code, out) is None
+
+
 @pytest.mark.skipif(not offered("discover", "--joined-relation") or not offered("synth", "--guarded-cases"),
                     reason="needs a GND newer than 0.3.0 (gnd discover guarded-join, gnd synth --guarded-cases)")
 def test_suggestions_and_generated_cases_with_newer_gnd(project):
@@ -1364,6 +1444,7 @@ def test_suggestions_and_generated_cases_with_newer_gnd(project):
                            "consequent": {"atom": {"fact_type": "component_uses", "bind": {"caller": "$a", "callee": "$b"}}}})
     path.write_text(json.dumps(rules))
     code, out = tool(project, "test", script=RULES)
+    skip_without_synth_extra(code, out)
     assert code == 1 and "wrong: cannot_fail can never fail" in out, out
     assert out.endswith("7 rule(s), 12 example(s); 1 wrong; 1 rule(s) without examples\n"), out
 
@@ -1885,10 +1966,440 @@ def test_plain_pytest_leaves_out_phases_that_are_not_complete(project):
     state(project, completed_phases='"01"')
 
     def run(*args):
-        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", *args],
+        proc = subprocess.run([sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider", "--color=no", *args],
                               cwd=project, capture_output=True, text=True)
         return proc.stdout.strip().splitlines()[-1]
 
     assert run().startswith("2 passed, 1 deselected")
     assert run("--phase", "2").startswith("1 passed, 2 deselected")
     assert run("tests/acceptance/p02_later/test_p02_later.py").startswith("1 passed")
+
+
+# --- The index tool: a baseline a project refuses, a base that is behind, a reread entry, the counted folders.
+
+INDEX_SETTINGS = "scripts/components_index.settings.json"
+
+
+def index_settings(project, **values):
+    path = project / INDEX_SETTINGS
+    path.write_text(json.dumps(dict(json.loads(path.read_text()), **values)))
+
+
+def run_index(project, *args, script=INDEX, env=None):
+    """Run a script of the project with its standard output and standard error kept apart."""
+    env = {**os.environ, "XDG_CACHE_HOME": str(project.parent / "cache"), **(env or {})}
+    return subprocess.run([sys.executable, script, *args], cwd=project, capture_output=True, text=True, env=env)
+
+
+def git_in(project, *args):
+    done = subprocess.run([GIT, "-c", "user.name=t", "-c", "user.email=t@example.com", *args], cwd=project,
+                          capture_output=True, text=True, check=True)
+    return done.stdout.strip()
+
+
+def test_strict_check_refuses_a_baseline_when_the_setting_says_so(project):
+    (project / "src/widget/loose.py").write_text('"""Loose."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    assert tool(project, "stats", "--write-baseline", script=INDEX)[0] == 0
+    assert "src/widget/loose.py" in (project / "docs/components/unassigned-baseline.txt").read_text().split()
+    assert tool(project, "--check", "--strict", script=INDEX)[0] == 0, "by default a baseline excuses its modules"
+
+    index_settings(project, allow_baseline=False)
+    code, out = tool(project, "--check", "--strict", script=INDEX)
+    assert code == 1, out
+    assert ("baseline refused: docs/components/unassigned-baseline.txt exists and allow_baseline is false "
+            "(give its modules a component, then delete the file)\n") in out
+    assert "no component: src/widget/loose.py" in out, "the file excuses nothing"
+    code, out = tool(project, "--check", script=INDEX)
+    assert code == 0 and "baseline refused" not in out and "no component" not in out, out
+
+    catalog(project, entry("core.all", "Hold every module", "src/widget/"))
+    (project / "docs/components/unassigned-baseline.txt").unlink()
+    code, out = tool(project, "--check", "--strict", script=INDEX)
+    assert code == 0, out
+
+
+def test_no_baseline_is_written_when_the_setting_refuses_one(project):
+    (project / "src/widget/loose.py").write_text('"""Loose."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    index_settings(project, allow_baseline=False)
+    code, out = tool(project, "stats", "--write-baseline", script=INDEX)
+    assert code == 1 and "allow_baseline is false: this project keeps no baseline; give each module a component" in out
+    assert not (project / "docs/components/unassigned-baseline.txt").exists()
+    code, out = tool(project, "stats", script=INDEX)
+    assert code == 0 and "src/widget/loose.py" in out
+
+
+def test_allow_baseline_must_be_a_boolean(project):
+    index_settings(project, allow_baseline="no")
+    code, out = tool(project, "stats", script=INDEX)
+    assert code != 0 and "allow_baseline must be true or false" in out
+
+
+def behind(project):
+    """A remote under tmp_path; `main` tracks origin/main and is one commit behind it; the work is on a
+    branch cut from origin/main. Returns the commits of main and of origin/main."""
+    catalog(project, entry("core.all", "Hold every module", "src/widget/"))
+    commit(project)
+    first = git_in(project, "rev-parse", "HEAD")
+    origin = project.parent / "origin.git"
+    git_in(project.parent, "clone", "-q", "--bare", str(project), str(origin))
+    git_in(project, "remote", "add", "origin", str(origin))
+    (project / "src/widget/later.py").write_text('"""Added upstream."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    git_in(project, "push", "-q", "origin", "main")
+    git_in(project, "fetch", "-q", "origin")
+    git_in(project, "branch", "-q", "-u", "origin/main", "main")
+    git_in(project, "checkout", "-q", "-b", "work")
+    git_in(project, "branch", "-q", "-f", "main", first)
+    return first, git_in(project, "rev-parse", "origin/main")
+
+
+def summary(out):
+    return next(line for line in out.splitlines() if line.startswith("changed against "))
+
+
+def test_changed_compares_with_the_upstream_of_a_base_that_is_behind(project):
+    first, upstream = behind(project)
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0, out
+    lines = out.splitlines()
+    note = ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7]))
+    assert note in lines and lines.index(note) == lines.index(summary(out)) - 1, out
+    assert summary(out) == summary(tool(project, "changed", "--base", "origin/main", script=INDEX)[1])
+    assert summary(out).startswith("changed against origin/main (%s): " % upstream[:7])
+
+
+def test_changed_reads_a_branch_named_in_full_like_its_short_name(project):
+    first, upstream = behind(project)
+    code, out = tool(project, "changed", "--base", "refs/heads/main", script=INDEX)
+    assert code == 0, out
+    assert ("note: refs/heads/main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7])) in out.splitlines(), out
+    assert summary(out).startswith("changed against origin/main (%s): " % upstream[:7])
+
+
+@pytest.mark.parametrize("state", ["level", "ahead", "diverged", "no upstream", "commit", "origin/main given",
+                                   "only the remote has it", "a tag of the same name", "a tag"])
+def test_changed_reads_every_other_base_as_it_is(project, state):
+    first, upstream = behind(project)
+    base, named = "main", "main"
+    if state == "level":
+        git_in(project, "branch", "-q", "-f", "main", upstream)
+    elif state in ("ahead", "diverged"):
+        git_in(project, "branch", "-q", "-f", "main", upstream if state == "ahead" else first)
+        git_in(project, "checkout", "-q", "main")
+        git_in(project, "commit", "-q", "--allow-empty", "-m", state)
+        git_in(project, "checkout", "-q", "work")
+    elif state == "no upstream":
+        git_in(project, "branch", "-q", "--unset-upstream", "main")
+    elif state == "commit":
+        base = named = first
+    elif state == "origin/main given":
+        base = named = "origin/main"
+    elif state == "a tag of the same name":
+        git_in(project, "tag", "main", first)  # git reads the name as the tag; so must the index
+    elif state == "a tag":
+        git_in(project, "tag", "v1", first)
+        base = named = "v1"
+    else:
+        git_in(project, "branch", "-q", "-D", "main")
+        named = "origin/main"
+    code, out = tool(project, "changed", "--base", base, script=INDEX)
+    assert code == 0, out
+    assert "note:" not in out, out
+    assert summary(out).startswith("changed against %s (" % named), out
+
+
+def test_no_command_of_the_index_fetches(project):
+    behind(project)
+    folder = project.parent / "recording-git"
+    folder.mkdir()
+    log = project.parent / "git-calls.txt"
+    (folder / "git").write_text('#!/bin/sh\necho "$@" >> %s\nexec %s "$@"\n' % (log, GIT))
+    (folder / "git").chmod(0o755)
+    env = {"PATH": "%s%s%s" % (folder, os.pathsep, os.environ["PATH"])}
+    for args in (("changed", "--base", "main"), ("facts", "--base", "main")):
+        assert run_index(project, *args, env=env).returncode == 0
+    calls = log.read_text().splitlines()
+    assert calls, "the recording git was not the one run"
+    assert not [call for call in calls if {"fetch", "pull", "push", "remote"} & set(call.split())], calls
+
+
+def test_facts_follow_the_same_base_and_stay_one_json_document(project):
+    first, upstream = behind(project)
+    done = run_index(project, "facts", "--base", "main")
+    assert done.returncode == 0, done.stderr
+    assert json.loads(done.stdout) == json.loads(run_index(project, "facts", "--base", "origin/main").stdout)
+    assert done.stderr == ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main\n"
+                           % (first[:7], upstream[:7]))
+    out = project.parent / "facts.json"
+    assert run_index(project, "facts", "--base", "main", "--out", str(out)).returncode == 0
+    assert json.loads(out.read_text()) == json.loads(done.stdout)
+
+
+def test_the_rule_check_says_which_base_it_judged_against(project):
+    layered(project)
+    first, upstream = behind(project)
+    fake_gnd(project)
+    done = run_index(project, "check", "--base", "main", script=RULES)
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert ("note: main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7])) in done.stderr, done.stderr
+    # The summary names the base as it was asked for, and the commit the facts were read at: origin/main's.
+    assert done.stdout.endswith("rules against main (%s): 5 rule(s); 0 to fix, 0 warning(s), 0 standing\n"
+                                % upstream[:7]), done.stdout
+    other = run_index(project, "check", "--base", "origin/main", script=RULES)
+    assert done.stdout == other.stdout.replace("rules against origin/main (", "rules against main ("), other.stdout
+
+
+def reread_entry(project, text):
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- modules: src/widget/sizes.py\n",
+                                             "- modules: src/widget/sizes.py\n- reread: %s\n" % text))
+
+
+def older_than_code(project):
+    out = tool(project, "review", script=INDEX)[1]
+    return [line for line in out.split("## Descriptions older than their code")[1].split("\n## ")[0].splitlines()[1:]
+            if line.strip()]
+
+
+def test_a_reread_line_brings_an_entrys_date_forward(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since ") and lead.endswith(
+        ", when its does and verbs were last edited"), lead
+
+    reread_entry(project, "2026-11-23, read beside the rewrite, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    assert tool(project, "--check", script=INDEX)[0] == 0
+    assert older_than_code(project) == [], "a reread line not committed yet counts as now"
+    commit(project)
+    assert older_than_code(project) == []
+    assert "- reread: 2026-11-23, read beside the rewrite, still accurate" in (
+        project / "docs/components/COMPONENTS.md").read_text(), "write keeps the line"
+
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten again."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since ") and lead.endswith(
+        ", when it was last marked as reread"), lead
+
+
+def test_a_reread_line_committed_in_the_same_second_still_counts(project, monkeypatch):
+    # Commit times have a resolution of one second; a tie is settled by history, not by the clock.
+    for name in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(name, "2026-11-23T12:00:00+00:00")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert len(older_than_code(project)) == 1
+    reread_entry(project, "2026-11-23, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert older_than_code(project) == [], "the reread line's commit is the newer one, though the clock ties"
+
+
+def test_a_tie_in_commit_time_is_settled_by_history_without_a_reread_line(project, monkeypatch):
+    # The verbs edited in the same commit as the code, and in the same second as the entry was written: the entry
+    # was updated with its code, so it is not listed. Before ties were settled by history, the blame order decided.
+    for name in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(name, "2026-11-23T12:00:00+00:00")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- verbs: sizes\n", "- verbs: sizes, parse sizes\n"))
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert older_than_code(project) == []
+
+
+def test_a_reread_line_written_twice_is_refused(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    reread_entry(project, "once")
+    reread_entry(project, "twice")
+    code, out = tool(project, "--check", script=INDEX)
+    assert code == 1 and "core.sizes: reread appears twice" in out, out
+
+
+def test_changed_takes_a_reread_line_as_an_edit_of_the_entry(project):
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "reread: core.sizes (entry not edited): src/widget/sizes.py" in out, out
+    reread_entry(project, "2026-11-23, still accurate")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0 and "reread:" not in out, out
+
+
+def section(out, title):
+    """The lines of one group of `review`, its heading included."""
+    start = out.index("## " + title)
+    return out[start:out.index("\n\n", start)].splitlines()
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_reads_the_counted_folders_for_names_and_docstrings(project, count):
+    extra_tools(project, count=count)
+    (project / "tools/bare.py").write_text("def unnamed():\n    return 1\n")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef report(rows):\n    """Print rows."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"),
+            entry("tools.report", "Print a size report", "tools/"))
+    commit(project)
+    out = tool(project, "review", script=INDEX)[1]
+    same = section(out, "The same public name in two or three components")
+    bare = section(out, "Modules with no docstring")
+    if count:
+        assert [line for line in same[1:] if line.startswith("report")
+                and "src/widget/sizes.py (core.sizes)" in line and "tools/report.py (tools.report)" in line], same
+        assert "tools/bare.py" in bare, bare
+        assert "from 3 component(s) and 4 module(s)" in out, out.splitlines()[-1]
+    else:
+        assert same == ["## The same public name in two or three components (a duplicate?) (0)"], same
+        assert "tools/bare.py" not in bare, bare
+        assert "from 3 component(s) and 2 module(s)" in out, out.splitlines()[-1]
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_sizes_a_component_by_its_counted_modules(project, count):
+    extra_tools(project, count=count)
+    for number in range(12):
+        (project / ("tools/part%d.py" % number)).write_text('"""Part %d."""\n' % number)
+    catalog(project, entry("tools.report", "Print a size report", "tools/"))
+    commit(project)
+    rows = section(tool(project, "review", script=INDEX)[1], "Components that cover more than 12 modules")
+    assert bool([line for line in rows[1:] if line.startswith("tools.report: 13 modules")]) == count, rows
+
+
+@pytest.mark.parametrize("count", [True, False])
+def test_review_labels_an_entry_point_in_a_counted_folder(project, count):
+    extra_tools(project, count=count)
+    (project / "tools/cli.py").write_text('"""Command line."""\n\n\ndef main():\n    """Run."""\n')
+    catalog(project, entry("tools.cli", "Run the report from the command line", "tools/cli.py"))
+    commit(project)
+    rows = section(tool(project, "review", script=INDEX)[1], "Components nothing in the package imports")
+    assert ("tools.cli (defines main)" in rows) == count and ("tools.cli" in rows) != count, rows
+
+
+# --- Starter rules where there is no phase tool, and settings files a script cannot use.
+
+PHASE_TOOL = ".claude/skills/process-phase/scripts/phase_tool.py"
+
+
+def test_a_rule_about_plans_is_skipped_where_the_phase_tool_is_not(project):
+    rules_without_examples(project)
+    (project / PHASE_TOOL).unlink()
+    seen = fake_gnd(project, cases={"schema_version": "gnd-guarded-cases/1", "rules": []})
+    code, out = tool(project, "test", script=RULES)
+    assert code == 0, out
+    assert ("skip: %s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py is not here "
+            "(it is judged where the phase tool is installed)\n" % PLAN_RULE) in out
+    assert out.rstrip().endswith("; 1 rule(s) about plans skipped"), out
+    assert rule_ids(json.loads((seen / "synth-model.json").read_text())) == STARTER_IDS, "not given to gnd synth"
+    code, out = tool(project, "test", "--format", "json", script=RULES)
+    assert {"level": "skip", "text": "%s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py "
+            "is not here (it is judged where the phase tool is installed)" % PLAN_RULE} in json.loads(out)["results"]
+
+
+def test_a_rule_that_is_not_about_plans_still_names_only_known_facts(project):
+    layered(project)
+    (project / PHASE_TOOL).unlink()
+    path = project / "docs/components/rules.json"
+    rules = json.loads(path.read_text())
+    rules["rules"].append({"id": "tasks_are_planned", "level": "should", "type": "guarded",
+                           "antecedent": [{"fact_type": "component_is_listed", "bind": {"component": "$a"}}],
+                           "consequent": {"atom": {"fact_type": "component_is_listed", "bind": {"component": "$a"}}},
+                           "examples": {"fails": {"task_in_plan": [{"task": "01-01-T1", "plan": "01-01"}]}}})
+    path.write_text(json.dumps(rules))
+    fake_gnd(project)
+    code, out = tool(project, "test", script=RULES)
+    assert code == 1, out
+    assert "wrong: tasks_are_planned: the failing example 1 names task_in_plan, which no fact type of this project is" in out
+
+
+@pytest.mark.parametrize("script, settings", [
+    (INDEX, INDEX_SETTINGS), (RULES, RULES_SETTINGS), (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"))])
+@pytest.mark.parametrize("text, says", [('{"no_such_setting": 1}', "unknown setting(s): no_such_setting"),
+                                         ("{", "not valid JSON"), ("[]", "the settings must be a JSON object")])
+def test_a_settings_file_the_script_cannot_use_exits_2(project, script, settings, text, says):
+    (project / settings).write_text(text)
+    args = {INDEX: ("--check",), RULES: ("test",), PHASE_TOOL: ("status",)}[script]
+    done = run_index(project, *args, script=script)
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert says in done.stdout + done.stderr and settings.rsplit("/", 1)[1] in done.stdout + done.stderr
+    assert "Traceback" not in done.stderr, done.stderr
+
+
+@pytest.mark.parametrize("args", [("status",), ("check", "--roadmap"), ("roadmap", "list")])
+def test_phase_tool_reports_a_bad_settings_file_in_one_envelope(project, args):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    done = run_index(project, "--format", "json", *args, script=PHASE_TOOL)
+    assert done.returncode == 2, done.stdout + done.stderr
+    envelope = json.loads(done.stdout)  # one JSON object, nothing before or after it
+    assert envelope["ok"] is False and envelope["error"]["code"] == "SETTINGS", envelope
+    assert "phase_tool.settings.json: unknown setting(s): planing_dir" in envelope["error"]["message"]
+    assert envelope["tool"] == "phase_tool." + args[0]
+
+
+def test_the_phase_tool_can_be_loaded_with_a_bad_settings_file(project, monkeypatch):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    monkeypatch.chdir(project)
+    spec = importlib.util.spec_from_file_location("phase_tool_loaded", project / PHASE_TOOL)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)  # no SystemExit: a caller that reads its fact types is not stopped
+    assert module.FACT_TYPES and "unknown setting(s): planing_dir" in module.SETTINGS_ERROR
+
+
+
+@pytest.mark.parametrize("script, settings, text, says", [
+    (INDEX, INDEX_SETTINGS, '{"verb_list": []}', "verb_list must be a string"),
+    (INDEX, INDEX_SETTINGS, '{"extra_source_dirs": "tools"}', "extra_source_dirs must be a list of strings"),
+    (RULES, RULES_SETTINGS, '{"index_script": 7}', "index_script must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"package_prefix": 7}', "package_prefix must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"process_skill": null}', "process_skill must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"phase_gaps": 1}', "phase_gaps must be true or false"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"skill_roots": [7]}', "skill_roots must be a list of strings"),
+])
+def test_a_setting_of_the_wrong_type_exits_2(project, script, settings, text, says):
+    (project / settings).write_text(text)
+    args = {INDEX: ("--check",), RULES: ("init", "--print"), PHASE_TOOL: ("--format", "json", "status")}[script]
+    done = run_index(project, *args, script=script)
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert says in done.stdout + done.stderr and "Traceback" not in done.stderr, done.stdout + done.stderr
+    if script == PHASE_TOOL:
+        assert json.loads(done.stdout)["error"]["code"] == "SETTINGS"
+
+
+@pytest.mark.parametrize("args, tool_name, as_json", [
+    (("--for=json", "status"), "status", True),            # an abbreviation the parser accepts
+    (("--format", "json", "--root", "status", "check", "--roadmap"), "check", True),  # a command word as a value
+    (("--format=json", "status", "--format", "md"), "status", False),  # the last one wins in the parser
+])
+def test_the_settings_envelope_follows_the_parsed_command_line(project, args, tool_name, as_json):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    done = run_index(project, *args, script=PHASE_TOOL)
+    assert done.returncode == 2, done.stdout + done.stderr
+    if as_json:
+        envelope = json.loads(done.stdout)
+        assert envelope["tool"] == "phase_tool." + tool_name and envelope["error"]["code"] == "SETTINGS"
+    else:
+        assert done.stdout.startswith("phase_tool.%s: FAILED\nerror SETTINGS: " % tool_name), done.stdout

@@ -23,10 +23,12 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - adopt existing copies: sync.copies
 - advance phase: phase.state
 - after_apply: sync.copies
+- allow baseline: components.index
 - allowlist: phase.codex_gate
 - apply sync: sync.copies
 - archive gsd files: migrate.from_gsd
 - as-is: sync.copies
+- base behind its upstream: components.index
 - build plugins: plugins.build
 - bump and rebuild plugins: subsystem.release
 - bump version: plugins.release
@@ -145,6 +147,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - list handoffs: handoff.notes
 - major version: plugins.release
 - map requirement ids: migrate.from_gsd
+- mark an entry reread: components.index
 - marketplace json: plugins.build
 - max added: phase.codex_gate
 - max tracks: phase.coder_pool
@@ -195,6 +198,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - rebuild plugins: plugins.build
 - receipt: sync.copies
 - receipt only: sync.copies
+- refuse a baseline: components.index
 - regenerate plugins: plugins.build
 - release flow: subsystem.release
 - release notes: plugins.release
@@ -230,6 +234,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - skill lint: phase.state
 - slash commands in note: handoff.notes
 - snapshot of the checkout: handoff.notes
+- stale local main: components.index
 - standing check for code fitted to its examples: review.rounds
 - starter catalog: components.index
 - starter config: sync.copies
@@ -298,7 +303,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_sync.py
-- duplicates: devtools/from_gsd.py
+- distinct_from: migrate.from_gsd
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Exit codes: 0 ok, 1 drift, 2 configuration, 3 refused (nothing written), 4 after_apply failed, 5 check --strict with something to report (milestone sync-reports). unit_report returns the rows and report_lines prints them; the receipt's shipped list is what makes a unit new. A refusal prints only the flag it needs. A journal lets an interrupted apply finish on the next run. after_apply runs the project's own commands, without a shell, only when a file changed. survey and compare write nothing; adopt-devtools is the skill that drives them. Its OTHER_PLANS list and search loop repeat from_gsd.py's (REVIEW.md suggestion 1).
 
 ### migrate.from_gsd
@@ -310,20 +315,22 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - tests: tests/test_from_gsd.py
 - distinct_from: plugins.release, plugins.build
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read, as its docstring says (since issue-sweep phase 3; it said "never calls git"). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins. Loads sync.py by path for its list of other planning tools (OTHER_PLANS, other_plans); the index cannot see that load.
+- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (the docstring's sentence about git only); does and verbs still true
 
 ## The component index
 
 ### components.index
-- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show (components_index.py)
-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, count extra dirs, draft entries, changed since base, new caller of deprecated component, entries to reread, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
+- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true, and allow_baseline false makes the strict check refuse a baseline (components_index.py)
+- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
 - status: canonical
 - modules: skills/components/scripts/components_index.py
 - uses: (none)
 - used_by: (none)
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py, tests/test_index_cache.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). search and --check read a parse cache in $XDG_CACHE_HOME/components-index/, outside the checkout, and drop cache files older than 30 days. review's per-module leads (same-named definitions) look only under package_dir. In a plugin install the settings come from the current folder's checkout, whatever --root says.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). search and --check read a parse cache in $XDG_CACHE_HOME/components-index/, outside the checkout, and drop cache files older than 30 days. review's leads read from the modules (same names, docstrings, size, entry points) cover the counted modules, so count_extra_dirs reaches them; the import graph stays within package_dir. In a plugin install the settings come from the current folder's checkout, whatever --root says.
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file exits 2) and its review repairs at 43f6d83 (every value of the settings checked for its type, the loop inside the file branch); does and verbs still true
 
 ### components.rules
 - does: Judge the project's own rules about its components and plans with GND, over the facts components_index.py extracts: init writes starter rules and layers, check (against a base, or --phase NN for plans), test judges each rule on its examples, suggest proposes layers and near misses (rules_check.py)
@@ -334,7 +341,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Without GND, check, test and suggest print skip: and exit 0 (1 with --require); a check that could not run exits 2. It runs components_index.py facts and phase_tool.py facts as subprocesses and loads phase_tool.py with importlib (subsystem.rule_check), and keeps its own copy of phase_tool's PLAN_KEYS. In a dvt-milestone install its default phase_script is missing (that plugin ships no phase_tool.py), so check --phase cannot run there.
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Without GND, check, test and suggest print skip: and exit 0 (1 with --require); a check that could not run exits 2. It runs components_index.py facts and phase_tool.py facts as subprocesses and loads phase_tool.py with importlib (subsystem.rule_check), and keeps its own copy of phase_tool's PLAN_KEYS. In a dvt-milestone install its default phase_script is missing (that plugin ships no phase_tool.py), so check --phase cannot run there. check --base relays the index script's note: line when facts were read at the upstream of a base that is behind it.
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (test skips a rule about plans without the phase tool; a bad settings file exits 2) and its review repairs at 43f6d83 (every value of the settings checked for its type, the loop inside the file branch); does and verbs still true
 
 ## Moving work between assistants and machines
 
@@ -358,7 +366,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - uses: (none)
 - used_by: (none)
 - tests: tests/test_review_tool.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A bad settings file exits 1, where the docstring says 2. Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A settings file it cannot use (an unknown key, not a JSON object) exits 2, as the docstring says (since issue-sweep phase 3). Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file is a Stop, exit 2; the docstring's exit codes) and its review repairs at 43f6d83 (every value of the settings checked for its type); does and verbs still true
 
 ## The phase workflow
 
@@ -371,7 +380,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - part_of: subsystem.phase_status, subsystem.rule_check
 - tests: tests/test_tools.py
-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a bad phase_tool.settings.json exits 1 at import with no envelope. check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
+- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a phase_tool.settings.json it cannot use is reported in one envelope with error code SETTINGS and exit 2, status included (since issue-sweep phase 3; the module still loads, on the defaults). check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file is one envelope with exit 2; the docstring's exit codes) and its review repairs at 43f6d83 (every value checked for its type; the settings envelope after the parser); does and verbs still true
 
 ### phase.coder_pool
 - does: Say which coding assistants Implement may use and how many tracks at once: merge the team's and the developer's TOML files, keep the coders on PATH, fall back to claude, and give each account's model, effort and env (coder_pool.py show)
@@ -383,6 +393,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - part_of: subsystem.phase_status
 - tests: tests/test_tools.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). show exits 0 even with an empty pool (nothing on PATH gives effective_tracks 0); bad limits warn and use 4, bad TOML exits 1. A linked worktree without a local file of its own reads the main checkout's. It carries its own small TOML reader for a Python without tomllib. phase_tool.py runs show --json (subsystem.phase_status).
+- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (the docstring's fallback sentence only); does and verbs still true
 
 ### phase.codex_gate
 - does: Check a coding round's changed paths against an allowlist and its added lines against a budget (codex_gate.py)
@@ -400,7 +411,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - modules: skills/phase/pytest/phase_selection.py
 - uses: (none)
 - used_by: (none)
-- notes: No test in tests/ runs it (REVIEW.md).
+- tests: tests/test_tools.py, tests/test_phase_selection.py
+- notes: tests/test_tools.py runs it as the sync delivers it (test_plain_pytest_leaves_out_phases_that_are_not_complete, test_phase_numbers_above_99_work_like_any_other); tests/test_phase_selection.py holds its other branches.
 
 ## Where one script runs another
 
@@ -421,6 +433,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - members_uses: (none)
 - flow: components.rules -> phase.state -> components.index
 - notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
+- reread: 2026-11-23, issue-sweep phase 3: its members changed (rules_check test skips a rule about plans without the phase tool; a settings file a script cannot use exits 2); the flow and the calls are as described
 
 ### subsystem.phase_status
 - does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
@@ -430,3 +443,4 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - members_uses: (none)
 - flow: phase.state -> phase.coder_pool
 - notes: A run-time call, which the import graph cannot see: for a wave of more than one plan, phase_tool.py runs coder_pool.py show --json as a subprocess, reads effective_tracks and warns when more plans can start at once.
+- reread: 2026-11-23, issue-sweep phase 3: its members changed (a phase_tool.py settings file it cannot use is one envelope, exit 2; coder_pool.py's docstring only); the flow and the call are as described

@@ -14,13 +14,15 @@ so the phase folders stay as they are. What differs is the format of three files
 missing ones (never overwriting a file that exists) and writes a record of every choice
 it made. The folder of a finished phase is left as it is. In the folder of a phase GSD
 had not finished, GSD's plans, summaries and verification move into a ``gsd/`` folder, so
-that the steps of the new process do not take them for their own. It never calls git.
+that the steps of the new process do not take them for their own. It never calls git to
+change anything: every git command it runs only reads.
 ``skills/move-from-gsd/SKILL.md`` is the guide that uses it. Python 3.11 or newer.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
+import importlib.util
 import json
 import re
 import shutil
@@ -42,10 +44,11 @@ INSTRUCTION_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"]
 # Folders at the top of a project that are never a coding tool's own.
 NOT_A_TOOL = {".git", ".planning", ".venv", ".tox", ".idea", ".vscode", ".mypy_cache", ".pytest_cache", ".ruff_cache"}
 HOOK_FILES = ["settings.json", "settings.local.json", "hooks.json"]
-# Signs of a plan kept by another tool: (what to look for, the tool).
-OTHER_PLANS = [(".specify", "Spec Kit"), ("specs/*/spec.md", "Spec Kit"), ("openspec", "OpenSpec"),
-               (".kiro/specs", "Kiro"), (".bmad-core", "BMAD"), ("bmad", "BMAD"), (".taskmaster", "Task Master"),
-               (".agent-os", "Agent OS")]
+# The signs of a plan kept by another tool are sync.py's (OTHER_PLANS): one list, read by both scripts.
+# Loaded by path, as release_plugins.py loads build_plugins.py: these scripts are run from a checkout.
+_SYNC = importlib.util.spec_from_file_location("sync", Path(__file__).resolve().with_name("sync.py"))
+sync = importlib.util.module_from_spec(_SYNC)
+_SYNC.loader.exec_module(sync)
 
 HEAD = re.compile(r"^(#{2,4})\s+(?:[^\w\s]+\s+)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+?)\s*$")
 ITEM = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(\*\*)?Phase\s+(\d+(?:\.\d+)?)\s*[:—–-]\s*(.+)$")
@@ -488,12 +491,7 @@ def hook_files(project: Path) -> list:
 
 def other_plans(project: Path) -> list:
     """Other planning tools whose files are in the project. The move does not read them."""
-    found = {}
-    for pattern, tool in OTHER_PLANS:
-        hit = next(iter(sorted(project.glob(pattern))), None)
-        if hit is not None:
-            found.setdefault(tool, hit.relative_to(project).as_posix() + ("/" if hit.is_dir() else ""))
-    return [{"tool": tool, "sign": sign} for tool, sign in found.items()]
+    return [{"tool": tool, "sign": sign} for sign, tool in sync.other_plans(project)]
 
 
 def gsd_pointer(state: dict, text: str) -> str:
