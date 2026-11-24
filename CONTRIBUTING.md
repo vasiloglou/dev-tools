@@ -28,7 +28,12 @@ Nobody else can approve or merge.
    run `claude --plugin-dir plugins/dvt-milestone` after `python3 devtools/build_plugins.py`.
 
 4. **Open a pull request against `main`.** Say what changed and why, and link the issue
-   if there is one. One purpose per pull request.
+   if there is one. One purpose per pull request. The `gates` workflow
+   (`.github/workflows/gates.yml`) runs the tests, the plugin check and the index checks
+   on the pull request, on Linux with Python 3.11 and 3.14 and on macOS with 3.14.
+   `devtools/ci_local.sh` runs the same jobs on your machine before you push: on a fresh
+   clone of your last commit, the Linux jobs in podman or docker. A plain `pytest` run can
+   pass where CI fails, for example when your shell sets `PYTHONDONTWRITEBYTECODE`.
 5. **Review.** You may be asked for changes before it is merged.
 
 ## dev-tools is developed with dev-tools

@@ -1,0 +1,65 @@
+# The gates of .devtools/project.md, run on every pull request and on main.
+# The same commands run on the machine that makes a change; this runs them again where
+# everyone can see the result.
+name: gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gates-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: gates (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.11"  # the oldest Python the scripts support
+          - os: ubuntu-latest
+            python: "3.14"
+          - os: macos-latest
+            python: "3.14"
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # the component index dates entries from history; `changed` needs origin/main
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install GND, with the synth extra the generated-case tests need
+        run: uv tool install --python "${{ matrix.python }}" "get-nick-done[synth]==0.4.0"
+
+      - name: Git identity for the tests that commit
+        run: |
+          git config --global user.name "dev-tools CI"
+          git config --global user.email "ci@example.invalid"
+          git config --global init.defaultBranch main
+
+      - name: The plugins match the skills
+        run: python3 devtools/build_plugins.py --check
+
+      - name: The component index is current, and no baseline is kept
+        run: python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict
+
+      - name: The index against what the pull request touched
+        if: github.event_name == 'pull_request'
+        run: python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/${{ github.base_ref }}
+
+      - name: All tests
+        run: uv run --no-project --python "${{ matrix.python }}" --with pytest python -m pytest tests -q -rs
