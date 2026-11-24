@@ -61,7 +61,11 @@ Run from the repository root, with Python 3.11 or newer.
 | The component index is current, and no baseline is kept (`allow_baseline` is false here; when a phase closes; `tests/test_own_index.py` runs it too) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` |
 | The index against what a change touched (before a pull request, after `git fetch origin`) | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main` |
 
-There is no lint command and no CI: the tests run on the machine that makes the change.
+There is no lint command. The tests run on the machine that makes the change, and the
+`gates` workflow (`.github/workflows/gates.yml`) runs every gate above but the release
+status on each pull request and on `main`: Linux with Python 3.11 and 3.14, macOS with
+3.14, and GND 0.4.0 with its `synth` extra. The tests that need the `claude` CLI skip
+there. A record still cites the gates it ran itself; a workflow run is cited by its URL.
 
 ## Review instrument
 
