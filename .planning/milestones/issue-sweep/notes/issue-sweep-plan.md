@@ -6,9 +6,13 @@ component index tool closes three gaps its own milestone found (44, 45, 46), and
 shipped scripts do what their starter rules and docstrings say (33, 43). The other two
 (39, 40) are each left for a milestone of its own, with the reason written down.
 
-**Status.** Approved by the owner at the plan gate, 2026-11-23, with D3 to D11 as
-proposed (o). The plan-gate record, `001-plan.md`, is written with the commit that holds
-these bytes. No phase has started: phase 1's spec awaits its own owner gate.
+**Status.** Closed, 2026-11-23, by delegated approval (auto=true): `006-close.md`, after the
+close review (`notes/reviews/close-r1`), with one earlier record corrected in
+`005-phase-3-correction.md`. Repaired at the close where the phase records refuted it, each
+repair marked `(c1)`. Approved by the owner at the plan gate, 2026-11-23,
+with D3 to D11 as proposed (o): `001-plan.md`. Run with `process-milestone issue-sweep
+auto`, from 2026-11-23: phases 1 to 3 are recorded in `002-phase-1.md`, `003-phase-2.md`
+and `004-phase-3.md`.
 
 - Written with `start-milestone` (the installed dvt-milestone 0.1.3; the scripts run are
   the built copies under `plugins/`, at 0.1.6), on branch
@@ -160,7 +164,7 @@ surface; the decisions are in section 10.
 | Issue | Today | After |
 |---|---|---|
 | 33 | Where the phase tool is not installed, `rules_check.py test` calls the starter rule about plans `wrong` twice, and exits 1 | `test` leaves out a rule marked `"about": "plans"` when the phase tool is not there, prints one `skip:` line that names the rule and the reason, and judges the rest. The rule is also left out of what `gnd synth` is given. `init` writes what it writes today (D9) |
-| 43 | A settings file a script cannot use ends it with the message on standard error and exit 1, the code each docstring gives to "a check found something" or "domain failure" | The message is the same and the exit is 2, in every script under `skills/` that reads a settings file (D10). The four docstrings say what the code does: `phase_tool.py` (what it prints then is D11's to rule: proposed, one JSON envelope with `"ok": false` under `--format json`, for `status` too, and the docstring says `status` exits 0 unless the settings file cannot be used) (r1 F1; prior wording: "the envelope and `status` hold once the settings are read"), `review_tool.py`, `from_gsd.py` ("it never calls git to change anything"), `coder_pool.py` ("when `claude` is on PATH") |
+| 43 | A settings file a script cannot use ends it with the message on standard error and exit 1, the code each docstring gives to "a check found something" or "domain failure" | The message is the same and the exit is 2, in every script under `skills/` that reads a settings file (D10), except `coder_pool.py` (c1, below). The four docstrings say what the code does: `phase_tool.py` (what it prints then is D11's to rule: proposed, one JSON envelope with `"ok": false` under `--format json`, for `status` too, and the docstring says `status` exits 0 unless the settings file cannot be used) (r1 F1; prior wording: "the envelope and `status` hold once the settings are read"), `review_tool.py`, `from_gsd.py` ("it never calls git to change anything"), `coder_pool.py` ("when `claude` is on PATH") |
 
 ## 3. Dependencies and artifact homes
 
@@ -298,8 +302,10 @@ and nothing a project runs behaves differently.
 *Criteria:*
 
 - P2.1. `allow_baseline: false` and a baseline file: `--check --strict` exits 1 and names
-  the file; `stats --write-baseline` writes nothing and exits 2. Without the setting, a
-  project with a baseline exits as today.
+  the file; `stats --write-baseline` writes nothing and exits 1. Without the setting, a
+  project with a baseline exits as today. *Repaired at the close, 2026-11-23 (c1), from
+  `003-phase-2.md` (phase 2 spec D1: the script exits 1 for every refusal). Prior wording:
+  "writes nothing and exits 2".*
 - P2.2. A local base strictly behind its remote-tracking branch: the summary line names
   the remote-tracking branch and its commit, and one line before it says why. Level,
   ahead, diverged, no upstream, and a commit given as the base: today's lines.
@@ -436,7 +442,7 @@ Commands run from the repository root.
 | 1 | `uv run --no-project --with pytest python -m pytest tests -q` | exits 0 | Same |
 | 1 | `python3 devtools/build_plugins.py --check` | exits 0, and no file under `plugins/` differs from `cecebc6` | Plugin users: no change |
 | 1 | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict` | exits 0 | dev-tools' own sessions |
-| 1 | By hand, if D4 of the phase 1 spec is ruled so: the suite with a GND installed without its extra | the one test reported as skipped, with the guard's reason; exit 0 | A contributor whose GND has no extra |
+| 1 | By hand, if D4 of the phase 1 spec is ruled so: the suite with a GND installed without its extra. *Repaired at the close (c1), from `002-phase-1.md` (spec I2): the command is `GND_COMMAND="uvx -q --isolated --from get-nick-done==0.4.0 gnd"`; without `--isolated`, `uvx` reused the installed GND, extra included, and tested nothing. Prior wording named no command; the phase 1 spec's D4 named the one without `--isolated`* | the one test reported as skipped, with the guard's reason; exit 0 | A contributor whose GND has no extra |
 | 2 | The focused gate over `tests/test_tools.py` and `tests/test_own_index.py`, then the three gates of phase 1 | exit 0 each | Every project that keeps an index: a new setting, a new field, and one new line from `changed` in the stale-base case |
 | 2 | `python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base main`, in a worktree whose local `main` is behind | The line that names `origin/main`, and the count that `--base origin/main` gives | dev-tools' own sessions in worktrees |
 | 3 | The focused gate over `tests/test_plugins.py` and `tests/test_tools.py`, then the three gates of phase 1 | exit 0 each | dvt-milestone projects that write rules; every caller that reads a script's exit |
@@ -458,7 +464,7 @@ Commands run from the repository root.
 | D7 | Marking an entry as reread (issue 45, part 2) | **A `reread:` line, dated by its own last edit:** nothing to parse or validate, and what the entry says is untouched; one more optional field. **Count an edit to `notes:`:** no new field, and any edit of a note for another reason marks the entry as reread | Ruled: the `reread:` line (o) |
 | D8 | Which groups of `review` follow `count_extra_dirs` (issue 44) | **Every group not built from the import graph** (same name, no docstring, over 12 modules, the summary's count): one rule a reader can state. **The same-name group alone**, as the issue asks: the summary would still say `4 module(s)` beside leads about 12 | Ruled: every such group (o) |
 | D9 | The starter rule about plans where there is no phase tool (issue 33) | **`test` leaves the rule out and says so:** also right for a rules file written under one install and read under another. **`init` leaves the rule out:** quiet, and a project that later takes the phase workflow never gets the rule. **dvt-milestone ships `phase_tool.py`:** a milestone project carries a 2000-line script for one rule | Ruled: `test` leaves it out (o) |
-| D10 | The exit for a settings file a script cannot use (issue 43) | **Exit 2, in every script under `skills/` that reads one:** it is the code each docstring already gives to "could not run"; several scripts change by a few lines each. **Exit 2 in the issue's two only:** `components_index.py --check` keeps exit 1 for a broken settings file, the code that means "stale". **Leave the exit and correct the docstrings:** no caller changes, and a broken file still reads as a finding | Ruled: exit 2, in every one (o) |
+| D10 | The exit for a settings file a script cannot use (issue 43) | **Exit 2, in every script under `skills/` that reads one:** it is the code each docstring already gives to "could not run"; several scripts change by a few lines each. **Exit 2 in the issue's two only:** `components_index.py --check` keeps exit 1 for a broken settings file, the code that means "stale". **Leave the exit and correct the docstrings:** no caller changes, and a broken file still reads as a finding | Ruled: exit 2, in every one (o). *Amended at the close, 2026-11-23 (c1), by delegated approval, from `004-phase-3.md` (phase 3 spec D1; a refuted premise there): except `coder_pool.py`, which keeps exit 1, since its docstring gives 1 to "a settings or configuration file cannot be used" and its pool's TOML files share that code, so "the code each docstring already gives to 'could not run'" is false for it. Prior ruling: "exit 2, in every one"* |
 | D11 | What `phase_tool.py` prints for a settings file it cannot use (issue 43; r1 F1) | **One JSON envelope with `"ok": false` under `--format json`, exit 2, for every command:** the issue's own pairing ("exit 2, with an envelope"); a caller that parses the output always gets JSON; `status` no longer "always exits 0", and the docstring says when it does not; the settings are checked when the script is loaded, so the spec has to move the report into `main`. **Plain text on standard error, exit 2, and the docstring says the envelope holds once the settings are read:** a few lines fewer, and a caller that parses standard output gets nothing to parse | Ruled: the envelope (o) |
 
 ### Open questions (carried to the close sweep)

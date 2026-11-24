@@ -23,11 +23,15 @@ the fix. Issues 39 and 40 are left for milestones of their own.
 - **Execution:** `process-milestone issue-sweep auto`, from 2026-11-23: each spec's owner
   gate and the close ruling are delegated approvals (auto=true). Pushing, the pull
   request, merging, tagging and anything posted to GitHub need the owner.
-- **Next action:** the close: the close review, the question sweep, the plan repairs and
-  the close record.
+- **Closed** 2026-11-23 by delegated approval (auto=true): [006-close.md](006-close.md), after
+  the close review (`notes/reviews/close-r1`).
+- **Next action:** the owner's: push the branch and open the pull request (issues 31, 33,
+  41 to 46), merge it, tag 0.1.7, and rule the carried questions of the close record.
 - **Records:** [001-plan.md](001-plan.md): the plan gate; [002-phase-1.md](002-phase-1.md):
   the GND guard, the plugin's tests, one list of other planning tools.
   [003-phase-2.md](003-phase-2.md): the index tool refuses a baseline, reads a stale base's
   upstream, takes a `reread:` line, and reviews the counted folders.
   [004-phase-3.md](004-phase-3.md): starter rules pass without the phase tool; a settings
   file a script cannot use exits 2.
+  [005-phase-3-correction.md](005-phase-3-correction.md): one misquoted line of 004.
+  [006-close.md](006-close.md): the close, the ten issues, the question sweep.
