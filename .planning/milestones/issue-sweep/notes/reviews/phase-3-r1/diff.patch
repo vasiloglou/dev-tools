@@ -1,0 +1,1818 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index ed467ea..8b0d7e9 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -315,8 +315,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - used_by: (none)
+ - tests: tests/test_from_gsd.py
+ - distinct_from: plugins.release, plugins.build
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read (the module docstring's "never calls git" is wrong). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins. Loads sync.py by path for its list of other planning tools (OTHER_PLANS, other_plans); the index cannot see that load.
+-- reread: 2026-11-23, issue-sweep phase 2: read beside 2921a3b (other_plans now reads sync.py's list); does and verbs still true
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Its git calls only read, as its docstring says (since issue-sweep phase 3; it said "never calls git"). It refuses a folder that is not GSD's or is moved or half moved, workstreams not chosen, a git-ignored plan and an unknown base branch; --dry-run runs the same refusals. It reads the planning templates and sync.py's .devtools-receipt.json. move-from-gsd is the skill that drives it. Its Stop and git are its own, as each script's are; its build makes the conversion plan, not plugins. Loads sync.py by path for its list of other planning tools (OTHER_PLANS, other_plans); the index cannot see that load.
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (the docstring's sentence about git only); does and verbs still true
+ 
+ ## The component index
+ 
+@@ -330,6 +330,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - part_of: subsystem.rule_check
+ - tests: tests/test_tools.py, tests/test_index_cache.py
+ - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). search and --check read a parse cache in $XDG_CACHE_HOME/components-index/, outside the checkout, and drop cache files older than 30 days. review's leads read from the modules (same names, docstrings, size, entry points) cover the counted modules, so count_extra_dirs reaches them; the import graph stays within package_dir. In a plugin install the settings come from the current folder's checkout, whatever --root says.
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file exits 2); does and verbs still true
+ 
+ ### components.rules
+ - does: Judge the project's own rules about its components and plans with GND, over the facts components_index.py extracts: init writes starter rules and layers, check (against a base, or --phase NN for plans), test judges each rule on its examples, suggest proposes layers and near misses (rules_check.py)
+@@ -341,7 +342,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - part_of: subsystem.rule_check
+ - tests: tests/test_tools.py
+ - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Without GND, check, test and suggest print skip: and exit 0 (1 with --require); a check that could not run exits 2. It runs components_index.py facts and phase_tool.py facts as subprocesses and loads phase_tool.py with importlib (subsystem.rule_check), and keeps its own copy of phase_tool's PLAN_KEYS. In a dvt-milestone install its default phase_script is missing (that plugin ships no phase_tool.py), so check --phase cannot run there. check --base relays the index script's note: line when facts were read at the upstream of a base that is behind it.
+-- reread: 2026-11-23, issue-sweep phase 2: read beside 457be4a (string formatting only) and this phase's diff (the relayed note); does and verbs still true
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (test skips a rule about plans without the phase tool; a bad settings file exits 2); does and verbs still true
+ 
+ ## Moving work between assistants and machines
+ 
+@@ -365,7 +366,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - uses: (none)
+ - used_by: (none)
+ - tests: tests/test_review_tool.py
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A bad settings file exits 1, where the docstring says 2. Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A settings file it cannot use (an unknown key, not a JSON object) exits 2, as the docstring says (since issue-sweep phase 3). Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file is a Stop, exit 2; the docstring's exit codes); does and verbs still true
+ 
+ ## The phase workflow
+ 
+@@ -378,7 +380,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - used_by: (none)
+ - part_of: subsystem.phase_status, subsystem.rule_check
+ - tests: tests/test_tools.py
+-- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a bad phase_tool.settings.json exits 1 at import with no envelope. check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
++- notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a phase_tool.settings.json it cannot use is reported in one envelope with error code SETTINGS and exit 2, status included (since issue-sweep phase 3; the module still loads, on the defaults). check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file is one envelope with exit 2; the docstring's exit codes); does and verbs still true
+ 
+ ### phase.coder_pool
+ - does: Say which coding assistants Implement may use and how many tracks at once: merge the team's and the developer's TOML files, keep the coders on PATH, fall back to claude, and give each account's model, effort and env (coder_pool.py show)
+@@ -390,6 +393,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - part_of: subsystem.phase_status
+ - tests: tests/test_tools.py
+ - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). show exits 0 even with an empty pool (nothing on PATH gives effective_tracks 0); bad limits warn and use 4, bad TOML exits 1. A linked worktree without a local file of its own reads the main checkout's. It carries its own small TOML reader for a Python without tomllib. phase_tool.py runs show --json (subsystem.phase_status).
++- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (the docstring's fallback sentence only); does and verbs still true
+ 
+ ### phase.codex_gate
+ - does: Check a coding round's changed paths against an allowlist and its added lines against a budget (codex_gate.py)
+diff --git a/.devtools/components/modules/_root.md b/.devtools/components/modules/_root.md
+index 518417b..a26dfc3 100644
+--- a/.devtools/components/modules/_root.md
++++ b/.devtools/components/modules/_root.md
+@@ -23,54 +23,54 @@ Move a project's planning folder from GSD to the dev-tools phase workflow.
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `Stop` | class(Exception) | 73 | The project cannot be converted as it stands; the message says what to do. |
+-| `norm(value) -> str` | function | 77 | (no docstring) |
+-| `key(nn) -> tuple` | function | 82 | (no docstring) |
+-| `shown(nn) -> str` | function | 87 | The id as a roadmap heading writes it: 7, 7.1. |
+-| `read(path) -> str` | function | 93 | (no docstring) |
+-| `frontmatter(text) -> dict` | function | 97 | (no docstring) |
+-| `plain(text) -> str` | function | 109 | (no docstring) |
+-| `slugify(text) -> str` | function | 114 | (no docstring) |
+-| `cell(text) -> str` | function | 118 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
+-| `sections(text, level) -> dict` | function | 123 | {heading: body} for the headings of one level, in order. |
+-| `parked(text, section) -> str` | function | 138 | The word by which a line says its phase is put off, or ''. |
+-| `phase_numbers(text) -> list` | function | 149 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
+-| `dependencies(text) -> tuple` | function | 165 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
+-| `same_phase(one, other) -> bool` | function | 181 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
+-| `runs(found) -> list` | function | 190 | Split phases in file order into numbering runs: a run ends where a number comes back |
+-| `one_run(groups) -> dict` | function | 203 | Every run read as one: the owner said the repeated numbers are the same phases. |
+-| `read_roadmap(text) -> tuple` | function | 214 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
+-| `read_folders(planning) -> tuple` | function | 263 | (no docstring) |
+-| `left_by_gsd(folder) -> str` | function | 289 | What GSD had done on a phase it did not finish, in words. |
+-| `read_requirements(planning) -> dict` | function | 300 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
+-| `out_of_scope(text) -> list` | function | 332 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
+-| `named_ids(text, defined) -> list` | function | 346 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
+-| `row_cells(line) -> list` | function | 368 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
+-| `read_decisions(section) -> list` | function | 388 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
+-| `read_project(planning, fallback) -> dict` | function | 411 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
+-| `git(project, *args) -> str` | function | 430 | (no docstring) |
+-| `tool_folders(project) -> list` | function | 438 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
+-| `gsd_entries(text) -> tuple` | function | 452 | (calls, permissions) in a settings file: the strings that name GSD outside its |
+-| `hook_files(project) -> list` | function | 475 | Settings files that still name GSD: its hooks and status line are wired there, and the |
+-| `other_plans(project) -> list` | function | 491 | Other planning tools whose files are in the project. The move does not read them. |
+-| `gsd_pointer(state, text) -> str` | function | 496 | The phase GSD's STATE.md names as the current one, or ''. |
+-| `installed(project) -> list` | function | 503 | GSD's own files inside the project, one entry per tool folder that has any. |
+-| `default_branch(project) -> tuple` | function | 528 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
+-| `plan_ignored(project, planning_dir)` | function | 544 | True when git would ignore a file the move writes; None outside a git work tree. |
+-| `read_workstreams(root) -> dict` | function | 556 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
+-| `code_summary(project, planning_dir)` | function | 574 | What the project is written in, from the files git tracks; None outside a git work tree. |
+-| `map_ids(names) -> dict` | function | 595 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
+-| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 618 | (no docstring) |
+-| `roadmap_text(model) -> str` | function | 929 | (no docstring) |
+-| `requirements_text(model) -> str` | function | 983 | (no docstring) |
+-| `state_text(model, base, release, today) -> str` | function | 1024 | (no docstring) |
+-| `decisions_text(model, owner, today) -> str` | function | 1061 | (no docstring) |
+-| `manifesto_text(model, template) -> str` | function | 1083 | (no docstring) |
+-| `readme_text(model, template) -> str` | function | 1095 | (no docstring) |
+-| `record_text(model, written, kept, merged, today) -> str` | function | 1112 | (no docstring) |
+-| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1162 | (no docstring) |
+-| `survey_lines(model) -> list` | function | 1251 | (no docstring) |
+-| `main(argv) -> int` | function | 1348 | (no docstring) |
++| `Stop` | class(Exception) | 74 | The project cannot be converted as it stands; the message says what to do. |
++| `norm(value) -> str` | function | 78 | (no docstring) |
++| `key(nn) -> tuple` | function | 83 | (no docstring) |
++| `shown(nn) -> str` | function | 88 | The id as a roadmap heading writes it: 7, 7.1. |
++| `read(path) -> str` | function | 94 | (no docstring) |
++| `frontmatter(text) -> dict` | function | 98 | (no docstring) |
++| `plain(text) -> str` | function | 110 | (no docstring) |
++| `slugify(text) -> str` | function | 115 | (no docstring) |
++| `cell(text) -> str` | function | 119 | Text that is safe inside one table cell: the phase tool splits a row on every '\|'. |
++| `sections(text, level) -> dict` | function | 124 | {heading: body} for the headings of one level, in order. |
++| `parked(text, section) -> str` | function | 139 | The word by which a line says its phase is put off, or ''. |
++| `phase_numbers(text) -> list` | function | 150 | Every phase number named after "Phase" or "Phases": lists ("1, 2 and 3", "7/07.1/8") |
++| `dependencies(text) -> tuple` | function | 166 | (phases a GSD "Depends on" line depends on, phases it names without depending on them). |
++| `same_phase(one, other) -> bool` | function | 182 | Two titles of one phase number name the same phase: equal, or sharing half their words. |
++| `runs(found) -> list` | function | 191 | Split phases in file order into numbering runs: a run ends where a number comes back |
++| `one_run(groups) -> dict` | function | 204 | Every run read as one: the owner said the repeated numbers are the same phases. |
++| `read_roadmap(text) -> tuple` | function | 215 | (runs of checklist entries, runs of detail sections). Each says if GSD put the phase off. |
++| `read_folders(planning) -> tuple` | function | 264 | (no docstring) |
++| `left_by_gsd(folder) -> str` | function | 290 | What GSD had done on a phase it did not finish, in words. |
++| `read_requirements(planning) -> dict` | function | 301 | Requirements GSD tracks now, those it put off, and every definition in the archives. |
++| `out_of_scope(text) -> list` | function | 333 | What GSD's REQUIREMENTS.md rules out: the rows or bullets of its "Out of Scope" section. |
++| `named_ids(text, defined) -> list` | function | 347 | The requirement ids a roadmap line names. An id is one GSD defines somewhere, or one |
++| `row_cells(line) -> list` | function | 369 | The cells of one table row. A "\|" inside backticks, or after a backslash, is text. |
++| `read_decisions(section) -> list` | function | 389 | The rows of GSD's "Key Decisions" table, with each column found by its heading. |
++| `read_project(planning, fallback) -> dict` | function | 412 | GSD's PROJECT.md. A workstream has none of its own: the project's is in the root folder. |
++| `git(project, *args) -> str` | function | 431 | (no docstring) |
++| `tool_folders(project) -> list` | function | 439 | The folders a coding tool may keep at the top of the project: the ones the skills go to, |
++| `gsd_entries(text) -> tuple` | function | 453 | (calls, permissions) in a settings file: the strings that name GSD outside its |
++| `hook_files(project) -> list` | function | 476 | Settings files that still name GSD: its hooks and status line are wired there, and the |
++| `other_plans(project) -> list` | function | 492 | Other planning tools whose files are in the project. The move does not read them. |
++| `gsd_pointer(state, text) -> str` | function | 497 | The phase GSD's STATE.md names as the current one, or ''. |
++| `installed(project) -> list` | function | 504 | GSD's own files inside the project, one entry per tool folder that has any. |
++| `default_branch(project) -> tuple` | function | 529 | (the branch the project's work starts from, how it was found); ("", "") when it cannot be told. |
++| `plan_ignored(project, planning_dir)` | function | 545 | True when git would ignore a file the move writes; None outside a git work tree. |
++| `read_workstreams(root) -> dict` | function | 557 | GSD's other plans: every folder under workstreams/ is a planning tree of its own, and |
++| `code_summary(project, planning_dir)` | function | 575 | What the project is written in, from the files git tracks; None outside a git work tree. |
++| `map_ids(names) -> dict` | function | 596 | GSD requirement id -> an id the phase tool reads (REQ-<LETTERS>-<digits>). |
++| `build(project, planning_dir, numbering, complete, keep_open) -> dict` | function | 619 | (no docstring) |
++| `roadmap_text(model) -> str` | function | 930 | (no docstring) |
++| `requirements_text(model) -> str` | function | 984 | (no docstring) |
++| `state_text(model, base, release, today) -> str` | function | 1025 | (no docstring) |
++| `decisions_text(model, owner, today) -> str` | function | 1062 | (no docstring) |
++| `manifesto_text(model, template) -> str` | function | 1084 | (no docstring) |
++| `readme_text(model, template) -> str` | function | 1096 | (no docstring) |
++| `record_text(model, written, kept, merged, today) -> str` | function | 1113 | (no docstring) |
++| `convert(model, owner, base, release, tool, dry_run, root_plan, ignored_plan) -> dict` | function | 1163 | (no docstring) |
++| `survey_lines(model) -> list` | function | 1252 | (no docstring) |
++| `main(argv) -> int` | function | 1349 | (no docstring) |
+ 
+ ## devtools.release_plugins — `devtools/release_plugins.py`
+ Components: plugins.release
+diff --git a/.devtools/components/modules/skills.md b/.devtools/components/modules/skills.md
+index 3c31661..b9cacec 100644
+--- a/.devtools/components/modules/skills.md
++++ b/.devtools/components/modules/skills.md
+@@ -8,83 +8,85 @@ Generate and search the component catalog using source ASTs, never package impor
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `load_settings(path) -> dict` | function | 82 | (no docstring) |
+-| `plugin_root(script)` | function | 98 | The plugin install that holds this script, or None. A plugin keeps it in |
+-| `checkout_root() -> Path` | function | 107 | The git checkout that holds the working directory, or the working directory. |
+-| `catalog(root) -> Path` | function | 162 | (no docstring) |
+-| `external_config(root) -> dict` | function | 169 | Libraries to index, from the optional external.toml. |
+-| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 175 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
+-| `read_components(root) -> list[dict]` | function | 201 | Read component headings and single-line fields, retaining duplicate ids. |
+-| `parse_components(text) -> list[dict]` | function | 206 | (no docstring) |
+-| `values(entry, key) -> list[str]` | function | 220 | (no docstring) |
+-| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 225 | A `modules:` value as (the files it names, the folders it names). |
+-| `covers(entry, path) -> bool` | function | 231 | (no docstring) |
+-| `sources(root, directory)` | function | 236 | (no docstring) |
+-| `counted_modules(root) -> list[str]` | function | 244 | The repo-relative paths every module must have a component for: the package's, and |
+-| `counted_dirs() -> str` | function | 254 | (no docstring) |
+-| `coverage(root, entries) -> tuple[list[str], int]` | function | 258 | (no docstring) |
+-| `validate(root, entries, external_names) -> list[str]` | function | 263 | (no docstring) |
+-| `validate_subsystem(entry, entries) -> list[str]` | function | 309 | (no docstring) |
+-| `docstring(node) -> str` | function | 322 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
+-| `summary(node) -> str` | function | 327 | (no docstring) |
+-| `shorten(text, length) -> str` | function | 331 | (no docstring) |
+-| `signature(node, name) -> str` | function | 335 | (no docstring) |
+-| `tool_kind(node) -> str` | function | 354 | (no docstring) |
+-| `symbols(tree, prefix, methods, private, hidden)` | function | 363 | Public definitions in source order; never descend into function bodies. |
+-| `parse(path) -> ast.Module` | function | 391 | (no docstring) |
+-| `parse_source(data, name) -> ast.Module` | function | 395 | (no docstring) |
+-| `cell(text) -> str` | function | 410 | (no docstring) |
+-| `table(rows) -> list[str]` | function | 414 | (no docstring) |
+-| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 421 | The generated module pages and one search hit per module. |
+-| `file_facts(root, relative, trust) -> list` | function | 461 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
+-| `top_level(rows) -> list[dict]` | function | 494 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
+-| `cache_path(root) -> Path` | function | 499 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
+-| `cache_stamp() -> list` | function | 505 | What the kept facts depend on besides the content of a file. |
+-| `cache_state(root) -> dict` | function | 511 | What earlier runs kept for this checkout, read once per run. |
+-| `save_caches() -> None` | function | 532 | (no docstring) |
+-| `write_cache(root, state) -> None` | function | 539 | (no docstring) |
+-| `external_source(dist, dotted) -> Path` | function | 557 | Locate metadata-owned source first, or probe only the top-level package spec. |
+-| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 579 | (no docstring) |
+-| `verb_block(entries) -> str` | function | 614 | (no docstring) |
+-| `subsystem(entry) -> bool` | function | 625 | (no docstring) |
+-| `import_nodes(tree)` | function | 629 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
+-| `raw_imports(tree) -> list` | function | 641 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
+-| `text_imports(text, name) -> list` | function | 649 | The imports of source that is not a file here (a file as it was at another commit). |
+-| `resolve_imports(tree, path, available) -> set[str]` | function | 654 | Resolve only the project's own modules; from-import symbols fall back to their base. |
+-| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 680 | The files of the package, optionally at a base revision: the components that hold each |
+-| `component_graph(root, entries, overrides, files) -> dict` | function | 704 | Map component pairs to sorted module evidence, optionally at a base revision. |
+-| `private(path) -> bool` | function | 717 | Whether a package file is private by its name: the file, or a folder above it inside the |
+-| `relations(entries, edges) -> dict` | function | 724 | (no docstring) |
+-| `direct_edges(edges) -> dict` | function | 739 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
+-| `cycle_groups(pairs) -> list[list[str]]` | function | 744 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
+-| `listing(ids, cap) -> str` | function | 779 | (no docstring) |
+-| `rewrite(text, entries, edges) -> str` | function | 786 | Replace only generated fields, preserving the authored catalog content. |
+-| `graph_text(entries, edges) -> str` | function | 808 | (no docstring) |
+-| `components_text(root, entries, edges) -> str` | function | 826 | (no docstring) |
+-| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 837 | (no docstring) |
+-| `tokens(text) -> set[str]` | function | 847 | (no docstring) |
+-| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 855 | Search the recorded catalog even without the dependency installed. |
+-| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 876 | The hits that share a word with the query, best first, each with its ``matched`` words. |
+-| `coverage_line(root, entries) -> str` | function | 916 | (no docstring) |
+-| `generated_paths(root) -> set[str]` | function | 923 | (no docstring) |
+-| `external_skips(root) -> dict[str, str]` | function | 928 | Explain recorded inventories that cannot be reproduced by this installation. |
+-| `stale_files(root, files) -> list[str]` | function | 945 | Return sorted stale or missing index paths without writing or printing. |
+-| `write_or_check(root, check, strict) -> int` | function | 955 | (no docstring) |
+-| `git(root, *args, check) -> str` | function | 988 | Output of a git command run in `root`; '' when it fails and `check` is off. |
+-| `files_at(root, commit, paths) -> dict[str, str]` | function | 1000 | The text each path (relative to `root`) had at a commit, read with one git process. |
+-| `package_imports(root) -> dict[str, set[str]]` | function | 1022 | Each package module -> the package modules it imports at run time. |
+-| `draft(root, entries, only, by_importers) -> list[str]` | function | 1028 | Stub entries for the modules no component covers: a starting point, never a catalog. |
+-| `resolve_base(root, base) -> tuple[str, str]` | function | 1087 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
+-| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1119 | The checkout as it was at the merge base with `base`. |
+-| `changed(root, base, strict) -> int` | function | 1141 | Check the index against the files that differ from the merge base with `base`. |
+-| `facts(root, base, modules, notes) -> dict` | function | 1227 | The catalog and the import graph as rows of facts, for a rule checker. |
+-| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1296 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+-| `is_retired(entry) -> bool` | function | 1326 | (no docstring) |
+-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1330 | Package module -> the files in tests/ and the extra source directories that import it. |
+-| `some(items, cap) -> str` | function | 1348 | (no docstring) |
+-| `review(root, areas, everything) -> list[str]` | function | 1353 | Leads for a review of the index. Each one is a place to look, not a finding. |
+-| `show(root, name) -> list[str]` | function | 1538 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+-| `main(argv) -> int` | function | 1581 | (no docstring) |
++| `settings_error(message)` | function | 82 | A settings file this script cannot use: say why on standard error and exit 2, the code for a command |
++| `read_settings_file(path) -> dict` | function | 89 | The settings a file holds, or `settings_error` when it is not a JSON object. |
++| `load_settings(path) -> dict` | function | 100 | (no docstring) |
++| `plugin_root(script)` | function | 116 | The plugin install that holds this script, or None. A plugin keeps it in |
++| `checkout_root() -> Path` | function | 125 | The git checkout that holds the working directory, or the working directory. |
++| `catalog(root) -> Path` | function | 180 | (no docstring) |
++| `external_config(root) -> dict` | function | 187 | Libraries to index, from the optional external.toml. |
++| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 193 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
++| `read_components(root) -> list[dict]` | function | 219 | Read component headings and single-line fields, retaining duplicate ids. |
++| `parse_components(text) -> list[dict]` | function | 224 | (no docstring) |
++| `values(entry, key) -> list[str]` | function | 238 | (no docstring) |
++| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 243 | A `modules:` value as (the files it names, the folders it names). |
++| `covers(entry, path) -> bool` | function | 249 | (no docstring) |
++| `sources(root, directory)` | function | 254 | (no docstring) |
++| `counted_modules(root) -> list[str]` | function | 262 | The repo-relative paths every module must have a component for: the package's, and |
++| `counted_dirs() -> str` | function | 272 | (no docstring) |
++| `coverage(root, entries) -> tuple[list[str], int]` | function | 276 | (no docstring) |
++| `validate(root, entries, external_names) -> list[str]` | function | 281 | (no docstring) |
++| `validate_subsystem(entry, entries) -> list[str]` | function | 327 | (no docstring) |
++| `docstring(node) -> str` | function | 340 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
++| `summary(node) -> str` | function | 345 | (no docstring) |
++| `shorten(text, length) -> str` | function | 349 | (no docstring) |
++| `signature(node, name) -> str` | function | 353 | (no docstring) |
++| `tool_kind(node) -> str` | function | 372 | (no docstring) |
++| `symbols(tree, prefix, methods, private, hidden)` | function | 381 | Public definitions in source order; never descend into function bodies. |
++| `parse(path) -> ast.Module` | function | 409 | (no docstring) |
++| `parse_source(data, name) -> ast.Module` | function | 413 | (no docstring) |
++| `cell(text) -> str` | function | 428 | (no docstring) |
++| `table(rows) -> list[str]` | function | 432 | (no docstring) |
++| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 439 | The generated module pages and one search hit per module. |
++| `file_facts(root, relative, trust) -> list` | function | 479 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
++| `top_level(rows) -> list[dict]` | function | 512 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
++| `cache_path(root) -> Path` | function | 517 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
++| `cache_stamp() -> list` | function | 523 | What the kept facts depend on besides the content of a file. |
++| `cache_state(root) -> dict` | function | 529 | What earlier runs kept for this checkout, read once per run. |
++| `save_caches() -> None` | function | 550 | (no docstring) |
++| `write_cache(root, state) -> None` | function | 557 | (no docstring) |
++| `external_source(dist, dotted) -> Path` | function | 575 | Locate metadata-owned source first, or probe only the top-level package spec. |
++| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 597 | (no docstring) |
++| `verb_block(entries) -> str` | function | 632 | (no docstring) |
++| `subsystem(entry) -> bool` | function | 643 | (no docstring) |
++| `import_nodes(tree)` | function | 647 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
++| `raw_imports(tree) -> list` | function | 659 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
++| `text_imports(text, name) -> list` | function | 667 | The imports of source that is not a file here (a file as it was at another commit). |
++| `resolve_imports(tree, path, available) -> set[str]` | function | 672 | Resolve only the project's own modules; from-import symbols fall back to their base. |
++| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 698 | The files of the package, optionally at a base revision: the components that hold each |
++| `component_graph(root, entries, overrides, files) -> dict` | function | 722 | Map component pairs to sorted module evidence, optionally at a base revision. |
++| `private(path) -> bool` | function | 735 | Whether a package file is private by its name: the file, or a folder above it inside the |
++| `relations(entries, edges) -> dict` | function | 742 | (no docstring) |
++| `direct_edges(edges) -> dict` | function | 757 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
++| `cycle_groups(pairs) -> list[list[str]]` | function | 762 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
++| `listing(ids, cap) -> str` | function | 797 | (no docstring) |
++| `rewrite(text, entries, edges) -> str` | function | 804 | Replace only generated fields, preserving the authored catalog content. |
++| `graph_text(entries, edges) -> str` | function | 826 | (no docstring) |
++| `components_text(root, entries, edges) -> str` | function | 844 | (no docstring) |
++| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 855 | (no docstring) |
++| `tokens(text) -> set[str]` | function | 865 | (no docstring) |
++| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 873 | Search the recorded catalog even without the dependency installed. |
++| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 894 | The hits that share a word with the query, best first, each with its ``matched`` words. |
++| `coverage_line(root, entries) -> str` | function | 934 | (no docstring) |
++| `generated_paths(root) -> set[str]` | function | 941 | (no docstring) |
++| `external_skips(root) -> dict[str, str]` | function | 946 | Explain recorded inventories that cannot be reproduced by this installation. |
++| `stale_files(root, files) -> list[str]` | function | 963 | Return sorted stale or missing index paths without writing or printing. |
++| `write_or_check(root, check, strict) -> int` | function | 973 | (no docstring) |
++| `git(root, *args, check) -> str` | function | 1006 | Output of a git command run in `root`; '' when it fails and `check` is off. |
++| `files_at(root, commit, paths) -> dict[str, str]` | function | 1018 | The text each path (relative to `root`) had at a commit, read with one git process. |
++| `package_imports(root) -> dict[str, set[str]]` | function | 1040 | Each package module -> the package modules it imports at run time. |
++| `draft(root, entries, only, by_importers) -> list[str]` | function | 1046 | Stub entries for the modules no component covers: a starting point, never a catalog. |
++| `resolve_base(root, base) -> tuple[str, str]` | function | 1105 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
++| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1137 | The checkout as it was at the merge base with `base`. |
++| `changed(root, base, strict) -> int` | function | 1159 | Check the index against the files that differ from the merge base with `base`. |
++| `facts(root, base, modules, notes) -> dict` | function | 1245 | The catalog and the import graph as rows of facts, for a rule checker. |
++| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1314 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
++| `is_retired(entry) -> bool` | function | 1344 | (no docstring) |
++| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1348 | Package module -> the files in tests/ and the extra source directories that import it. |
++| `some(items, cap) -> str` | function | 1366 | (no docstring) |
++| `review(root, areas, everything) -> list[str]` | function | 1371 | Leads for a review of the index. Each one is a place to look, not a finding. |
++| `show(root, name) -> list[str]` | function | 1556 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
++| `main(argv) -> int` | function | 1599 | (no docstring) |
+ 
+ ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
+ Components: components.rules
+@@ -93,43 +95,45 @@ Check the project's own rules about its components. Optional: it needs GND insta
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+ | `Problem` | class(Exception) | 215 | The check could not run. |
+-| `load_settings(path) -> dict` | function | 219 | (no docstring) |
+-| `plugin_root(script)` | function | 230 | The plugin install that holds this script, or None. A plugin keeps it in |
+-| `checkout_root() -> Path` | function | 239 | The git checkout that holds the working directory, or the working directory. |
+-| `places(root) -> tuple[str, str]` | function | 260 | The rules file and the layers file: beside the catalog, where the index script reads the layers. |
+-| `load_rules(root) -> list[dict]` | function | 273 | (no docstring) |
+-| `example_sets(rule)` | function | 307 | A rule's examples as [(kind, number, facts)], or None when they are not written as `test` reads them. |
+-| `domains(types, facts) -> list[dict]` | function | 323 | The value lists the vocabulary fixes, for the roles the types have: a rule naming another value is a |
+-| `model(types, rules, facts) -> dict` | function | 347 | The GND model: fact types as the facts file describes them, the project's rules, and the value |
+-| `population(doc) -> dict` | function | 369 | (no docstring) |
+-| `named_facts(value) -> set` | function | 375 | Every fact type a rule names, wherever in it. |
+-| `run(command, what, **options) -> subprocess.CompletedProcess` | function | 382 | (no docstring) |
+-| `read_facts(root, base, modules) -> dict` | function | 389 | (no docstring) |
+-| `features(gnd, command, flags) -> set` | function | 406 | Which flags of GND 0.3.1 this one has, read from `gnd <command> --help`. |
+-| `judge(gnd, folder, head, base, diagnose) -> dict` | function | 412 | The report of `gnd check` on the head facts, against the base facts when given. With `diagnose`, |
+-| `findings(report, rules) -> tuple[list, list]` | function | 441 | What is broken, as (level, rule, binding, new), and the rules gnd could not decide, as (level, rule, why). |
+-| `silent(report, rules) -> list[str]` | function | 468 | `reread:` notes for the rules a report shows judged nothing: an antecedent that no binding gets |
+-| `outside(report, built, rules) -> list[str]` | function | 485 | `reread:` notes for a literal in a rule that no fact of its kind can hold, from GND's warnings. |
+-| `hidden(comparison) -> list[str]` | function | 511 | `reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code. |
+-| `base_rules(root, revision) -> list[dict] \| None` | function | 538 | The rules about components as `rules.json` held them at a commit, or None when it had none. |
+-| `compare(gnd, folder, head_model, base_model) -> dict` | function | 552 | `gnd check` of today's facts under today's rules, against the base edition of the rules. |
+-| `used_pair(rule, binding) -> tuple \| None` | function | 564 | The (caller, callee) a broken rule is about: what its first `component_uses` atom binds. |
+-| `describe(binding) -> str` | function | 573 | (no docstring) |
+-| `changed_rules(root, commit) -> list[str]` | function | 579 | The rules files that differ from a commit, untracked ones included. |
+-| `check(root, base, strict, require, as_json) -> int` | function | 590 | (no docstring) |
+-| `read_plan_facts(root, phase) -> dict` | function | 663 | What the plans of a phase say, from the phase tool. |
+-| `names(entry, path) -> bool` | function | 683 | Whether an entry of a task's files (a path, a folder ending in /, or a pattern with *) names a file. |
+-| `plans_with_components(root, code, plans) -> dict` | function | 688 | One set of facts from the two: the component facts, the plan facts, and the JOINED ones. |
+-| `bindings(report) -> dict` | function | 727 | {rule id: how many bindings its antecedent had}, for the guarded rules GND counted. |
+-| `check_phase(root, phase, strict, require, as_json) -> int` | function | 735 | Judge the rules about plans over the plans of one phase. No base: a plan is judged as written. |
+-| `vocabulary(root) -> dict` | function | 789 | Every fact type a rule can name: the component facts, the file facts, and, where the phase tool is |
+-| `generated(gnd, types, rules, noted) -> list[tuple]` | function | 807 | What `gnd synth --guarded-cases` finds about the rules as written: a rule it could build no failing, |
+-| `test(root, require, as_json) -> int` | function | 833 | Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set |
+-| `joined(gnd, head) -> dict` | function | 908 | GND's guarded-join discovery over the component facts: the report of `gnd discover`. |
+-| `area_pair(constraint) -> tuple \| None` | function | 931 | (source area, target area) of a forbidden pair GND proposes: a use from the one never reaches the other. |
+-| `suggest(root, require, form) -> int` | function | 943 | Rules about areas the code already keeps, and the near misses, from GND's guarded-join discovery. |
+-| `init(root, show) -> int` | function | 1019 | (no docstring) |
+-| `main(argv) -> int` | function | 1034 | (no docstring) |
++| `settings_error(message)` | function | 219 | A settings file this script cannot use: say why on standard error and exit 2, the code for a command |
++| `read_settings_file(path) -> dict` | function | 226 | The settings a file holds, or `settings_error` when it is not a JSON object. |
++| `load_settings(path) -> dict` | function | 237 | (no docstring) |
++| `plugin_root(script)` | function | 248 | The plugin install that holds this script, or None. A plugin keeps it in |
++| `checkout_root() -> Path` | function | 257 | The git checkout that holds the working directory, or the working directory. |
++| `places(root) -> tuple[str, str]` | function | 278 | The rules file and the layers file: beside the catalog, where the index script reads the layers. |
++| `load_rules(root) -> list[dict]` | function | 291 | (no docstring) |
++| `example_sets(rule)` | function | 325 | A rule's examples as [(kind, number, facts)], or None when they are not written as `test` reads them. |
++| `domains(types, facts) -> list[dict]` | function | 341 | The value lists the vocabulary fixes, for the roles the types have: a rule naming another value is a |
++| `model(types, rules, facts) -> dict` | function | 365 | The GND model: fact types as the facts file describes them, the project's rules, and the value |
++| `population(doc) -> dict` | function | 387 | (no docstring) |
++| `named_facts(value) -> set` | function | 393 | Every fact type a rule names, wherever in it. |
++| `run(command, what, **options) -> subprocess.CompletedProcess` | function | 400 | (no docstring) |
++| `read_facts(root, base, modules) -> dict` | function | 407 | (no docstring) |
++| `features(gnd, command, flags) -> set` | function | 424 | Which flags of GND 0.3.1 this one has, read from `gnd <command> --help`. |
++| `judge(gnd, folder, head, base, diagnose) -> dict` | function | 430 | The report of `gnd check` on the head facts, against the base facts when given. With `diagnose`, |
++| `findings(report, rules) -> tuple[list, list]` | function | 459 | What is broken, as (level, rule, binding, new), and the rules gnd could not decide, as (level, rule, why). |
++| `silent(report, rules) -> list[str]` | function | 486 | `reread:` notes for the rules a report shows judged nothing: an antecedent that no binding gets |
++| `outside(report, built, rules) -> list[str]` | function | 503 | `reread:` notes for a literal in a rule that no fact of its kind can hold, from GND's warnings. |
++| `hidden(comparison) -> list[str]` | function | 529 | `reread:` notes from `gnd check --baseline-model`: what the edited rules stop reporting on this code. |
++| `base_rules(root, revision) -> list[dict] \| None` | function | 556 | The rules about components as `rules.json` held them at a commit, or None when it had none. |
++| `compare(gnd, folder, head_model, base_model) -> dict` | function | 570 | `gnd check` of today's facts under today's rules, against the base edition of the rules. |
++| `used_pair(rule, binding) -> tuple \| None` | function | 582 | The (caller, callee) a broken rule is about: what its first `component_uses` atom binds. |
++| `describe(binding) -> str` | function | 591 | (no docstring) |
++| `changed_rules(root, commit) -> list[str]` | function | 597 | The rules files that differ from a commit, untracked ones included. |
++| `check(root, base, strict, require, as_json) -> int` | function | 608 | (no docstring) |
++| `read_plan_facts(root, phase) -> dict` | function | 681 | What the plans of a phase say, from the phase tool. |
++| `names(entry, path) -> bool` | function | 701 | Whether an entry of a task's files (a path, a folder ending in /, or a pattern with *) names a file. |
++| `plans_with_components(root, code, plans) -> dict` | function | 706 | One set of facts from the two: the component facts, the plan facts, and the JOINED ones. |
++| `bindings(report) -> dict` | function | 745 | {rule id: how many bindings its antecedent had}, for the guarded rules GND counted. |
++| `check_phase(root, phase, strict, require, as_json) -> int` | function | 753 | Judge the rules about plans over the plans of one phase. No base: a plan is judged as written. |
++| `vocabulary(root) -> dict` | function | 807 | Every fact type a rule can name: the component facts, the file facts, and, where the phase tool is |
++| `generated(gnd, types, rules, noted) -> list[tuple]` | function | 825 | What `gnd synth --guarded-cases` finds about the rules as written: a rule it could build no failing, |
++| `test(root, require, as_json) -> int` | function | 851 | Judge each rule alone on the examples it carries: each `fails` set must break it, each `passes` set |
++| `joined(gnd, head) -> dict` | function | 935 | GND's guarded-join discovery over the component facts: the report of `gnd discover`. |
++| `area_pair(constraint) -> tuple \| None` | function | 958 | (source area, target area) of a forbidden pair GND proposes: a use from the one never reaches the other. |
++| `suggest(root, require, form) -> int` | function | 970 | Rules about areas the code already keeps, and the near misses, from GND's guarded-join discovery. |
++| `init(root, show) -> int` | function | 1046 | (no docstring) |
++| `main(argv) -> int` | function | 1061 | (no docstring) |
+ 
+ ## skills.dev-handoff.scripts.handoff — `skills/dev-handoff/scripts/handoff.py`
+ Components: handoff.notes
+@@ -139,27 +143,28 @@ handoff.py: hand a branch to another coding assistant, developer or machine, and
+ | --- | --- | --- | --- |
+ | `plugin_root(script)` | function | 45 | The plugin install that holds this script, or None. A plugin keeps it in |
+ | `checkout_root() -> Path` | function | 54 | The git checkout that holds the working directory, or the working directory. |
+-| `load_settings(path) -> dict` | function | 86 | (no docstring) |
+-| `note_dir(root) -> Path` | function | 173 | (no docstring) |
+-| `note_path(root, branch) -> Path` | function | 177 | (no docstring) |
+-| `other_notes(root) -> list[str]` | function | 181 | (no docstring) |
+-| `current_branch(root) -> str` | function | 185 | (no docstring) |
+-| `base_ref(root, base) -> str` | function | 205 | The ref ``base`` names in this checkout, the local branch or origin's; '' when there is |
+-| `default_base(root) -> str` | function | 214 | The branch work starts from: the setting, the phase workflow's, origin's default, main. |
+-| `snapshot(root, base, *, ignored) -> dict` | function | 225 | What git and the planning folder say about the branch right now. ``ignored`` is an |
+-| `branch_start(root, base) -> float \| None` | function | 283 | Commit time of the point where the branch left ``base``; None when unknown. |
+-| `ignored_inventory(root, *, max_mb, since, include) -> list[dict]` | function | 368 | Files git ignores in this checkout: {path, kind, bytes, files}, largest first. |
+-| `carry(root, dest, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 558 | Copy the ignored files worth carrying to another checkout: a local path or host:path. |
+-| `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 610 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
+-| `level(sender, to, machine) -> int` | function | 642 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
+-| `detect_sender() -> str` | function | 649 | The assistant running this process, when it says so in the environment. |
+-| `HandoffError` | class(Exception) | 766 | The command cannot do what was asked; the message says why. |
+-| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 786 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
+-| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 820 | What the next machine would not get: findings as dicts, most severe first. |
+-| `doctor(root, *, home) -> list[dict]` | function | 888 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
+-| `available(root) -> list[dict]` | function | 943 | Hand-off notes that can be taken over, one per branch, newest first. |
+-| `takeover(root, *, home) -> dict` | function | 1025 | Everything the receiving side checks before continuing, in one report. |
+-| `main(argv) -> int` | function | 1230 | (no docstring) |
++| `settings_error(message)` | function | 86 | A settings file this script cannot use: say why on standard error and exit 2, the code for a command |
++| `load_settings(path) -> dict` | function | 93 | (no docstring) |
++| `note_dir(root) -> Path` | function | 185 | (no docstring) |
++| `note_path(root, branch) -> Path` | function | 189 | (no docstring) |
++| `other_notes(root) -> list[str]` | function | 193 | (no docstring) |
++| `current_branch(root) -> str` | function | 197 | (no docstring) |
++| `base_ref(root, base) -> str` | function | 217 | The ref ``base`` names in this checkout, the local branch or origin's; '' when there is |
++| `default_base(root) -> str` | function | 226 | The branch work starts from: the setting, the phase workflow's, origin's default, main. |
++| `snapshot(root, base, *, ignored) -> dict` | function | 237 | What git and the planning folder say about the branch right now. ``ignored`` is an |
++| `branch_start(root, base) -> float \| None` | function | 295 | Commit time of the point where the branch left ``base``; None when unknown. |
++| `ignored_inventory(root, *, max_mb, since, include) -> list[dict]` | function | 380 | Files git ignores in this checkout: {path, kind, bytes, files}, largest first. |
++| `carry(root, dest, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 570 | Copy the ignored files worth carrying to another checkout: a local path or host:path. |
++| `pull(root, source, *, include, max_mb, with_keys, base, all_ages, yes) -> dict` | function | 622 | ``carry`` in the other direction: fetch ignored files from the old checkout into this one. |
++| `level(sender, to, machine) -> int` | function | 654 | 1 same assistant and machine, 2 other assistant, 3 other machine (the default). |
++| `detect_sender() -> str` | function | 661 | The assistant running this process, when it says so in the environment. |
++| `HandoffError` | class(Exception) | 778 | The command cannot do what was asked; the message says why. |
++| `write_note(root, *, base, today, sender, to, machine, snap) -> Path` | function | 798 | Create the branch's note, or refresh its snapshot, target and date; filled sections stay. |
++| `check_note(root, path, *, base, ignored) -> list[dict]` | function | 832 | What the next machine would not get: findings as dicts, most severe first. |
++| `doctor(root, *, home) -> list[dict]` | function | 900 | Can this machine continue the work? Rows of {name, ok, detail, fix}. |
++| `available(root) -> list[dict]` | function | 955 | Hand-off notes that can be taken over, one per branch, newest first. |
++| `takeover(root, *, home) -> dict` | function | 1037 | Everything the receiving side checks before continuing, in one report. |
++| `main(argv) -> int` | function | 1242 | (no docstring) |
+ 
+ ## skills.milestone.process-phase.scripts.review_tool — `skills/milestone/process-phase/scripts/review_tool.py`
+ Components: review.rounds
+@@ -167,46 +172,46 @@ review_tool.py: the independent review of the milestone workflow (process-phase
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `plugin_root(script)` | function | 67 | The plugin install that holds this script, or None. A plugin keeps it in |
+-| `checkout_root() -> Path` | function | 76 | The git checkout that holds the working directory, or the working directory. |
+-| `Stop` | class(Exception) | 143 | The command cannot run; exit 2 with this message. |
+-| `load_settings(path) -> dict` | function | 147 | (no docstring) |
+-| `now(precise) -> str` | function | 160 | (no docstring) |
+-| `sha256(path) -> str` | function | 166 | (no docstring) |
+-| `git(root, *args, check) -> subprocess.CompletedProcess` | function | 170 | (no docstring) |
+-| `repo_root() -> Path` | function | 175 | (no docstring) |
+-| `looks_secret(path) -> bool` | function | 183 | (no docstring) |
+-| `write_json(path, data) -> None` | function | 187 | (no docstring) |
+-| `read_json(path) -> dict` | function | 193 | (no docstring) |
+-| `shown(root, path) -> str` | function | 197 | A path as a brief names it: relative to the repository when inside it. |
+-| `unquote(path) -> str` | function | 205 | A path as git prints it in a diff header: C-quoted when it holds a special byte. |
+-| `strip_prefix(path) -> str` | function | 225 | (no docstring) |
+-| `header_paths(line) -> list[str]` | function | 229 | Both paths of a 'diff --git' line, quoted or not. |
+-| `split_diff(text) -> list[tuple[list[str], str]]` | function | 242 | (paths, block) for each file of a unified git diff. The paths come from the block's |
+-| `without_secrets(text) -> tuple[str, list[str]]` | function | 267 | The diff without any block that names a credential file on either side, and every |
+-| `cmd_brief(args, settings) -> int` | function | 281 | (no docstring) |
+-| `brief_text(root, out, brief) -> str` | function | 391 | (no docstring) |
+-| `ledger_text(out) -> str` | function | 450 | (no docstring) |
+-| `load_brief(path) -> tuple[Path, dict]` | function | 469 | (no docstring) |
+-| `changed_files(root, out, brief) -> list[str]` | function | 477 | (no docstring) |
+-| `pick_reviewer(args, settings) -> str` | function | 488 | (no docstring) |
+-| `command(name, settings) -> tuple[list[str], str]` | function | 499 | The reviewer's argv with the brief folder as {dir}, and the file its stdout goes to. |
+-| `preconditions(name) -> list[str]` | function | 513 | (no docstring) |
+-| `cmd_run(args, settings) -> int` | function | 524 | (no docstring) |
+-| `watch(root, out) -> int` | function | 555 | (no docstring) |
+-| `rounds(paths) -> list[Path]` | function | 590 | (no docstring) |
+-| `alive(pid) -> bool` | function | 602 | (no docstring) |
+-| `run_state(run) -> str` | function | 610 | (no docstring) |
+-| `split_row(line) -> list[str]` | function | 617 | The cells of a table row, with or without its outer pipes. |
+-| `ledger_rows(text) -> list[dict]` | function | 625 | The rows of the findings table: from its Id header to the next heading or table, |
+-| `says_none(text) -> bool` | function | 650 | (no docstring) |
+-| `ledger_problems(root, out, finished) -> tuple[list[dict], list[str]]` | function | 654 | (no docstring) |
+-| `cmd_status(args, settings) -> int` | function | 694 | (no docstring) |
+-| `run_gh(args) -> str` | function | 766 | (no docstring) |
+-| `pr_view(number) -> dict` | function | 776 | (no docstring) |
+-| `cmd_post(args, settings) -> int` | function | 782 | (no docstring) |
+-| `cmd_sanitize(args, settings) -> int` | function | 827 | (no docstring) |
+-| `main(argv) -> int` | function | 857 | (no docstring) |
++| `plugin_root(script)` | function | 68 | The plugin install that holds this script, or None. A plugin keeps it in |
++| `checkout_root() -> Path` | function | 77 | The git checkout that holds the working directory, or the working directory. |
++| `Stop` | class(Exception) | 144 | The command cannot run; exit 2 with this message. |
++| `load_settings(path) -> dict` | function | 148 | The settings, or `Stop` (exit 2: the command could not run) for a file this script cannot use. |
++| `now(precise) -> str` | function | 167 | (no docstring) |
++| `sha256(path) -> str` | function | 173 | (no docstring) |
++| `git(root, *args, check) -> subprocess.CompletedProcess` | function | 177 | (no docstring) |
++| `repo_root() -> Path` | function | 182 | (no docstring) |
++| `looks_secret(path) -> bool` | function | 190 | (no docstring) |
++| `write_json(path, data) -> None` | function | 194 | (no docstring) |
++| `read_json(path) -> dict` | function | 200 | (no docstring) |
++| `shown(root, path) -> str` | function | 204 | A path as a brief names it: relative to the repository when inside it. |
++| `unquote(path) -> str` | function | 212 | A path as git prints it in a diff header: C-quoted when it holds a special byte. |
++| `strip_prefix(path) -> str` | function | 232 | (no docstring) |
++| `header_paths(line) -> list[str]` | function | 236 | Both paths of a 'diff --git' line, quoted or not. |
++| `split_diff(text) -> list[tuple[list[str], str]]` | function | 249 | (paths, block) for each file of a unified git diff. The paths come from the block's |
++| `without_secrets(text) -> tuple[str, list[str]]` | function | 274 | The diff without any block that names a credential file on either side, and every |
++| `cmd_brief(args, settings) -> int` | function | 288 | (no docstring) |
++| `brief_text(root, out, brief) -> str` | function | 398 | (no docstring) |
++| `ledger_text(out) -> str` | function | 457 | (no docstring) |
++| `load_brief(path) -> tuple[Path, dict]` | function | 476 | (no docstring) |
++| `changed_files(root, out, brief) -> list[str]` | function | 484 | (no docstring) |
++| `pick_reviewer(args, settings) -> str` | function | 495 | (no docstring) |
++| `command(name, settings) -> tuple[list[str], str]` | function | 506 | The reviewer's argv with the brief folder as {dir}, and the file its stdout goes to. |
++| `preconditions(name) -> list[str]` | function | 520 | (no docstring) |
++| `cmd_run(args, settings) -> int` | function | 531 | (no docstring) |
++| `watch(root, out) -> int` | function | 562 | (no docstring) |
++| `rounds(paths) -> list[Path]` | function | 597 | (no docstring) |
++| `alive(pid) -> bool` | function | 609 | (no docstring) |
++| `run_state(run) -> str` | function | 617 | (no docstring) |
++| `split_row(line) -> list[str]` | function | 624 | The cells of a table row, with or without its outer pipes. |
++| `ledger_rows(text) -> list[dict]` | function | 632 | The rows of the findings table: from its Id header to the next heading or table, |
++| `says_none(text) -> bool` | function | 657 | (no docstring) |
++| `ledger_problems(root, out, finished) -> tuple[list[dict], list[str]]` | function | 661 | (no docstring) |
++| `cmd_status(args, settings) -> int` | function | 701 | (no docstring) |
++| `run_gh(args) -> str` | function | 773 | (no docstring) |
++| `pr_view(number) -> dict` | function | 783 | (no docstring) |
++| `cmd_post(args, settings) -> int` | function | 789 | (no docstring) |
++| `cmd_sanitize(args, settings) -> int` | function | 834 | (no docstring) |
++| `main(argv) -> int` | function | 864 | (no docstring) |
+ 
+ ## skills.phase.process-phase.scripts.coder_pool — `skills/phase/process-phase/scripts/coder_pool.py`
+ Components: phase.coder_pool
+@@ -258,108 +263,108 @@ phase_tool.py: owns phase state and the planning checks (process-phase skill).
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `plugin_root(script)` | function | 47 | The plugin install that holds this script, or None. A plugin keeps it in |
+-| `checkout_root() -> Path` | function | 56 | The git checkout that holds the working directory, or the working directory. |
+-| `load_settings(path) -> dict` | function | 99 | (no docstring) |
+-| `ToolError` | class(Exception) | 172 | A domain (exit 1) or usage (exit 2) failure reported in the envelope. |
+-| `Parser` | class(argparse.ArgumentParser) | 181 | ArgumentParser that raises instead of printing and exiting. |
+-| `Parser.error(self, message)` | method | 184 | (no docstring) |
+-| `today() -> str` | function | 191 | (no docstring) |
+-| `norm_phase(value) -> str` | function | 195 | Normalise whole or inserted phase ids to NN or NN.M (e.g. 06.1). |
+-| `phase_key(value) -> tuple` | function | 204 | Numeric major/minor ordering, with a whole phase before its insertions. |
+-| `rel(root, path) -> str` | function | 210 | (no docstring) |
+-| `issue(file, line, rule, message) -> dict` | function | 217 | (no docstring) |
+-| `git(root, *args)` | function | 221 | Run git in root; return stdout or None when git is unavailable or fails. |
+-| `find_root(explicit) -> Path` | function | 230 | (no docstring) |
+-| `split_frontmatter(text)` | function | 243 | Return (frontmatter lines, body) or (None, text) when there is no frontmatter. |
+-| `parse_frontmatter(text) -> dict` | function | 255 | (no docstring) |
+-| `format_value(key, value) -> str` | function | 266 | (no docstring) |
+-| `update_frontmatter(path, updates) -> None` | function | 272 | Rewrite flat keys in place, appending missing keys at the end of the block. |
+-| `phase_list(raw) -> list` | function | 290 | (no docstring) |
+-| `Planning` | class | 297 | Lazy accessors over the .planning/ directory of a repo root. |
+-| `Planning.require(self) -> None` | method | 304 | (no docstring) |
+-| `Planning.state(self) -> dict` | method | 309 | (no docstring) |
+-| `Planning.roadmap_text(self) -> str` | method | 324 | (no docstring) |
+-| `Planning.phases(self) -> list` | method | 328 | (no docstring) |
+-| `Planning.phase(self, nn)` | method | 331 | (no docstring) |
+-| `Planning.phase_dir(self, nn)` | method | 337 | (no docstring) |
+-| `Planning.ensure_phase_dir(self, nn) -> Path` | method | 342 | (no docstring) |
+-| `parse_roadmap(text) -> list` | function | 353 | Parse '## Phase N[.M]: Title' sections and their '- **Field:** value' bullets. |
+-| `public_phase(phase) -> dict` | function | 382 | (no docstring) |
+-| `parse_requirements(text)` | function | 386 | Return (u_ids {id: line}, reqs [{id, u, phases, status, line, raw}]). |
+-| `load_gates() -> dict` | function | 408 | (no docstring) |
+-| `gates_for(nn) -> list` | function | 415 | (no docstring) |
+-| `missing_artifacts(pl, nn, status) -> list` | function | 425 | (no docstring) |
+-| `finished_elsewhere(phase, status) -> bool` | function | 451 | A complete phase whose roadmap block says it has no acceptance tests ("none: finished |
+-| `open_phases(pl, completed) -> list` | function | 458 | Roadmap phases that are not complete, lowest first; those that can start come before blocked ones. |
+-| `next_phase(pl, state) -> str` | function | 465 | Lowest incomplete roadmap phase whose dependencies are complete (else the lowest incomplete one). |
+-| `cmd_status(pl, args) -> dict` | function | 471 | (no docstring) |
+-| `cmd_setup(pl, args) -> dict` | function | 526 | Create the planning files a new project needs; never overwrites an existing file. |
+-| `cmd_init(pl, args) -> dict` | function | 568 | (no docstring) |
+-| `cmd_roadmap(pl, args) -> dict` | function | 602 | (no docstring) |
+-| `check_top_level(pl) -> list` | function | 620 | (no docstring) |
+-| `check_state(pl) -> list` | function | 625 | (no docstring) |
+-| `check_roadmap(pl) -> list` | function | 639 | (no docstring) |
+-| `coverage(pl) -> dict` | function | 690 | (no docstring) |
+-| `check_requirements(pl) -> list` | function | 704 | (no docstring) |
+-| `check_docs(pl) -> list` | function | 725 | (no docstring) |
+-| `check_ignored(pl) -> list` | function | 740 | (no docstring) |
+-| `check_skill(root, skill_dir) -> list` | function | 757 | (no docstring) |
+-| `check_skills(pl) -> list` | function | 785 | (no docstring) |
+-| `hashable(path) -> bool` | function | 808 | (no docstring) |
+-| `acceptance_files(root, nn) -> dict` | function | 813 | Hash acceptance files under pNN_* or pNN_M_*, excluding caches and other phases. |
+-| `fixture_files(root, declared) -> dict` | function | 825 | sha256 of declared fixture files; a directory entry expands to every file under it. |
+-| `current_fixture_hashes(root, locked) -> dict` | function | 840 | (no docstring) |
+-| `check_testlock(pl, nn) -> list` | function | 844 | (no docstring) |
+-| `check_all_testlocks(pl) -> list` | function | 875 | (no docstring) |
+-| `check_doc_file(root, path, rule, needs_tests) -> list` | function | 883 | (no docstring) |
+-| `check_plan_reuse(root, text, filename) -> list` | function | 899 | Require component search evidence only for an explicitly checked plan. |
+-| `scalar(text) -> str` | function | 923 | One YAML-ish value: the text inside its quotes, or the text before a trailing comment. |
+-| `frontmatter_list(text, key) -> list` | function | 932 | A frontmatter list: inline (``key: [a, "b, c"]``) or one ``- item`` a line, indented or not. |
+-| `listed(value, pattern) -> list` | function | 952 | The items of a task field: what is in backticks, or without any, what commas and lines separate. |
+-| `parse_plan(text) -> dict` | function | 964 | What a plan declares: its wave, the plans it depends on, its requirements and the tests |
+-| `phase_plans(pl, nn) -> dict` | function | 996 | {repo-relative path: parsed plan} for every NN-MM-PLAN.md of a phase. A plan's id is the |
+-| `overlap(a, b) -> bool` | function | 1006 | Whether two entries of tasks' `files` can name the same file. An entry is a path, a |
+-| `index_paths() -> tuple` | function | 1026 | The component index as (files, folders): the catalog and what is generated beside it. |
+-| `inside(entry, entries) -> bool` | function | 1033 | Whether everything an entry names is named by one of `entries` too. |
+-| `track_cap(root)` | function | 1039 | How many tracks the coder pool runs at once here (coder_pool.py beside this script), or |
+-| `plan_order(nn, plans) -> tuple` | function | 1054 | The order `depends_on` gives the plans of a phase, by plan id: the plans each one names, |
+-| `check_plan_order(pl, nn, plans) -> tuple` | function | 1088 | How the plans of a phase are ordered and what they share; returns (issues, warnings). |
+-| `traceability(text) -> tuple` | function | 1142 | What NN-TESTS.md lists: its test_dir, and each row of the Traceability table that names |
+-| `test_path(folder, name) -> str` | function | 1155 | A test id with its folder: one written as a bare file name is in the phase's test_dir. |
+-| `check_plans(pl, nn) -> tuple` | function | 1161 | The plans of a phase together; returns (issues, warnings). Every contract test id in the |
+-| `check_scope(pl, nn, base) -> tuple` | function | 1221 | What the phase branch changed against what its plans declared; returns (issues, warnings). |
+-| `check_capabilities(pl) -> list` | function | 1274 | Compare generated capability bytes without loading the product or writing files. |
+-| `heading_words(title) -> set` | function | 1305 | (no docstring) |
+-| `template_sections(path)` | function | 1309 | Section number -> heading words, and heading titles, of a template (``## 3. Timeboxed prototype``). |
+-| `citation_words(rest)` | function | 1320 | The two words after a citation when the first is a content word; () when it is a stopword or punctuation. |
+-| `check_template_citations(pl) -> list` | function | 1329 | Each ``prove.md §N`` / ``templates/X.md §N`` (or quoted heading) in the skill exists, and the words |
+-| `merge_base(pl)` | function | 1359 | (base branch name, merge-base sha with HEAD) using the STATE base branch or origin/<base>; sha None when unknown. |
+-| `changed_paths(name_status)` | function | 1372 | Paths in ``git diff --name-status -z`` output; a rename or copy yields both its old and new path. |
+-| `check_rule_decs(pl) -> list` | function | 1387 | In a git work tree, a working-tree diff against the base branch that changes process-phase rule text |
+-| `markdown_tables(text) -> list` | function | 1419 | Return pipe tables as lists of (line number, cells), excluding separators. |
+-| `check_prove(pl, nn) -> list` | function | 1436 | (no docstring) |
+-| `cmd_check(pl, args) -> dict` | function | 1470 | (no docstring) |
+-| `cmd_req_coverage(pl, args) -> dict` | function | 1524 | (no docstring) |
+-| `require_dec(pl, dec) -> str` | function | 1536 | A DEC id that exists as a row in DECISIONS.md (used by re-locks and gate overrides). |
+-| `cmd_testlock(pl, args) -> dict` | function | 1549 | (no docstring) |
+-| `set_roadmap_status(pl, nn, status) -> bool` | function | 1588 | (no docstring) |
+-| `evidence_problems(pl, nn) -> list` | function | 1600 | (no docstring) |
+-| `gate_problems(pl, nn, target) -> list` | function | 1608 | Blocking prerequisites of a transition (empty list = the gate is satisfied). |
+-| `cmd_advance(pl, args) -> dict` | function | 1642 | (no docstring) |
+-| `cmd_branch(pl, args) -> dict` | function | 1684 | Show or set STATE.phase_branch (the only writer of that key; git itself is not touched). |
+-| `validate_requirements(pl, completed) -> int` | function | 1703 | (no docstring) |
+-| `cmd_activate(pl, args) -> dict` | function | 1719 | (no docstring) |
+-| `cmd_complete(pl, args) -> dict` | function | 1737 | (no docstring) |
+-| `module_name(token)` | function | 1782 | (no docstring) |
+-| `cmd_migration_check(pl, args) -> dict` | function | 1792 | (no docstring) |
+-| `golden_base(pl, state, explicit)` | function | 1821 | Ref the phase's goldens are compared against: --base, else merge-base(base_branch, HEAD). |
+-| `cmd_golden_diff(pl, args) -> dict` | function | 1832 | Golden files changed on this phase (committed since the base or uncommitted) must be declared. |
+-| `cmd_evidence_check(pl, args) -> dict` | function | 1852 | (no docstring) |
+-| `cmd_facts(pl, args) -> dict` | function | 1897 | The plans of a phase as rows of facts, for a rule checker (`rules_check.py check --phase`). |
+-| `build_parser() -> Parser` | function | 1958 | (no docstring) |
+-| `render_md(env) -> str` | function | 2005 | (no docstring) |
+-| `main(argv) -> int` | function | 2025 | (no docstring) |
++| `plugin_root(script)` | function | 48 | The plugin install that holds this script, or None. A plugin keeps it in |
++| `checkout_root() -> Path` | function | 57 | The git checkout that holds the working directory, or the working directory. |
++| `load_settings(path) -> dict` | function | 100 | The settings; ValueError with the reason for a file this script cannot use. |
++| `ToolError` | class(Exception) | 184 | A domain (exit 1) or usage (exit 2) failure reported in the envelope. |
++| `Parser` | class(argparse.ArgumentParser) | 193 | ArgumentParser that raises instead of printing and exiting. |
++| `Parser.error(self, message)` | method | 196 | (no docstring) |
++| `today() -> str` | function | 203 | (no docstring) |
++| `norm_phase(value) -> str` | function | 207 | Normalise whole or inserted phase ids to NN or NN.M (e.g. 06.1). |
++| `phase_key(value) -> tuple` | function | 216 | Numeric major/minor ordering, with a whole phase before its insertions. |
++| `rel(root, path) -> str` | function | 222 | (no docstring) |
++| `issue(file, line, rule, message) -> dict` | function | 229 | (no docstring) |
++| `git(root, *args)` | function | 233 | Run git in root; return stdout or None when git is unavailable or fails. |
++| `find_root(explicit) -> Path` | function | 242 | (no docstring) |
++| `split_frontmatter(text)` | function | 255 | Return (frontmatter lines, body) or (None, text) when there is no frontmatter. |
++| `parse_frontmatter(text) -> dict` | function | 267 | (no docstring) |
++| `format_value(key, value) -> str` | function | 278 | (no docstring) |
++| `update_frontmatter(path, updates) -> None` | function | 284 | Rewrite flat keys in place, appending missing keys at the end of the block. |
++| `phase_list(raw) -> list` | function | 302 | (no docstring) |
++| `Planning` | class | 309 | Lazy accessors over the .planning/ directory of a repo root. |
++| `Planning.require(self) -> None` | method | 316 | (no docstring) |
++| `Planning.state(self) -> dict` | method | 321 | (no docstring) |
++| `Planning.roadmap_text(self) -> str` | method | 336 | (no docstring) |
++| `Planning.phases(self) -> list` | method | 340 | (no docstring) |
++| `Planning.phase(self, nn)` | method | 343 | (no docstring) |
++| `Planning.phase_dir(self, nn)` | method | 349 | (no docstring) |
++| `Planning.ensure_phase_dir(self, nn) -> Path` | method | 354 | (no docstring) |
++| `parse_roadmap(text) -> list` | function | 365 | Parse '## Phase N[.M]: Title' sections and their '- **Field:** value' bullets. |
++| `public_phase(phase) -> dict` | function | 394 | (no docstring) |
++| `parse_requirements(text)` | function | 398 | Return (u_ids {id: line}, reqs [{id, u, phases, status, line, raw}]). |
++| `load_gates() -> dict` | function | 420 | (no docstring) |
++| `gates_for(nn) -> list` | function | 427 | (no docstring) |
++| `missing_artifacts(pl, nn, status) -> list` | function | 437 | (no docstring) |
++| `finished_elsewhere(phase, status) -> bool` | function | 463 | A complete phase whose roadmap block says it has no acceptance tests ("none: finished |
++| `open_phases(pl, completed) -> list` | function | 470 | Roadmap phases that are not complete, lowest first; those that can start come before blocked ones. |
++| `next_phase(pl, state) -> str` | function | 477 | Lowest incomplete roadmap phase whose dependencies are complete (else the lowest incomplete one). |
++| `cmd_status(pl, args) -> dict` | function | 483 | (no docstring) |
++| `cmd_setup(pl, args) -> dict` | function | 538 | Create the planning files a new project needs; never overwrites an existing file. |
++| `cmd_init(pl, args) -> dict` | function | 580 | (no docstring) |
++| `cmd_roadmap(pl, args) -> dict` | function | 614 | (no docstring) |
++| `check_top_level(pl) -> list` | function | 632 | (no docstring) |
++| `check_state(pl) -> list` | function | 637 | (no docstring) |
++| `check_roadmap(pl) -> list` | function | 651 | (no docstring) |
++| `coverage(pl) -> dict` | function | 702 | (no docstring) |
++| `check_requirements(pl) -> list` | function | 716 | (no docstring) |
++| `check_docs(pl) -> list` | function | 737 | (no docstring) |
++| `check_ignored(pl) -> list` | function | 752 | (no docstring) |
++| `check_skill(root, skill_dir) -> list` | function | 769 | (no docstring) |
++| `check_skills(pl) -> list` | function | 797 | (no docstring) |
++| `hashable(path) -> bool` | function | 820 | (no docstring) |
++| `acceptance_files(root, nn) -> dict` | function | 825 | Hash acceptance files under pNN_* or pNN_M_*, excluding caches and other phases. |
++| `fixture_files(root, declared) -> dict` | function | 837 | sha256 of declared fixture files; a directory entry expands to every file under it. |
++| `current_fixture_hashes(root, locked) -> dict` | function | 852 | (no docstring) |
++| `check_testlock(pl, nn) -> list` | function | 856 | (no docstring) |
++| `check_all_testlocks(pl) -> list` | function | 887 | (no docstring) |
++| `check_doc_file(root, path, rule, needs_tests) -> list` | function | 895 | (no docstring) |
++| `check_plan_reuse(root, text, filename) -> list` | function | 911 | Require component search evidence only for an explicitly checked plan. |
++| `scalar(text) -> str` | function | 935 | One YAML-ish value: the text inside its quotes, or the text before a trailing comment. |
++| `frontmatter_list(text, key) -> list` | function | 944 | A frontmatter list: inline (``key: [a, "b, c"]``) or one ``- item`` a line, indented or not. |
++| `listed(value, pattern) -> list` | function | 964 | The items of a task field: what is in backticks, or without any, what commas and lines separate. |
++| `parse_plan(text) -> dict` | function | 976 | What a plan declares: its wave, the plans it depends on, its requirements and the tests |
++| `phase_plans(pl, nn) -> dict` | function | 1008 | {repo-relative path: parsed plan} for every NN-MM-PLAN.md of a phase. A plan's id is the |
++| `overlap(a, b) -> bool` | function | 1018 | Whether two entries of tasks' `files` can name the same file. An entry is a path, a |
++| `index_paths() -> tuple` | function | 1038 | The component index as (files, folders): the catalog and what is generated beside it. |
++| `inside(entry, entries) -> bool` | function | 1045 | Whether everything an entry names is named by one of `entries` too. |
++| `track_cap(root)` | function | 1051 | How many tracks the coder pool runs at once here (coder_pool.py beside this script), or |
++| `plan_order(nn, plans) -> tuple` | function | 1066 | The order `depends_on` gives the plans of a phase, by plan id: the plans each one names, |
++| `check_plan_order(pl, nn, plans) -> tuple` | function | 1100 | How the plans of a phase are ordered and what they share; returns (issues, warnings). |
++| `traceability(text) -> tuple` | function | 1154 | What NN-TESTS.md lists: its test_dir, and each row of the Traceability table that names |
++| `test_path(folder, name) -> str` | function | 1167 | A test id with its folder: one written as a bare file name is in the phase's test_dir. |
++| `check_plans(pl, nn) -> tuple` | function | 1173 | The plans of a phase together; returns (issues, warnings). Every contract test id in the |
++| `check_scope(pl, nn, base) -> tuple` | function | 1233 | What the phase branch changed against what its plans declared; returns (issues, warnings). |
++| `check_capabilities(pl) -> list` | function | 1286 | Compare generated capability bytes without loading the product or writing files. |
++| `heading_words(title) -> set` | function | 1317 | (no docstring) |
++| `template_sections(path)` | function | 1321 | Section number -> heading words, and heading titles, of a template (``## 3. Timeboxed prototype``). |
++| `citation_words(rest)` | function | 1332 | The two words after a citation when the first is a content word; () when it is a stopword or punctuation. |
++| `check_template_citations(pl) -> list` | function | 1341 | Each ``prove.md §N`` / ``templates/X.md §N`` (or quoted heading) in the skill exists, and the words |
++| `merge_base(pl)` | function | 1371 | (base branch name, merge-base sha with HEAD) using the STATE base branch or origin/<base>; sha None when unknown. |
++| `changed_paths(name_status)` | function | 1384 | Paths in ``git diff --name-status -z`` output; a rename or copy yields both its old and new path. |
++| `check_rule_decs(pl) -> list` | function | 1399 | In a git work tree, a working-tree diff against the base branch that changes process-phase rule text |
++| `markdown_tables(text) -> list` | function | 1431 | Return pipe tables as lists of (line number, cells), excluding separators. |
++| `check_prove(pl, nn) -> list` | function | 1448 | (no docstring) |
++| `cmd_check(pl, args) -> dict` | function | 1482 | (no docstring) |
++| `cmd_req_coverage(pl, args) -> dict` | function | 1536 | (no docstring) |
++| `require_dec(pl, dec) -> str` | function | 1548 | A DEC id that exists as a row in DECISIONS.md (used by re-locks and gate overrides). |
++| `cmd_testlock(pl, args) -> dict` | function | 1561 | (no docstring) |
++| `set_roadmap_status(pl, nn, status) -> bool` | function | 1600 | (no docstring) |
++| `evidence_problems(pl, nn) -> list` | function | 1612 | (no docstring) |
++| `gate_problems(pl, nn, target) -> list` | function | 1620 | Blocking prerequisites of a transition (empty list = the gate is satisfied). |
++| `cmd_advance(pl, args) -> dict` | function | 1654 | (no docstring) |
++| `cmd_branch(pl, args) -> dict` | function | 1696 | Show or set STATE.phase_branch (the only writer of that key; git itself is not touched). |
++| `validate_requirements(pl, completed) -> int` | function | 1715 | (no docstring) |
++| `cmd_activate(pl, args) -> dict` | function | 1731 | (no docstring) |
++| `cmd_complete(pl, args) -> dict` | function | 1749 | (no docstring) |
++| `module_name(token)` | function | 1794 | (no docstring) |
++| `cmd_migration_check(pl, args) -> dict` | function | 1804 | (no docstring) |
++| `golden_base(pl, state, explicit)` | function | 1833 | Ref the phase's goldens are compared against: --base, else merge-base(base_branch, HEAD). |
++| `cmd_golden_diff(pl, args) -> dict` | function | 1844 | Golden files changed on this phase (committed since the base or uncommitted) must be declared. |
++| `cmd_evidence_check(pl, args) -> dict` | function | 1864 | (no docstring) |
++| `cmd_facts(pl, args) -> dict` | function | 1909 | The plans of a phase as rows of facts, for a rule checker (`rules_check.py check --phase`). |
++| `build_parser() -> Parser` | function | 1970 | (no docstring) |
++| `render_md(env) -> str` | function | 2017 | (no docstring) |
++| `main(argv) -> int` | function | 2037 | (no docstring) |
+ 
+ ## skills.phase.pytest.phase_selection — `skills/phase/pytest/phase_selection.py`
+ Components: phase.test_selection
+diff --git a/.planning/milestones/issue-sweep/notes/phase-3-spec.md b/.planning/milestones/issue-sweep/notes/phase-3-spec.md
+index dee4e82..8fe74fe 100644
+--- a/.planning/milestones/issue-sweep/notes/phase-3-spec.md
++++ b/.planning/milestones/issue-sweep/notes/phase-3-spec.md
+@@ -314,4 +314,39 @@ reading of the spec.
+ 
+ ## Implementation findings, recorded as they were found
+ 
+-(None yet.)
++All on 2026-11-23, on the phase's base `a247f4d`.
++
++- **K1. Red first (S0.3).** Before any code, 17 of the new or changed cases failed, each
++  for the reason it names: with dvt-milestone `2 wrong` and exit 1 (with the `gnd synth`
++  note about undeclared fact types the plan's baseline recorded); no `skip:` line;
++  exit 1, not 2, for every settings case, and a traceback for `{` and `[]`; no envelope
++  from `phase_tool.py`; `SystemExit` when loading it. T3 and the dvt-phase case of T1
++  passed before, as pins.
++- **K2. The lint gate caught this phase's own lines.** `ruff` 0.16.2 with the
++  configuration of pull request 34 reported 9 findings over the three scripts and their
++  plugin copies: an implicit string concatenation in a tuple (`ISC004`) in
++  `rules_check.py`, and two `str.format` calls in `handoff.py` (`UP032`). Fixed in the
++  sources and rebuilt; the gate then printed `All checks passed!`. Without P3.6 (plan
++  review r1 F2) these would have reached the projects that lint their synced copies.
++- **K3. The `skip:` line names the phase tool as the settings name it.** In a plugin
++  install that is the absolute path of the plugin's own `phase_tool.py`, as `rules_check.py`
++  computes it (`rules_check.py`, the plugin defaults); in a synced project it is the
++  relative path. Kept: it says where the script looked.
++- **K4. By hand** (P3.5), in scratch projects:
++  - issue 33's three commands: dvt-milestone `rules test: 5 rule(s), 10 example(s); 0
++    wrong; 1 rule(s) about plans skipped`, exit 0; dvt-phase `rules test: 6 rule(s), 12
++    example(s); 0 wrong`, exit 0;
++  - `phase_tool.py --format json status` with an unknown key: one envelope, `"code":
++    "SETTINGS"`, exit 2;
++  - `review_tool.py status .` with an unknown key: `error: …: unknown setting(s): nope`,
++    exit 2;
++  - `coder_pool.py show --json` with `PATH=/usr/bin:/bin`: `pool []`, `effective_tracks
++    0`, the warning `no coder on PATH; ask the user before Implement`, exit 0;
++  - `from_gsd.py` builds only `rev-parse`, `symbolic-ref`, `ls-files` and `check-ignore`.
++- **K5. Index entries.** The notes of `migrate.from_gsd`, `review.rounds` and
++  `phase.state` quoted the wrong docstrings or the old exit; corrected. Six entries whose
++  module changed were read beside this phase's diff and given or updated a `reread:`
++  line: `components.rules`, `components.index`, `review.rounds`, `phase.state`,
++  `phase.coder_pool`, `migrate.from_gsd`. `handoff.notes` was not: it is listed as older
++  than its code for four earlier commits this phase did not read, and a `reread:` line
++  would claim otherwise.
+diff --git a/devtools/from_gsd.py b/devtools/from_gsd.py
+index d6e8e67..0e7c5c4 100644
+--- a/devtools/from_gsd.py
++++ b/devtools/from_gsd.py
+@@ -14,7 +14,8 @@ so the phase folders stay as they are. What differs is the format of three files
+ missing ones (never overwriting a file that exists) and writes a record of every choice
+ it made. The folder of a finished phase is left as it is. In the folder of a phase GSD
+ had not finished, GSD's plans, summaries and verification move into a ``gsd/`` folder, so
+-that the steps of the new process do not take them for their own. It never calls git.
++that the steps of the new process do not take them for their own. It never calls git to
++change anything: every git command it runs only reads.
+ ``skills/move-from-gsd/SKILL.md`` is the guide that uses it. Python 3.11 or newer.
+ """
+ from __future__ import annotations
+diff --git a/docs/rules.html b/docs/rules.html
+index 383468d..e5b3999 100644
+--- a/docs/rules.html
++++ b/docs/rules.html
+@@ -208,7 +208,7 @@ rules against main (cf2e89d): 5 rule(s); 0 to fix, 1 warning(s), 2 standing
+       <span class="num">Testing a rule</span>
+       <h3>A rule that never fires is caught, not trusted</h3>
+       <p>A rule that never fires looks exactly like a rule the code obeys. One misspelt word turns a rule that reports two components into one that reports nothing, and a plain check stays green.</p>
+-      <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. This works with GND 0.3.0.</p>
++      <p>Each rule can carry examples its author writes: facts it must fail on and facts it must pass on. <code>rules_check.py test</code> judges every rule on its own examples, and every starter rule has them. A rule about plans is left out, with a <code>skip:</code> line, where the phase tool is not installed: its facts come from that tool. This works with GND 0.3.0.</p>
+       <p>GND 0.3.1 adds three lines to the ordinary check: a rule whose antecedent matched nothing, a value no fact of its kind can hold, and, when a change edits the rules, what the edit stops reporting on today's code. On 0.3.0 the check works as before.</p>
+     </div>
+     <div>
+diff --git a/plugins/dvt-milestone/skills/components/SKILL.md b/plugins/dvt-milestone/skills/components/SKILL.md
+index 77102d6..d10fb80 100644
+--- a/plugins/dvt-milestone/skills/components/SKILL.md
++++ b/plugins/dvt-milestone/skills/components/SKILL.md
+@@ -25,8 +25,10 @@ Paths below assume the default settings (`docs_dir` = `docs/components`, script
+ (`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `allow_baseline`,
+ `docs_dir`, `script_path`, `verb_list`). `count_extra_dirs` (true or false, default false;
+ from plugin 0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a
+-project whose code sits in more than one folder. `allow_baseline` (true or false, default
+-true; from plugin 0.1.7) set to false is for a project where every module has a component:
++project whose code sits in more than one folder. A settings file the script cannot use (an unknown
++key, a wrong value, text that is not a JSON object) stops it with the reason and exit 2.
++`allow_baseline` (true or false, default true; from plugin 0.1.7) set to false is for a
++project where every module has a component:
+ `--check --strict` then fails while `unassigned-baseline.txt` exists, and `stats
+ --write-baseline` refuses to write one.
+ 
+diff --git a/plugins/dvt-milestone/skills/components/references/rules.md b/plugins/dvt-milestone/skills/components/references/rules.md
+index bf4cd8a..a4d7a04 100644
+--- a/plugins/dvt-milestone/skills/components/references/rules.md
++++ b/plugins/dvt-milestone/skills/components/references/rules.md
+@@ -20,7 +20,7 @@ no rule.
+ |---|---|---|
+ | `docs/components/layers.toml` | A rank for each area and the forbidden pairs of areas | By hand |
+ | `docs/components/rules.json` | The rules. `init` writes four starter rules | By hand |
+-| `.devtools/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` |
++| `.devtools/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` A file the script cannot use (an unknown key, not a JSON object) stops it with exit 2 |
+ 
+ Both files live beside the catalog, in the index script's `docs_dir`; a project that
+ moved the catalog finds them there.
+@@ -233,8 +233,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/rules_check.py test
+ judges each rule alone on each set. `wrong:` a failing set that does not break the rule, a
+ passing set that does, or a set naming a fact type that does not exist. `note:` a passing set
+ the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
+-`no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
+-2 when it could not run. Rules without examples are listed. Every starter rule has one
++`no_import_inside_a_loop`, which reports every import inside a loop. `skip:` a rule about
++plans where the phase tool is not installed: its fact types come from that tool, so it is
++left out here, of what `gnd synth` is given too, and judged where the tool is. Exit 1 on a
++`wrong:`, 2 when it could not run. Rules without examples are listed. Every starter rule has one
+ example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs
+ 0.3.1.
+ 
+diff --git a/plugins/dvt-milestone/skills/components/scripts/components_index.py b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+index e469a7a..e6997ac 100644
+--- a/plugins/dvt-milestone/skills/components/scripts/components_index.py
++++ b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+@@ -79,19 +79,37 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+-        raise SystemExit(f'{path}: verb_list must be all, shared or none')
++        settings_error(f'{path}: verb_list must be all, shared or none')
+     for key in ('count_extra_dirs', 'allow_baseline'):
+         if not isinstance(settings[key], bool):
+-            raise SystemExit(f'{path}: {key} must be true or false')
++            settings_error(f'{path}: {key} must be true or false')
+     return settings
+ 
+ 
+diff --git a/plugins/dvt-milestone/skills/components/scripts/rules_check.py b/plugins/dvt-milestone/skills/components/scripts/rules_check.py
+index d5fdfbf..7c88f55 100755
+--- a/plugins/dvt-milestone/skills/components/scripts/rules_check.py
++++ b/plugins/dvt-milestone/skills/components/scripts/rules_check.py
+@@ -216,13 +216,31 @@ class Problem(Exception):
+     """The check could not run."""
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     return settings
+ 
+@@ -843,6 +861,14 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     diagnose = '--guarded-diagnostics' in features(gnd)
+     types = vocabulary(root)
+     results, without, count, typos = [], [], 0, set()
++    if not (root / SETTINGS['phase_script']).is_file():
++        # Their fact types come from the phase tool: judged where it is installed, and left out here.
++        skipped = [rule['id'] for rule in rules if rule.get('about') == 'plans']
++        rules = [rule for rule in rules if rule.get('about') != 'plans']
++        results.extend(('skip', (f'{name}: a rule about plans, and {SETTINGS["phase_script"]} is not here '
++                                 f'(it is judged where the phase tool is installed)')) for name in skipped)
++    else:
++        skipped = []
+     for rule in rules:
+         sets = example_sets(rule) or []
+         if not sets:
+@@ -892,7 +918,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
+     wrong = sum(level == 'wrong' for level, _ in results)
+     summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
+-               + (f'; {len(without)} rule(s) without examples' if without else ''))
++               + (f'; {len(without)} rule(s) without examples' if without else '')
++               + (f'; {len(skipped)} rule(s) about plans skipped' if skipped else ''))
+     if as_json:
+         print(json.dumps({'results': [{'level': level, 'text': text} for level, text in results],
+                           'without_examples': without, 'summary': summary}, indent=1))
+diff --git a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+index ce5f79f..055794d 100755
+--- a/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-milestone/skills/dev-handoff/scripts/handoff.py
+@@ -21,7 +21,7 @@ Common options: --base REF, --repo DIR, --json, --max-mb N.
+ Stdlib only; runs on the system python3 (3.9) with git. Nothing is committed, pushed or deleted,
+ and no key is read or printed. ``carry`` and ``pull`` are dry runs until ``--yes``.
+ Exit codes: 0; ``check`` exits 1 while a critical or major finding stands, and ``write`` when the
+-file in the note's place is not a note; 2 usage error.
++file in the note's place is not a note; 2 usage error or a settings file it cannot use.
+ """
+ 
+ from __future__ import annotations
+@@ -83,13 +83,25 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
+ def load_settings(path=SETTINGS_FILE) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path is not None and path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            settings_error(f"{path}: not valid JSON: {exc}")
++        if not isinstance(loaded, dict):
++            settings_error(f"{path}: the settings must be a JSON object")
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
++            settings_error("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+         settings.update(loaded)
+     return settings
+ 
+diff --git a/plugins/dvt-milestone/skills/process-phase/scripts/review_tool.py b/plugins/dvt-milestone/skills/process-phase/scripts/review_tool.py
+index 278eb4a..2fc4488 100755
+--- a/plugins/dvt-milestone/skills/process-phase/scripts/review_tool.py
++++ b/plugins/dvt-milestone/skills/process-phase/scripts/review_tool.py
+@@ -42,7 +42,8 @@ ledger) and posts it only with ``--yes``, which the owner's approval supplies.
+ before they are committed, and says so at the top of ``review.md``.
+ 
+ Exit codes: 0 ok, 1 a check found something (a changed file, an unfinished ledger, a
+-failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git).
++failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git, a
++settings file it cannot use).
+ 
+ Settings live beside this script, in review_tool.settings.json; when the script runs from a
+ plugin install, in the project's .devtools/review_tool.settings.json.
+@@ -145,15 +146,21 @@ class Stop(Exception):
+ 
+ 
+ def load_settings(path: Path = SETTINGS_FILE) -> dict:
++    """The settings, or `Stop` (exit 2: the command could not run) for a file this script cannot use."""
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            raise Stop(f"{path}: not valid JSON: {exc}")
++        if not isinstance(loaded, dict):
++            raise Stop(f"{path}: the settings must be a JSON object")
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
++            raise Stop("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+         settings.update(loaded)
+     if settings["reviewer"] not in ("auto", "codex", "claude"):
+-        raise SystemExit(f"{path}: reviewer must be auto, codex or claude")
++        raise Stop(f"{path}: reviewer must be auto, codex or claude")
+     return settings
+ 
+ 
+diff --git a/plugins/dvt-phase/skills/components/SKILL.md b/plugins/dvt-phase/skills/components/SKILL.md
+index e4353a7..da482e7 100644
+--- a/plugins/dvt-phase/skills/components/SKILL.md
++++ b/plugins/dvt-phase/skills/components/SKILL.md
+@@ -25,8 +25,10 @@ Paths below assume the default settings (`docs_dir` = `docs/components`, script
+ (`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `allow_baseline`,
+ `docs_dir`, `script_path`, `verb_list`). `count_extra_dirs` (true or false, default false;
+ from plugin 0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a
+-project whose code sits in more than one folder. `allow_baseline` (true or false, default
+-true; from plugin 0.1.7) set to false is for a project where every module has a component:
++project whose code sits in more than one folder. A settings file the script cannot use (an unknown
++key, a wrong value, text that is not a JSON object) stops it with the reason and exit 2.
++`allow_baseline` (true or false, default true; from plugin 0.1.7) set to false is for a
++project where every module has a component:
+ `--check --strict` then fails while `unassigned-baseline.txt` exists, and `stats
+ --write-baseline` refuses to write one.
+ 
+diff --git a/plugins/dvt-phase/skills/components/references/rules.md b/plugins/dvt-phase/skills/components/references/rules.md
+index bf4cd8a..a4d7a04 100644
+--- a/plugins/dvt-phase/skills/components/references/rules.md
++++ b/plugins/dvt-phase/skills/components/references/rules.md
+@@ -20,7 +20,7 @@ no rule.
+ |---|---|---|
+ | `docs/components/layers.toml` | A rank for each area and the forbidden pairs of areas | By hand |
+ | `docs/components/rules.json` | The rules. `init` writes four starter rules | By hand |
+-| `.devtools/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` |
++| `.devtools/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` A file the script cannot use (an unknown key, not a JSON object) stops it with exit 2 |
+ 
+ Both files live beside the catalog, in the index script's `docs_dir`; a project that
+ moved the catalog finds them there.
+@@ -233,8 +233,10 @@ python3 ${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/rules_check.py test
+ judges each rule alone on each set. `wrong:` a failing set that does not break the rule, a
+ passing set that does, or a set naming a fact type that does not exist. `note:` a passing set
+ the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
+-`no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
+-2 when it could not run. Rules without examples are listed. Every starter rule has one
++`no_import_inside_a_loop`, which reports every import inside a loop. `skip:` a rule about
++plans where the phase tool is not installed: its fact types come from that tool, so it is
++left out here, of what `gnd synth` is given too, and judged where the tool is. Exit 1 on a
++`wrong:`, 2 when it could not run. Rules without examples are listed. Every starter rule has one
+ example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs
+ 0.3.1.
+ 
+diff --git a/plugins/dvt-phase/skills/components/scripts/components_index.py b/plugins/dvt-phase/skills/components/scripts/components_index.py
+index e469a7a..e6997ac 100644
+--- a/plugins/dvt-phase/skills/components/scripts/components_index.py
++++ b/plugins/dvt-phase/skills/components/scripts/components_index.py
+@@ -79,19 +79,37 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+-        raise SystemExit(f'{path}: verb_list must be all, shared or none')
++        settings_error(f'{path}: verb_list must be all, shared or none')
+     for key in ('count_extra_dirs', 'allow_baseline'):
+         if not isinstance(settings[key], bool):
+-            raise SystemExit(f'{path}: {key} must be true or false')
++            settings_error(f'{path}: {key} must be true or false')
+     return settings
+ 
+ 
+diff --git a/plugins/dvt-phase/skills/components/scripts/rules_check.py b/plugins/dvt-phase/skills/components/scripts/rules_check.py
+index d5fdfbf..7c88f55 100755
+--- a/plugins/dvt-phase/skills/components/scripts/rules_check.py
++++ b/plugins/dvt-phase/skills/components/scripts/rules_check.py
+@@ -216,13 +216,31 @@ class Problem(Exception):
+     """The check could not run."""
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     return settings
+ 
+@@ -843,6 +861,14 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     diagnose = '--guarded-diagnostics' in features(gnd)
+     types = vocabulary(root)
+     results, without, count, typos = [], [], 0, set()
++    if not (root / SETTINGS['phase_script']).is_file():
++        # Their fact types come from the phase tool: judged where it is installed, and left out here.
++        skipped = [rule['id'] for rule in rules if rule.get('about') == 'plans']
++        rules = [rule for rule in rules if rule.get('about') != 'plans']
++        results.extend(('skip', (f'{name}: a rule about plans, and {SETTINGS["phase_script"]} is not here '
++                                 f'(it is judged where the phase tool is installed)')) for name in skipped)
++    else:
++        skipped = []
+     for rule in rules:
+         sets = example_sets(rule) or []
+         if not sets:
+@@ -892,7 +918,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
+     wrong = sum(level == 'wrong' for level, _ in results)
+     summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
+-               + (f'; {len(without)} rule(s) without examples' if without else ''))
++               + (f'; {len(without)} rule(s) without examples' if without else '')
++               + (f'; {len(skipped)} rule(s) about plans skipped' if skipped else ''))
+     if as_json:
+         print(json.dumps({'results': [{'level': level, 'text': text} for level, text in results],
+                           'without_examples': without, 'summary': summary}, indent=1))
+diff --git a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+index ce5f79f..055794d 100755
+--- a/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
++++ b/plugins/dvt-phase/skills/dev-handoff/scripts/handoff.py
+@@ -21,7 +21,7 @@ Common options: --base REF, --repo DIR, --json, --max-mb N.
+ Stdlib only; runs on the system python3 (3.9) with git. Nothing is committed, pushed or deleted,
+ and no key is read or printed. ``carry`` and ``pull`` are dry runs until ``--yes``.
+ Exit codes: 0; ``check`` exits 1 while a critical or major finding stands, and ``write`` when the
+-file in the note's place is not a note; 2 usage error.
++file in the note's place is not a note; 2 usage error or a settings file it cannot use.
+ """
+ 
+ from __future__ import annotations
+@@ -83,13 +83,25 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
+ def load_settings(path=SETTINGS_FILE) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path is not None and path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            settings_error(f"{path}: not valid JSON: {exc}")
++        if not isinstance(loaded, dict):
++            settings_error(f"{path}: the settings must be a JSON object")
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
++            settings_error("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+         settings.update(loaded)
+     return settings
+ 
+diff --git a/plugins/dvt-phase/skills/process-phase/scripts/coder_pool.py b/plugins/dvt-phase/skills/process-phase/scripts/coder_pool.py
+index 921c53c..66149ce 100644
+--- a/plugins/dvt-phase/skills/process-phase/scripts/coder_pool.py
++++ b/plugins/dvt-phase/skills/process-phase/scripts/coder_pool.py
+@@ -9,7 +9,7 @@ The pool comes from two TOML files of the same shape: the team's, checked in, an
+ developer's own, gitignored. Tables merge; a scalar or a list in the developer's file
+ replaces the team's. A linked git worktree with no file of its own reads the main
+ checkout's. Only coders found on PATH are kept, and with none left the pool is the
+-Claude Code coder.
++Claude Code coder when ``claude`` is on PATH, and empty otherwise (read the warnings).
+ 
+     [roles]
+     coders = ["codex", "gemini"]     # in preference order
+diff --git a/plugins/dvt-phase/skills/process-phase/scripts/phase_tool.py b/plugins/dvt-phase/skills/process-phase/scripts/phase_tool.py
+index dfc65f6..3515735 100644
+--- a/plugins/dvt-phase/skills/process-phase/scripts/phase_tool.py
++++ b/plugins/dvt-phase/skills/process-phase/scripts/phase_tool.py
+@@ -21,7 +21,8 @@ envelope with ``--format json`` or a short human summary with ``--format md`` (d
+     phase_tool.py facts --phase NN
+ 
+ Common options: --format json|md, --root DIR.
+-Exit codes: 0 ok, 1 domain failure, 2 usage error. ``status`` always exits 0.
++Exit codes: 0 ok, 1 domain failure, 2 usage error or a settings file it cannot use.
++``status`` exits 0 unless the settings file cannot be used.
+ """
+ 
+ from __future__ import annotations
+@@ -97,17 +98,34 @@ RECEIPT = ".devtools-receipt.json"  # written by the sync; lists every file it d
+ 
+ 
+ def load_settings(path: Path = SETTINGS_FILE) -> dict:
++    """The settings; ValueError with the reason for a file this script cannot use."""
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            raise ValueError("%s: not valid JSON: %s" % (path, exc))
++        if not isinstance(loaded, dict):
++            raise ValueError("%s: the settings must be a JSON object" % path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
++            raise ValueError("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+         settings.update(loaded)
++    if settings["skill_check"] not in ("all", "synced"):
++        raise ValueError("%s: skill_check must be all or synced" % path)
++    if not isinstance(settings["shared_files"], list) or not all(isinstance(p, str) and p for p in settings["shared_files"]):
++        raise ValueError("%s: shared_files must be a list of paths" % path)
++    if settings["gated_from"] not in ("context_approved", "tests_approved", "plan_approved"):
++        raise ValueError("%s: gated_from must be context_approved, tests_approved or plan_approved" % path)
+     return settings
+ 
+ 
+-SETTINGS = load_settings()
++# A settings file that cannot be used does not stop the load: the constants below take the defaults,
++# so a caller that only reads this module's tables is not stopped, and main() refuses every command.
++try:
++    SETTINGS, SETTINGS_ERROR = load_settings(), ""
++except ValueError as exc:
++    SETTINGS, SETTINGS_ERROR = dict(DEFAULT_SETTINGS), str(exc)
+ PLANNING = SETTINGS["planning_dir"]
+ PACKAGE_PREFIX = SETTINGS["package_prefix"] + "." if SETTINGS["package_prefix"] else ""
+ 
+@@ -143,12 +161,6 @@ ARTIFACTS = [
+     ("verified", "{nn}-VERIFICATION.md", "{nn}-VERIFICATION.md"),
+ ]
+ GATED_FROM = SETTINGS["gated_from"]
+-if SETTINGS["skill_check"] not in ("all", "synced"):
+-    raise SystemExit("%s: skill_check must be all or synced" % SETTINGS_FILE)
+-if not isinstance(SETTINGS["shared_files"], list) or not all(isinstance(p, str) and p for p in SETTINGS["shared_files"]):
+-    raise SystemExit("%s: shared_files must be a list of paths" % SETTINGS_FILE)
+-if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
+-    raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
+ IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
+ IGNORED_SUFFIXES = (".pyc", ".pyo")
+ DEC_ID = re.compile(r"^DEC-\d{3}$")
+@@ -2028,6 +2040,11 @@ def main(argv=None) -> int:
+         or "--format=json" in argv else "md"
+     cmd = next((a for a in argv if a in COMMANDS), "usage")
+     env = {"ok": True, "tool": "phase_tool." + cmd, "version": VERSION, "data": {}}
++    if SETTINGS_ERROR:  # one envelope, and exit 2 for every command, status too
++        env.update(ok=False, error={"code": "SETTINGS", "message": SETTINGS_ERROR,
++                                    "hint": "fix or remove the settings file"})
++        print(json.dumps(env, indent=2, sort_keys=False) if fmt == "json" else render_md(env))
++        return 2
+     code = 0
+     try:
+         args = build_parser().parse_args(argv)
+diff --git a/skills/components/SKILL.md b/skills/components/SKILL.md
+index b1198f5..bd99e0b 100644
+--- a/skills/components/SKILL.md
++++ b/skills/components/SKILL.md
+@@ -23,8 +23,10 @@ Paths below assume the default settings (`docs_dir` = `docs/components`, script
+ (`package_dir`, `import_prefix`, `extra_source_dirs`, `count_extra_dirs`, `allow_baseline`,
+ `docs_dir`, `script_path`, `verb_list`). `count_extra_dirs` (true or false, default false;
+ from plugin 0.1.5) makes the modules of `extra_source_dirs` count like the package's, for a
+-project whose code sits in more than one folder. `allow_baseline` (true or false, default
+-true; from plugin 0.1.7) set to false is for a project where every module has a component:
++project whose code sits in more than one folder. A settings file the script cannot use (an unknown
++key, a wrong value, text that is not a JSON object) stops it with the reason and exit 2.
++`allow_baseline` (true or false, default true; from plugin 0.1.7) set to false is for a
++project where every module has a component:
+ `--check --strict` then fails while `unassigned-baseline.txt` exists, and `stats
+ --write-baseline` refuses to write one.
+ 
+diff --git a/skills/components/references/rules.md b/skills/components/references/rules.md
+index 6027539..7e3cb16 100644
+--- a/skills/components/references/rules.md
++++ b/skills/components/references/rules.md
+@@ -20,7 +20,7 @@ no rule.
+ |---|---|---|
+ | `docs/components/layers.toml` | A rank for each area and the forbidden pairs of areas | By hand |
+ | `docs/components/rules.json` | The rules. `init` writes four starter rules | By hand |
+-| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` |
++| `.claude/skills/components/scripts/rules_check.settings.json` | `gnd_command` (how to run GND), `index_script` (where the index script is) and `phase_script` (where the phase tool is, for [rules about plans](#rules-about-plans)) | In `.devtools.toml` A file the script cannot use (an unknown key, not a JSON object) stops it with exit 2 |
+ 
+ Both files live beside the catalog, in the index script's `docs_dir`; a project that
+ moved the catalog finds them there.
+@@ -233,8 +233,10 @@ python3 .claude/skills/components/scripts/rules_check.py test
+ judges each rule alone on each set. `wrong:` a failing set that does not break the rule, a
+ passing set that does, or a set naming a fact type that does not exist. `note:` a passing set
+ the rule matched nothing in: it shows only that the rule is quiet with no subject, as for
+-`no_import_inside_a_loop`, which reports every import inside a loop. Exit 1 on a `wrong:`,
+-2 when it could not run. Rules without examples are listed. Every starter rule has one
++`no_import_inside_a_loop`, which reports every import inside a loop. `skip:` a rule about
++plans where the phase tool is not installed: its fact types come from that tool, so it is
++left out here, of what `gnd synth` is given too, and judged where the tool is. Exit 1 on a
++`wrong:`, 2 when it could not run. Rules without examples are listed. Every starter rule has one
+ example of each kind. This works with GND 0.3.0; the reason a rule matched nothing needs
+ 0.3.1.
+ 
+diff --git a/skills/components/scripts/components_index.py b/skills/components/scripts/components_index.py
+index e469a7a..e6997ac 100644
+--- a/skills/components/scripts/components_index.py
++++ b/skills/components/scripts/components_index.py
+@@ -79,19 +79,37 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     if settings['verb_list'] not in {'all', 'shared', 'none'}:
+-        raise SystemExit(f'{path}: verb_list must be all, shared or none')
++        settings_error(f'{path}: verb_list must be all, shared or none')
+     for key in ('count_extra_dirs', 'allow_baseline'):
+         if not isinstance(settings[key], bool):
+-            raise SystemExit(f'{path}: {key} must be true or false')
++            settings_error(f'{path}: {key} must be true or false')
+     return settings
+ 
+ 
+diff --git a/skills/components/scripts/rules_check.py b/skills/components/scripts/rules_check.py
+index d5fdfbf..7c88f55 100755
+--- a/skills/components/scripts/rules_check.py
++++ b/skills/components/scripts/rules_check.py
+@@ -216,13 +216,31 @@ class Problem(Exception):
+     """The check could not run."""
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
++def read_settings_file(path: Path) -> dict:
++    """The settings a file holds, or `settings_error` when it is not a JSON object."""
++    try:
++        loaded = json.loads(path.read_text(encoding='utf-8'))
++    except (OSError, UnicodeDecodeError, ValueError) as exc:
++        settings_error(f'{path}: not valid JSON: {exc}')
++    if not isinstance(loaded, dict):
++        settings_error(f'{path}: the settings must be a JSON object')
++    return loaded
++
++
+ def load_settings(path: Path) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding='utf-8'))
++        loaded = read_settings_file(path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit(f'{path}: unknown setting(s): {", ".join(unknown)}')
++            settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+         settings.update(loaded)
+     return settings
+ 
+@@ -843,6 +861,14 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     diagnose = '--guarded-diagnostics' in features(gnd)
+     types = vocabulary(root)
+     results, without, count, typos = [], [], 0, set()
++    if not (root / SETTINGS['phase_script']).is_file():
++        # Their fact types come from the phase tool: judged where it is installed, and left out here.
++        skipped = [rule['id'] for rule in rules if rule.get('about') == 'plans']
++        rules = [rule for rule in rules if rule.get('about') != 'plans']
++        results.extend(('skip', (f'{name}: a rule about plans, and {SETTINGS["phase_script"]} is not here '
++                                 f'(it is judged where the phase tool is installed)')) for name in skipped)
++    else:
++        skipped = []
+     for rule in rules:
+         sets = example_sets(rule) or []
+         if not sets:
+@@ -892,7 +918,8 @@ def test(root: Path, require: bool, as_json: bool) -> int:
+     results = list(dict.fromkeys(results))  # a note about a rule's literal comes once, not once per example
+     wrong = sum(level == 'wrong' for level, _ in results)
+     summary = (f'rules test: {len(rules)} rule(s), {count} example(s); {wrong} wrong'
+-               + (f'; {len(without)} rule(s) without examples' if without else ''))
++               + (f'; {len(without)} rule(s) without examples' if without else '')
++               + (f'; {len(skipped)} rule(s) about plans skipped' if skipped else ''))
+     if as_json:
+         print(json.dumps({'results': [{'level': level, 'text': text} for level, text in results],
+                           'without_examples': without, 'summary': summary}, indent=1))
+diff --git a/skills/dev-handoff/scripts/handoff.py b/skills/dev-handoff/scripts/handoff.py
+index ce5f79f..055794d 100755
+--- a/skills/dev-handoff/scripts/handoff.py
++++ b/skills/dev-handoff/scripts/handoff.py
+@@ -21,7 +21,7 @@ Common options: --base REF, --repo DIR, --json, --max-mb N.
+ Stdlib only; runs on the system python3 (3.9) with git. Nothing is committed, pushed or deleted,
+ and no key is read or printed. ``carry`` and ``pull`` are dry runs until ``--yes``.
+ Exit codes: 0; ``check`` exits 1 while a critical or major finding stands, and ``write`` when the
+-file in the note's place is not a note; 2 usage error.
++file in the note's place is not a note; 2 usage error or a settings file it cannot use.
+ """
+ 
+ from __future__ import annotations
+@@ -83,13 +83,25 @@ DEFAULT_SETTINGS = {
+ }
+ 
+ 
++def settings_error(message: str):
++    """A settings file this script cannot use: say why on standard error and exit 2, the code for a command
++    that could not run."""
++    print(message, file=sys.stderr)
++    raise SystemExit(2)
++
++
+ def load_settings(path=SETTINGS_FILE) -> dict:
+     settings = dict(DEFAULT_SETTINGS)
+     if path is not None and path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            settings_error(f"{path}: not valid JSON: {exc}")
++        if not isinstance(loaded, dict):
++            settings_error(f"{path}: the settings must be a JSON object")
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
++            settings_error("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+         settings.update(loaded)
+     return settings
+ 
+diff --git a/skills/milestone/process-phase/scripts/review_tool.py b/skills/milestone/process-phase/scripts/review_tool.py
+index 278eb4a..2fc4488 100755
+--- a/skills/milestone/process-phase/scripts/review_tool.py
++++ b/skills/milestone/process-phase/scripts/review_tool.py
+@@ -42,7 +42,8 @@ ledger) and posts it only with ``--yes``, which the owner's approval supplies.
+ before they are committed, and says so at the top of ``review.md``.
+ 
+ Exit codes: 0 ok, 1 a check found something (a changed file, an unfinished ledger, a
+-failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git).
++failed run, an unreviewed file), 2 the command could not run (usage, no brief, no git, a
++settings file it cannot use).
+ 
+ Settings live beside this script, in review_tool.settings.json; when the script runs from a
+ plugin install, in the project's .devtools/review_tool.settings.json.
+@@ -145,15 +146,21 @@ class Stop(Exception):
+ 
+ 
+ def load_settings(path: Path = SETTINGS_FILE) -> dict:
++    """The settings, or `Stop` (exit 2: the command could not run) for a file this script cannot use."""
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            raise Stop(f"{path}: not valid JSON: {exc}")
++        if not isinstance(loaded, dict):
++            raise Stop(f"{path}: the settings must be a JSON object")
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
++            raise Stop("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+         settings.update(loaded)
+     if settings["reviewer"] not in ("auto", "codex", "claude"):
+-        raise SystemExit(f"{path}: reviewer must be auto, codex or claude")
++        raise Stop(f"{path}: reviewer must be auto, codex or claude")
+     return settings
+ 
+ 
+diff --git a/skills/phase/process-phase/scripts/coder_pool.py b/skills/phase/process-phase/scripts/coder_pool.py
+index 921c53c..66149ce 100644
+--- a/skills/phase/process-phase/scripts/coder_pool.py
++++ b/skills/phase/process-phase/scripts/coder_pool.py
+@@ -9,7 +9,7 @@ The pool comes from two TOML files of the same shape: the team's, checked in, an
+ developer's own, gitignored. Tables merge; a scalar or a list in the developer's file
+ replaces the team's. A linked git worktree with no file of its own reads the main
+ checkout's. Only coders found on PATH are kept, and with none left the pool is the
+-Claude Code coder.
++Claude Code coder when ``claude`` is on PATH, and empty otherwise (read the warnings).
+ 
+     [roles]
+     coders = ["codex", "gemini"]     # in preference order
+diff --git a/skills/phase/process-phase/scripts/phase_tool.py b/skills/phase/process-phase/scripts/phase_tool.py
+index dfc65f6..3515735 100644
+--- a/skills/phase/process-phase/scripts/phase_tool.py
++++ b/skills/phase/process-phase/scripts/phase_tool.py
+@@ -21,7 +21,8 @@ envelope with ``--format json`` or a short human summary with ``--format md`` (d
+     phase_tool.py facts --phase NN
+ 
+ Common options: --format json|md, --root DIR.
+-Exit codes: 0 ok, 1 domain failure, 2 usage error. ``status`` always exits 0.
++Exit codes: 0 ok, 1 domain failure, 2 usage error or a settings file it cannot use.
++``status`` exits 0 unless the settings file cannot be used.
+ """
+ 
+ from __future__ import annotations
+@@ -97,17 +98,34 @@ RECEIPT = ".devtools-receipt.json"  # written by the sync; lists every file it d
+ 
+ 
+ def load_settings(path: Path = SETTINGS_FILE) -> dict:
++    """The settings; ValueError with the reason for a file this script cannot use."""
+     settings = dict(DEFAULT_SETTINGS)
+     if path.is_file():
+-        loaded = json.loads(path.read_text(encoding="utf-8"))
++        try:
++            loaded = json.loads(path.read_text(encoding="utf-8"))
++        except (OSError, UnicodeDecodeError, ValueError) as exc:
++            raise ValueError("%s: not valid JSON: %s" % (path, exc))
++        if not isinstance(loaded, dict):
++            raise ValueError("%s: the settings must be a JSON object" % path)
+         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
+         if unknown:
+-            raise SystemExit("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
++            raise ValueError("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+         settings.update(loaded)
++    if settings["skill_check"] not in ("all", "synced"):
++        raise ValueError("%s: skill_check must be all or synced" % path)
++    if not isinstance(settings["shared_files"], list) or not all(isinstance(p, str) and p for p in settings["shared_files"]):
++        raise ValueError("%s: shared_files must be a list of paths" % path)
++    if settings["gated_from"] not in ("context_approved", "tests_approved", "plan_approved"):
++        raise ValueError("%s: gated_from must be context_approved, tests_approved or plan_approved" % path)
+     return settings
+ 
+ 
+-SETTINGS = load_settings()
++# A settings file that cannot be used does not stop the load: the constants below take the defaults,
++# so a caller that only reads this module's tables is not stopped, and main() refuses every command.
++try:
++    SETTINGS, SETTINGS_ERROR = load_settings(), ""
++except ValueError as exc:
++    SETTINGS, SETTINGS_ERROR = dict(DEFAULT_SETTINGS), str(exc)
+ PLANNING = SETTINGS["planning_dir"]
+ PACKAGE_PREFIX = SETTINGS["package_prefix"] + "." if SETTINGS["package_prefix"] else ""
+ 
+@@ -143,12 +161,6 @@ ARTIFACTS = [
+     ("verified", "{nn}-VERIFICATION.md", "{nn}-VERIFICATION.md"),
+ ]
+ GATED_FROM = SETTINGS["gated_from"]
+-if SETTINGS["skill_check"] not in ("all", "synced"):
+-    raise SystemExit("%s: skill_check must be all or synced" % SETTINGS_FILE)
+-if not isinstance(SETTINGS["shared_files"], list) or not all(isinstance(p, str) and p for p in SETTINGS["shared_files"]):
+-    raise SystemExit("%s: shared_files must be a list of paths" % SETTINGS_FILE)
+-if GATED_FROM not in ("context_approved", "tests_approved", "plan_approved"):
+-    raise SystemExit("%s: gated_from must be context_approved, tests_approved or plan_approved" % SETTINGS_FILE)
+ IGNORED_PARTS = {"__pycache__", ".pytest_cache"}
+ IGNORED_SUFFIXES = (".pyc", ".pyo")
+ DEC_ID = re.compile(r"^DEC-\d{3}$")
+@@ -2028,6 +2040,11 @@ def main(argv=None) -> int:
+         or "--format=json" in argv else "md"
+     cmd = next((a for a in argv if a in COMMANDS), "usage")
+     env = {"ok": True, "tool": "phase_tool." + cmd, "version": VERSION, "data": {}}
++    if SETTINGS_ERROR:  # one envelope, and exit 2 for every command, status too
++        env.update(ok=False, error={"code": "SETTINGS", "message": SETTINGS_ERROR,
++                                    "hint": "fix or remove the settings file"})
++        print(json.dumps(env, indent=2, sort_keys=False) if fmt == "json" else render_md(env))
++        return 2
+     code = 0
+     try:
+         args = build_parser().parse_args(argv)
+diff --git a/tests/test_handoff.py b/tests/test_handoff.py
+index d738de3..0855b86 100644
+--- a/tests/test_handoff.py
++++ b/tests/test_handoff.py
+@@ -454,7 +454,10 @@ def test_a_synced_copy_reads_the_settings_beside_it_and_refuses_an_unknown_key(r
+     assert "base: base" in (repo / "plan/handoffs/feature.md").read_text()
+     copy.with_suffix(".settings.json").write_text(json.dumps({"planing_dir": "plan"}))
+     done = run(repo, "write", script=copy)
+-    assert done.returncode != 0 and "unknown setting(s): planing_dir" in done.stderr
++    assert done.returncode == 2 and "unknown setting(s): planing_dir" in done.stderr
++    copy.with_suffix(".settings.json").write_text("[]")
++    done = run(repo, "write", script=copy)
++    assert done.returncode == 2 and "the settings must be a JSON object" in done.stderr and "Traceback" not in done.stderr
+ 
+ 
+ def test_a_plugin_install_reads_the_projects_settings(repo, tmp_path):
+diff --git a/tests/test_plugins.py b/tests/test_plugins.py
+index 86fff90..86255cd 100644
+--- a/tests/test_plugins.py
++++ b/tests/test_plugins.py
+@@ -185,3 +185,21 @@ def test_every_skill_a_project_syncs_is_in_its_workflows_plugin(example, plugin)
+     assert synced
+     assert synced <= set(build_plugins.PLUGINS[plugin]["skills"].values()), synced - set(
+         build_plugins.PLUGINS[plugin]["skills"].values())
++
++
++@pytest.mark.skipif(not (shutil.which("gnd") or __import__("os").environ.get("GND_COMMAND")),
++                    reason="GND is not installed (put gnd on PATH or set GND_COMMAND)")
++@pytest.mark.parametrize("plugin", PLUGINS)
++def test_starter_rules_pass_their_own_test_in_each_plugin(installed, plugin):
++    copy, project = installed(plugin)
++    (project / "src/app").mkdir(parents=True)
++    (project / "src/app/__init__.py").write_text('"""App."""\n')
++    gnd = __import__("os").environ.get("GND_COMMAND") or shutil.which("gnd")
++    (project / ".devtools/rules_check.settings.json").write_text(json.dumps({"gnd_command": gnd}))
++    scripts = copy / "skills/components/scripts"
++    assert run(project, scripts / "components_index.py", "init").returncode == 0
++    assert run(project, scripts / "rules_check.py", "init").returncode == 0
++    done = run(project, scripts / "rules_check.py", "test")
++    assert done.returncode == 0 and " 0 wrong" in done.stdout, done.stdout + done.stderr
++    skipped = "skip: plan_names_the_components_it_touches: a rule about plans"
++    assert (skipped in done.stdout) == (plugin == "dvt-milestone"), done.stdout
+diff --git a/tests/test_review_tool.py b/tests/test_review_tool.py
+index 1ecbc68..83bb4ae 100644
+--- a/tests/test_review_tool.py
++++ b/tests/test_review_tool.py
+@@ -364,7 +364,10 @@ def test_settings_choose_the_model_and_an_unknown_setting_is_an_error(project):
+     assert "-o reviews/plan-r1/review.md 'Read reviews/plan-r1/BRIEF.md and follow it.'" in out
+     settings.write_text(json.dumps({"reviewr": "codex"}))
+     code, out = review(project, "run", "reviews/plan-r1", "--dry-run")
+-    assert code == 1 and "unknown setting(s): reviewr" in out
++    assert code == 2 and "unknown setting(s): reviewr" in out, "a settings file it cannot use: the command could not run"
++    settings.write_text("{")
++    code, out = review(project, "status", "reviews")
++    assert code == 2 and "review_tool.settings.json: not valid JSON" in out and "Traceback" not in out, out
+ 
+ 
+ # Regression tests for the findings of the first review of this helper (F1 to F6).
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index 23a3a8f..3e5d0fe 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -479,7 +479,7 @@ def test_two_plans_of_one_wave_do_not_name_the_same_file(project):
+     assert second_plan(folder) == [together + "src/widget/scan.py"], "which excuse nothing else"
+     setting(project, shared_files="tests/unit/")
+     code, out = tool(project, "check", "--plans", "1")
+-    assert code == 1 and "shared_files must be a list of paths" in out
++    assert code == 2 and "shared_files must be a list of paths" in out
+ 
+ 
+ def test_a_plan_depends_only_on_plans_that_come_before_it(project):
+@@ -2298,3 +2298,72 @@ def test_review_labels_an_entry_point_in_a_counted_folder(project, count):
+     commit(project)
+     rows = section(tool(project, "review", script=INDEX)[1], "Components nothing in the package imports")
+     assert ("tools.cli (defines main)" in rows) == count and ("tools.cli" in rows) != count, rows
++
++
++# --- Starter rules where there is no phase tool, and settings files a script cannot use.
++
++PHASE_TOOL = ".claude/skills/process-phase/scripts/phase_tool.py"
++
++
++def test_a_rule_about_plans_is_skipped_where_the_phase_tool_is_not(project):
++    rules_without_examples(project)
++    (project / PHASE_TOOL).unlink()
++    seen = fake_gnd(project, cases={"schema_version": "gnd-guarded-cases/1", "rules": []})
++    code, out = tool(project, "test", script=RULES)
++    assert code == 0, out
++    assert ("skip: %s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py is not here "
++            "(it is judged where the phase tool is installed)\n" % PLAN_RULE) in out
++    assert out.rstrip().endswith("; 1 rule(s) about plans skipped"), out
++    assert rule_ids(json.loads((seen / "synth-model.json").read_text())) == STARTER_IDS, "not given to gnd synth"
++    code, out = tool(project, "test", "--format", "json", script=RULES)
++    assert {"level": "skip", "text": "%s: a rule about plans, and .claude/skills/process-phase/scripts/phase_tool.py "
++            "is not here (it is judged where the phase tool is installed)" % PLAN_RULE} in json.loads(out)["results"]
++
++
++def test_a_rule_that_is_not_about_plans_still_names_only_known_facts(project):
++    layered(project)
++    (project / PHASE_TOOL).unlink()
++    path = project / "docs/components/rules.json"
++    rules = json.loads(path.read_text())
++    rules["rules"].append({"id": "tasks_are_planned", "level": "should", "type": "guarded",
++                           "antecedent": [{"fact_type": "component_is_listed", "bind": {"component": "$a"}}],
++                           "consequent": {"atom": {"fact_type": "component_is_listed", "bind": {"component": "$a"}}},
++                           "examples": {"fails": {"task_in_plan": [{"task": "01-01-T1", "plan": "01-01"}]}}})
++    path.write_text(json.dumps(rules))
++    fake_gnd(project)
++    code, out = tool(project, "test", script=RULES)
++    assert code == 1, out
++    assert "wrong: tasks_are_planned: the failing example 1 names task_in_plan, which no fact type of this project is" in out
++
++
++@pytest.mark.parametrize("script, settings", [
++    (INDEX, INDEX_SETTINGS), (RULES, RULES_SETTINGS), (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"))])
++@pytest.mark.parametrize("text, says", [('{"no_such_setting": 1}', "unknown setting(s): no_such_setting"),
++                                         ("{", "not valid JSON"), ("[]", "the settings must be a JSON object")])
++def test_a_settings_file_the_script_cannot_use_exits_2(project, script, settings, text, says):
++    (project / settings).write_text(text)
++    args = {INDEX: ("--check",), RULES: ("test",), PHASE_TOOL: ("status",)}[script]
++    done = run_index(project, *args, script=script)
++    assert done.returncode == 2, done.stdout + done.stderr
++    assert says in done.stdout + done.stderr and settings.rsplit("/", 1)[1] in done.stdout + done.stderr
++    assert "Traceback" not in done.stderr, done.stderr
++
++
++@pytest.mark.parametrize("args", [("status",), ("check", "--roadmap"), ("roadmap", "list")])
++def test_phase_tool_reports_a_bad_settings_file_in_one_envelope(project, args):
++    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
++    done = run_index(project, "--format", "json", *args, script=PHASE_TOOL)
++    assert done.returncode == 2, done.stdout + done.stderr
++    envelope = json.loads(done.stdout)  # one JSON object, nothing before or after it
++    assert envelope["ok"] is False and envelope["error"]["code"] == "SETTINGS", envelope
++    assert "phase_tool.settings.json: unknown setting(s): planing_dir" in envelope["error"]["message"]
++    assert envelope["tool"] == "phase_tool." + args[0]
++
++
++def test_the_phase_tool_can_be_loaded_with_a_bad_settings_file(project, monkeypatch):
++    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
++    monkeypatch.chdir(project)
++    spec = importlib.util.spec_from_file_location("phase_tool_loaded", project / PHASE_TOOL)
++    module = importlib.util.module_from_spec(spec)
++    spec.loader.exec_module(module)  # no SystemExit: a caller that reads its fact types is not stopped
++    assert module.FACT_TYPES and "unknown setting(s): planing_dir" in module.SETTINGS_ERROR

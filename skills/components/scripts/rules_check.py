@@ -241,6 +241,11 @@ def load_settings(path: Path) -> dict:
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
             settings_error(f'{path}: unknown setting(s): {", ".join(unknown)}')
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                settings_error(f'{path}: {key} must be ' + {str: 'a string', bool: 'true or false',
+                                                            int: 'a whole number', list: 'a list of strings'}[kind])
         settings.update(loaded)
     return settings
 

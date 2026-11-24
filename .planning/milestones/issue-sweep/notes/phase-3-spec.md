@@ -132,7 +132,10 @@ def settings_error(message: str) -> NoReturn:
     raise SystemExit(2)
 ```
 
-for each refusal it has today, and for two it does not have: text that is not JSON
+for each refusal it has today, and for three it does not have: a value whose type is not
+its default's, or a list that holds anything but strings (`<path>: <key> must be a string`,
+`true or false`, `a whole number`, `a list of strings`; *added 2026-11-23, r1 F1 and F2*),
+text that is not JSON
 (`<path>: not valid JSON: <the parser's message>`) and JSON that is not an object
 (`<path>: the settings must be a JSON object`). Today the first ends in a traceback.
 
@@ -166,7 +169,8 @@ load with `SystemExit`, before `main` can print anything.
   sets `SETTINGS_ERROR` to the message, so every constant derived from the settings is
   defined and a caller that only imports the module (the rule check reads its fact types)
   is not stopped.
-- `main`: before parsing, when `SETTINGS_ERROR` is set, the envelope is
+- `main`: *corrected 2026-11-23 (r1 F3): after parsing, so the format and the command are
+  the parser's; prior wording: "before parsing"*, when `SETTINGS_ERROR` is set, the envelope is
   `{"ok": false, "tool": "phase_tool.<command>", "version": …, "data": {}, "error":
   {"code": "SETTINGS", "message": <the message>, "hint": "fix or remove the settings
   file"}}`, printed once in the format asked for, and the exit is 2, for `status` too.
@@ -350,3 +354,51 @@ All on 2026-11-23, on the phase's base `a247f4d`.
   `phase.coder_pool`, `migrate.from_gsd`. `handoff.notes` was not: it is listed as older
   than its code for four earlier commits this phase did not read, and a `reread:` line
   would claim otherwise.
+
+## Phase review round 1 (r1)
+
+`notes/reviews/phase-3-r1`, 2026-11-23: the review helper with `--subject phase --base
+a247f4d`, reviewer Codex, read-only, effort `high`, over the diff and 34 files; brief
+SHA-256 `a0dbaefcd587572ce521cb4b8b4d5d49f06b554e867476b6da34c6deeb95fe6b`. `VERDICT:
+CHANGES_REQUESTED`, 3 findings. One reviewer is one reviewer. It ran no fresh-project
+test and no suite (read-only).
+
+- **F1 (blocking), reproduced.** `phase_tool.py` checked three of its values only:
+  `{"package_prefix": 7}` and `{"process_skill": null}` ended the load in a `TypeError`,
+  exit 1, no envelope. Reproduced on the built copy in a scratch project. Repaired: every
+  value must have its default's type, and a list must hold strings; the load records the
+  error and every command prints the envelope.
+- **F2 (blocking), reproduced.** The same gap in the other four loaders: `verb_list: []`
+  and `index_script: 7` ended in a `TypeError`, exit 1. `handoff.py list` with
+  `planning_dir: 7` exited 0 here, because `list` does not read it; `write` does, and is
+  the case the test uses. `review_tool.py` with `codex_model: 7` was not run by hand
+  before the repair; its test was red. Repaired by the same rule in each loader.
+- **F3 (hardening), reproduced.** The settings branch read the format and the command
+  from raw tokens: `--for=json status` printed Markdown, and `--root status check`
+  named `status`. Repaired: the branch runs after the parser, through `ToolError`, and
+  `status`'s exit stays 2 for it.
+- Regression tests, each red before its repair: the seven cases of
+  `test_a_setting_of_the_wrong_type_exits_2`, the three of
+  `test_the_settings_envelope_follows_the_parsed_command_line` (the second only once it
+  used the reviewer's own command line), and the added assertions in
+  `tests/test_handoff.py` and `tests/test_review_tool.py`.
+
+| Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
+|---|---|---|---|---|---|---|
+| r1 | 1 (Codex) | 3 | 0 / 3 (first round) | 2 / 3 | blocking | CHANGES_REQUESTED |
+
+Round 2 is not run. The repairs are one rule repeated in five loaders and a move of one
+branch in `main`, each held by tests seen red. The repaired bytes carry no review
+opinion.
+
+- **K6. A defect of the repair, found by the full suite.** The first full run after the
+  repairs printed `34 failed, 493 passed`. In `rules_check.py` and `components_index.py`
+  the new type loop had been written one level out, after `if path.is_file():` instead of
+  inside it, so either script with no settings file at all ended in `UnboundLocalError`.
+  The focused selection had missed it: every case it ran wrote a settings file. Fixed;
+  the five loaders were then checked by their syntax tree (each loop inside the file
+  branch). The 34 tests that failed are its regression tests: among them 27 of
+  `tests/test_tools.py` that run `rules_check.py` with no settings file and both cases of
+  T1 in `tests/test_plugins.py`. The next full run printed `527 passed`, the same 527
+  tests.
+

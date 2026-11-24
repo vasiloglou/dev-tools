@@ -458,6 +458,9 @@ def test_a_synced_copy_reads_the_settings_beside_it_and_refuses_an_unknown_key(r
     copy.with_suffix(".settings.json").write_text("[]")
     done = run(repo, "write", script=copy)
     assert done.returncode == 2 and "the settings must be a JSON object" in done.stderr and "Traceback" not in done.stderr
+    copy.with_suffix(".settings.json").write_text(json.dumps({"planning_dir": 7}))
+    done = run(repo, "write", script=copy)
+    assert done.returncode == 2 and "planning_dir must be a string" in done.stderr and "Traceback" not in done.stderr
 
 
 def test_a_plugin_install_reads_the_projects_settings(repo, tmp_path):

@@ -2367,3 +2367,39 @@ def test_the_phase_tool_can_be_loaded_with_a_bad_settings_file(project, monkeypa
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # no SystemExit: a caller that reads its fact types is not stopped
     assert module.FACT_TYPES and "unknown setting(s): planing_dir" in module.SETTINGS_ERROR
+
+
+
+@pytest.mark.parametrize("script, settings, text, says", [
+    (INDEX, INDEX_SETTINGS, '{"verb_list": []}', "verb_list must be a string"),
+    (INDEX, INDEX_SETTINGS, '{"extra_source_dirs": "tools"}', "extra_source_dirs must be a list of strings"),
+    (RULES, RULES_SETTINGS, '{"index_script": 7}', "index_script must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"package_prefix": 7}', "package_prefix must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"process_skill": null}', "process_skill must be a string"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"phase_gaps": 1}', "phase_gaps must be true or false"),
+    (PHASE_TOOL, PHASE_TOOL.replace(".py", ".settings.json"), '{"skill_roots": [7]}', "skill_roots must be a list of strings"),
+])
+def test_a_setting_of_the_wrong_type_exits_2(project, script, settings, text, says):
+    (project / settings).write_text(text)
+    args = {INDEX: ("--check",), RULES: ("init", "--print"), PHASE_TOOL: ("--format", "json", "status")}[script]
+    done = run_index(project, *args, script=script)
+    assert done.returncode == 2, done.stdout + done.stderr
+    assert says in done.stdout + done.stderr and "Traceback" not in done.stderr, done.stdout + done.stderr
+    if script == PHASE_TOOL:
+        assert json.loads(done.stdout)["error"]["code"] == "SETTINGS"
+
+
+@pytest.mark.parametrize("args, tool_name, as_json", [
+    (("--for=json", "status"), "status", True),            # an abbreviation the parser accepts
+    (("--format", "json", "--root", "status", "check", "--roadmap"), "check", True),  # a command word as a value
+    (("--format=json", "status", "--format", "md"), "status", False),  # the last one wins in the parser
+])
+def test_the_settings_envelope_follows_the_parsed_command_line(project, args, tool_name, as_json):
+    (project / PHASE_TOOL.replace(".py", ".settings.json")).write_text('{"planing_dir": "x"}')
+    done = run_index(project, *args, script=PHASE_TOOL)
+    assert done.returncode == 2, done.stdout + done.stderr
+    if as_json:
+        envelope = json.loads(done.stdout)
+        assert envelope["tool"] == "phase_tool." + tool_name and envelope["error"]["code"] == "SETTINGS"
+    else:
+        assert done.stdout.startswith("phase_tool.%s: FAILED\nerror SETTINGS: " % tool_name), done.stdout

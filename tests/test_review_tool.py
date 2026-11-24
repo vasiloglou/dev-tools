@@ -368,6 +368,9 @@ def test_settings_choose_the_model_and_an_unknown_setting_is_an_error(project):
     settings.write_text("{")
     code, out = review(project, "status", "reviews")
     assert code == 2 and "review_tool.settings.json: not valid JSON" in out and "Traceback" not in out, out
+    settings.write_text(json.dumps({"codex_model": 7}))
+    code, out = review(project, "status", "reviews")
+    assert code == 2 and "codex_model must be a string" in out and "Traceback" not in out, out
 
 
 # Regression tests for the findings of the first review of this helper (F1 to F6).

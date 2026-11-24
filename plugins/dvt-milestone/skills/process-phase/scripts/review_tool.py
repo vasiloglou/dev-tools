@@ -158,6 +158,11 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
             raise Stop("{}: unknown setting(s): {}".format(path, ", ".join(unknown)))
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                raise Stop(f"{path}: {key} must be " + {str: "a string", bool: "true or false", int: "a whole number",
+                                                          list: "a list of strings"}[kind])
         settings.update(loaded)
     if settings["reviewer"] not in ("auto", "codex", "claude"):
         raise Stop(f"{path}: reviewer must be auto, codex or claude")

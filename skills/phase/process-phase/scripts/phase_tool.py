@@ -110,6 +110,12 @@ def load_settings(path: Path = SETTINGS_FILE) -> dict:
         unknown = sorted(set(loaded) - set(DEFAULT_SETTINGS))
         if unknown:
             raise ValueError("%s: unknown setting(s): %s" % (path, ", ".join(unknown)))
+        for key, value in loaded.items():  # each value has its default's type; a list holds strings
+            kind = type(DEFAULT_SETTINGS[key])
+            if type(value) is not kind or (kind is list and not all(isinstance(item, str) for item in value)):
+                if key != "shared_files":  # its own message below says what it holds
+                    raise ValueError("%s: %s must be %s" % (path, key, {
+                        str: "a string", bool: "true or false", int: "a whole number", list: "a list of strings"}[kind]))
         settings.update(loaded)
     if settings["skill_check"] not in ("all", "synced"):
         raise ValueError("%s: skill_check must be all or synced" % path)
@@ -2040,16 +2046,13 @@ def main(argv=None) -> int:
         or "--format=json" in argv else "md"
     cmd = next((a for a in argv if a in COMMANDS), "usage")
     env = {"ok": True, "tool": "phase_tool." + cmd, "version": VERSION, "data": {}}
-    if SETTINGS_ERROR:  # one envelope, and exit 2 for every command, status too
-        env.update(ok=False, error={"code": "SETTINGS", "message": SETTINGS_ERROR,
-                                    "hint": "fix or remove the settings file"})
-        print(json.dumps(env, indent=2, sort_keys=False) if fmt == "json" else render_md(env))
-        return 2
     code = 0
     try:
         args = build_parser().parse_args(argv)
         fmt, cmd = args.format, args.cmd
         env["tool"] = "phase_tool." + cmd
+        if SETTINGS_ERROR:  # after parsing, so the format and the command are the parser's; exit 2, status too
+            raise ToolError("SETTINGS", SETTINGS_ERROR, "fix or remove the settings file", exit_code=2)
         env["data"] = COMMANDS[cmd](Planning(find_root(args.root)), args)
     except ToolError as exc:
         env.update(ok=False, data=exc.data, error={"code": exc.code, "message": exc.message, "hint": exc.hint})
@@ -2058,7 +2061,7 @@ def main(argv=None) -> int:
         env.update(ok=False, error={"code": "INTERNAL", "message": "%s: %s" % (type(exc).__name__, exc),
                                     "hint": "report this as a phase_tool bug"})
         code = 1
-    if cmd == "status":
+    if cmd == "status" and not SETTINGS_ERROR:
         code = 0
     print(json.dumps(env, indent=2, sort_keys=False) if fmt == "json" else render_md(env))
     return code
