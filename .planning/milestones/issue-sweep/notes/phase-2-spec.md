@@ -48,7 +48,8 @@ the `--isolated` command is a plan repair for the close.
 - **S0.1 With default settings, today's lines and exits stay.** `allow_baseline` defaults
   to `true`: A4 names the two existing baseline tests that run unedited. An entry with no
   `reread:` line is dated and described as today: C1's first half asserts today's
-  sentence. `count_extra_dirs` off: D1's second half. The one exception is D6 of the
+  sentence, except a tie within one second, now settled by history (6.3; r1 F2), pinned
+  by `test_a_tie_in_commit_time_is_settled_by_history_without_a_reread_line`. `count_extra_dirs` off: D1's second half. The one exception is D6 of the
   plan, the stale base, and B2 holds every other state to today's summary line.
 - **S0.2 A shipped script stands alone.** No import is added to either script.
   `rules_check.py` already runs `components_index.py facts` as a subprocess; it now also
@@ -149,8 +150,12 @@ Normative order, and this docstring's function is its one home:
 
 1. `base` does not name a commit: `origin/<base>` when that does, else the error of
    today (`no branch or commit named <base>: …`). No line.
-2. `base` names a local branch (`refs/heads/<base>` resolves) that has an upstream
-   configured (`git rev-parse --abbrev-ref <base>@{upstream}` answers, and that ref
+2. `base` names a local branch that has an upstream configured. *Corrected 2026-11-23
+   (r1 F1): "names a local branch" means git itself reads the name as one
+   (`git rev-parse --symbolic-full-name <base>` prints `refs/heads/…`), so a tag of the
+   same name wins, as it does in git, and a branch given in full (`refs/heads/main`) is
+   read like its short name. Prior wording: "(`refs/heads/<base>` resolves)", which took a
+   same-named branch even when git read the name as a tag.* The branch is one (`git rev-parse --abbrev-ref <base>@{upstream}` answers, and that ref
    resolves), and the local branch is **strictly behind** it: the two commits differ and
    the merge base of the two is the local one. The upstream is used, and the line is
 
@@ -201,7 +206,12 @@ Only the branch's own configured upstream counts (D3). Every git command reads:
   returns which kind of line that was. An uncommitted line counts as edited now, as
   today.
 - `review`'s lead keeps today's sentence when the newest line is `does`, `verbs` or
-  `flow`: `… since <commit> (<day>), when its does and verbs were last edited`. When it
+  `flow`: `… since <commit> (<day>), when its does and verbs were last edited`.
+- *Added 2026-11-23 (J10; r1 F2):* lines committed in the same second are ordered by
+  history: the commit that has the other in its history is newer. This applies to the
+  `does`, `verbs` and `flow` lines too, so it is an exception to S0.1: an entry whose
+  `does` or `verbs` was edited in the same commit as its code, within one second of the
+  entry's other lines, was listed before (the blame order decided) and is not now. When it
   is the `reread` line: `… since <commit> (<day>), when it was last marked as reread`.
 - `reread` joins `CHECKED`: written twice in one entry it is refused, as `does` is.
 - `changed` already compares every hand-written field of an entry with the base, so an
@@ -474,3 +484,36 @@ All on 2026-11-23, on the phase's base `361b2cc`.
   commit's time to one second and failed on three of three runs before the repair.
   Rule 3 of the order of `entry_commits` is now: newest by commit time, ties settled by
   ancestry.
+
+## Phase review round 1 (r1)
+
+`notes/reviews/phase-2-r1`, 2026-11-23: the review helper with `--subject phase --base
+361b2cc`, reviewer Codex, read-only, effort `high`, over the diff and 29 files; brief
+SHA-256 `eb7a86756fa77ee04171505dbf662a701a9ff59653519463ed1a92385f8231d6`. `VERDICT:
+CHANGES_REQUESTED`, 2 findings. One reviewer is one reviewer. It ran no test (read-only;
+pytest was not in its environment) and could not repeat the negative controls.
+
+- **F1 (blocking), reproduced.** With a tag `main` and a local branch `main` behind its
+  upstream, git reads `main` as the tag, and `resolve_base` substituted `origin/main` with
+  a note. Reproduced in a scratch repository (`git rev-parse main` gave the tag's commit
+  with `refname 'main' is ambiguous`) and by the new case "a tag of the same name" of B2,
+  red before the repair. Repaired: rule 2 reads the name through `git rev-parse
+  --symbolic-full-name`, which refuses an ambiguous name. The reviewer also noted that
+  `refs/heads/main` was not read as the branch; that is now held by
+  `test_changed_reads_a_branch_named_in_full_like_its_short_name`, also red before. B2
+  gained "a tag" as well.
+- **F2 (hardening), reproduced.** The tie rule of J10 also orders `does` and `verbs`, so a
+  default-settings output changed: an entry whose `verbs` was edited with its code within
+  one second of being written was listed before and is not now. Reproduced with every
+  commit's time fixed to one second: listed on the code before the tie rule, not after.
+  The behaviour is kept, because the earlier answer depended on the order of blame lines;
+  the spec now names it as an exception to S0.1 (4, 6.3), and
+  `test_a_tie_in_commit_time_is_settled_by_history_without_a_reread_line` pins it.
+
+| Round | Seats | Per-seat counts | Self-inflicted / total | Blocking / total | Severity ceiling | Verdicts |
+|---|---|---|---|---|---|---|
+| r1 | 1 (Codex) | 2 | 0 / 2 (first round) | 1 / 2 | blocking | CHANGES_REQUESTED |
+
+Round 2 is not run. F1's repair is one rule of one function, held by two cases seen red;
+F2 changed no code. The repaired bytes carry no review opinion.
+

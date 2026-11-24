@@ -1088,8 +1088,9 @@ def resolve_base(root: Path, base: str) -> tuple[str, str]:
     """The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise).
 
     In this order: a name that is no commit is read as origin/<name>, or refused when that is none
-    either. A local branch strictly behind its configured upstream (they differ, and their merge
-    base is the local branch) is read as that upstream, and the line says so. Anything else is read
+    either. A name git reads as a local branch (short or in full; not when a tag has the same
+    name) that is strictly behind its configured upstream (they differ, and their merge base is
+    the local branch) is read as that upstream, and the line says so. Anything else is read
     as given: a branch level with, ahead of or diverged from its upstream, a branch with no
     upstream, a remote-tracking branch, a tag, a commit. Every git command here only reads.
     """
@@ -1100,8 +1101,13 @@ def resolve_base(root: Path, base: str) -> tuple[str, str]:
         if not commit('origin/' + base):
             raise ValueError(f'no branch or commit named {base}: pass --base <the branch this change will merge into>')
         return 'origin/' + base, ''
-    local = commit('refs/heads/' + base)
-    upstream = git(root, 'rev-parse', '--abbrev-ref', '--verify', '--quiet', base + '@{upstream}', check=False).strip()
+    # Only a name git itself reads as a local branch: a tag of the same name wins in git, and so here.
+    # An ambiguous name prints nothing, and is read as given.
+    full = git(root, 'rev-parse', '--symbolic-full-name', base, check=False).strip()
+    branch = full.removeprefix('refs/heads/') if full.startswith('refs/heads/') else ''
+    local = commit(full) if branch else ''
+    upstream = git(root, 'rev-parse', '--abbrev-ref', '--verify', '--quiet', branch + '@{upstream}',
+                   check=False).strip() if branch else ''
     ahead = commit(upstream) if local and upstream else ''
     if not ahead or ahead == local or git(root, 'merge-base', local, ahead, check=False).strip() != local:
         return base, ''

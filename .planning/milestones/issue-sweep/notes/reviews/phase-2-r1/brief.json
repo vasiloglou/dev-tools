@@ -1,0 +1,141 @@
+{
+  "base": "361b2cc",
+  "claims": [
+    "P2.1. With allow_baseline false and a baseline file, --check --strict exits 1 and names the file, and stats --write-baseline writes nothing; without the setting a project with a baseline exits as before.",
+    "P2.2. A local base strictly behind its configured upstream is compared through that upstream with one note: line before the summary; every other state of the base (level, ahead, diverged, no upstream, a commit, a remote-tracking branch, a tag, a name only the remote has) prints what it printed before this diff.",
+    "P2.2b. facts --base in the stale state writes on standard output, and to --out, exactly the document that facts --base <upstream> writes, with the note on standard error only; rules_check.py check --base judges against that base.",
+    "P2.3. No command of either script starts git fetch, pull, push or remote, in any state.",
+    "P2.4. An entry whose reread: line was committed after the last commit to its modules is not listed as older than its code, also when the commits share one second; after a later commit to a module it is listed again; a second reread: line is refused.",
+    "P2.5. With count_extra_dirs on, the same-name, no-docstring, over-12-modules groups, the defines-main label and the summary's count cover the extra folders; with it off every line of review is what it was before this diff.",
+    "P2.6. dev-tools' own check that no baseline is kept is --check --strict alone, and tests/test_own_index.py holds it through the setting.",
+    "The skill, its references, docs/components.html and .devtools/project.md describe what the code now does, and nothing they say is false of it."
+  ],
+  "created": "2026-11-24T00:17:27.377910+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/issue-sweep/notes/reviews/phase-2-r1/diff.patch",
+      "sha256": "ac796ef659659b9df8c1c1bc093585e95273827311677c9ea76ea0325f1fad46"
+    },
+    {
+      "path": ".devtools/components/COMPONENTS.md",
+      "sha256": "4c045ee969069caac4b2fc6e98511f2319172352300aa0fa0d7bf678cdeb47c3"
+    },
+    {
+      "path": ".devtools/components/modules/skills.md",
+      "sha256": "6bb486b61c9632bb47535e5770b4bda16d7505525eedc3bc6d80353d1be57f07"
+    },
+    {
+      "path": ".devtools/components_index.settings.json",
+      "sha256": "0ab385e6a6975d8f1906f4b57039255e0c56562b6a46471e8f6802310d23b83f"
+    },
+    {
+      "path": ".devtools/project.md",
+      "sha256": "fd2ec297396724924d180254c66e25b7534cd29dfdc32cb738f6aad3d3f8104d"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/phase-2-spec.md",
+      "sha256": "d1e6f5dedf8570152021aeabd711db6ef9cdaf88e2ab5b4f213b48f157369513"
+    },
+    {
+      "path": "devtools/PLUGIN_VERSION",
+      "sha256": "ba57e7c7f71876d645bcdd9fb070f2dea8e6db5ed284a7e3d85c6b7d2409fef1"
+    },
+    {
+      "path": "docs/components.html",
+      "sha256": "1cc1a1e794e6e37d0996050d31f5a679ec392854f4352fc978781779739e5c0a"
+    },
+    {
+      "path": "plugins/dvt-milestone/.claude-plugin/plugin.json",
+      "sha256": "ba49d7a134b03f75dbaa4fb140deecf56257bfc6a27d1c64c44b1f9a910d4b48"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/SKILL.md",
+      "sha256": "fdaa2b5840c8f2f14888b530b5afa52ac058191d52aafb45cf098d35b38432f0"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/references/build.md",
+      "sha256": "8611a48655783b8ef93aadfb242d2ff5faffb06e86e20b77cf4bc9a7931c2b5b"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/references/review.md",
+      "sha256": "cb28509de7384be701dd6aa74ae6045cd81667173d89f1b3a3ba8e1729191473"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/components_index.py",
+      "sha256": "c2c576e2012b85d6ba7239c40fba745caf00287dd5f4d8f9bb0bcaabf3d781c1"
+    },
+    {
+      "path": "plugins/dvt-milestone/skills/components/scripts/rules_check.py",
+      "sha256": "2d80e2f9c4bb33802e979a509bc0343002529324cda24e1be175e2e495ebcc77"
+    },
+    {
+      "path": "plugins/dvt-phase/.claude-plugin/plugin.json",
+      "sha256": "cb13a5176a3da1b2391dd70e2f9eeda0cbb46f795664bc6a9c73f13aad08dd32"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/SKILL.md",
+      "sha256": "25f8bc277866fe2852dc248747242967053d508dad0302d2f85db477b7ddb8a8"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/references/build.md",
+      "sha256": "8611a48655783b8ef93aadfb242d2ff5faffb06e86e20b77cf4bc9a7931c2b5b"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/references/review.md",
+      "sha256": "cb28509de7384be701dd6aa74ae6045cd81667173d89f1b3a3ba8e1729191473"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/components_index.py",
+      "sha256": "c2c576e2012b85d6ba7239c40fba745caf00287dd5f4d8f9bb0bcaabf3d781c1"
+    },
+    {
+      "path": "plugins/dvt-phase/skills/components/scripts/rules_check.py",
+      "sha256": "2d80e2f9c4bb33802e979a509bc0343002529324cda24e1be175e2e495ebcc77"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "7651579672099fa296d2b55667b79e54e2500bedef1c00d8dba98e56c696e1fc"
+    },
+    {
+      "path": "skills/components/references/build.md",
+      "sha256": "7709021f8ce3c350a9451885656055b2ac457117b902625fcaebb4d0f8682c61"
+    },
+    {
+      "path": "skills/components/references/review.md",
+      "sha256": "7fdc105d616b8c4c51cfd0ac38615efaf61eb7155eeca3db3ca1cf525226e12d"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "c2c576e2012b85d6ba7239c40fba745caf00287dd5f4d8f9bb0bcaabf3d781c1"
+    },
+    {
+      "path": "skills/components/scripts/rules_check.py",
+      "sha256": "2d80e2f9c4bb33802e979a509bc0343002529324cda24e1be175e2e495ebcc77"
+    },
+    {
+      "path": "tests/test_own_index.py",
+      "sha256": "a8d971fd544d93af956c7305e03b6f0e3fd238ba9eb6f9179e379c827ce6d3d5"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "1ad93e01664157f642d476a1f0d5c636e67540b5302dd1b342f92e9ef5d80fb1"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issue-sweep-plan.md",
+      "sha256": "309c6e556ac85f24e71f3c63f79356421392e570cdf143472b02f1acd90481a4"
+    },
+    {
+      "path": ".planning/milestones/issue-sweep/notes/issues-2026-11-23.md",
+      "sha256": "7584fec3d861c1113450fa58207fbc671f1ad9e77f2db673d6b1df1f575dc84c"
+    }
+  ],
+  "head": "47dc420fa63686856a4554137a65ce801bb9a1f3",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does this diff do what the phase 2 spec says for issues 44, 45 and 46, does a project with default settings see the lines and exits it saw before, and can each new test fail when the behaviour it names is wrong?",
+  "subject": "phase",
+  "version": 1
+}

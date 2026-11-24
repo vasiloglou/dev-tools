@@ -2072,8 +2072,17 @@ def test_changed_compares_with_the_upstream_of_a_base_that_is_behind(project):
     assert summary(out).startswith("changed against origin/main (%s): " % upstream[:7])
 
 
+def test_changed_reads_a_branch_named_in_full_like_its_short_name(project):
+    first, upstream = behind(project)
+    code, out = tool(project, "changed", "--base", "refs/heads/main", script=INDEX)
+    assert code == 0, out
+    assert ("note: refs/heads/main (%s) is 1 commit(s) behind origin/main (%s): comparing with origin/main"
+            % (first[:7], upstream[:7])) in out.splitlines(), out
+    assert summary(out).startswith("changed against origin/main (%s): " % upstream[:7])
+
+
 @pytest.mark.parametrize("state", ["level", "ahead", "diverged", "no upstream", "commit", "origin/main given",
-                                   "only the remote has it"])
+                                   "only the remote has it", "a tag of the same name", "a tag"])
 def test_changed_reads_every_other_base_as_it_is(project, state):
     first, upstream = behind(project)
     base, named = "main", "main"
@@ -2090,6 +2099,11 @@ def test_changed_reads_every_other_base_as_it_is(project, state):
         base = named = first
     elif state == "origin/main given":
         base = named = "origin/main"
+    elif state == "a tag of the same name":
+        git_in(project, "tag", "main", first)  # git reads the name as the tag; so must the index
+    elif state == "a tag":
+        git_in(project, "tag", "v1", first)
+        base = named = "v1"
     else:
         git_in(project, "branch", "-q", "-D", "main")
         named = "origin/main"
@@ -2196,6 +2210,22 @@ def test_a_reread_line_committed_in_the_same_second_still_counts(project, monkey
     assert tool(project, "write", script=INDEX)[0] == 0
     commit(project)
     assert older_than_code(project) == [], "the reread line's commit is the newer one, though the clock ties"
+
+
+def test_a_tie_in_commit_time_is_settled_by_history_without_a_reread_line(project, monkeypatch):
+    # The verbs edited in the same commit as the code, and in the same second as the entry was written: the entry
+    # was updated with its code, so it is not listed. Before ties were settled by history, the blame order decided.
+    for name in ("GIT_AUTHOR_DATE", "GIT_COMMITTER_DATE"):
+        monkeypatch.setenv(name, "2026-11-23T12:00:00+00:00")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text().replace("- verbs: sizes\n", "- verbs: sizes, parse sizes\n"))
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert older_than_code(project) == []
 
 
 def test_a_reread_line_written_twice_is_refused(project):
