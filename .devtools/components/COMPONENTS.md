@@ -330,7 +330,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py, tests/test_index_cache.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). search and --check read a parse cache in $XDG_CACHE_HOME/components-index/, outside the checkout, and drop cache files older than 30 days. review's leads read from the modules (same names, docstrings, size, entry points) cover the counted modules, so count_extra_dirs reaches them; the import graph stays within package_dir. In a plugin install the settings come from the current folder's checkout, whatever --root says.
-- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file exits 2); does and verbs still true
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file exits 2) and its review repairs at 43f6d83 (every value of the settings checked for its type, the loop inside the file branch); does and verbs still true
 
 ### components.rules
 - does: Judge the project's own rules about its components and plans with GND, over the facts components_index.py extracts: init writes starter rules and layers, check (against a base, or --phase NN for plans), test judges each rule on its examples, suggest proposes layers and near misses (rules_check.py)
@@ -342,7 +342,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - part_of: subsystem.rule_check
 - tests: tests/test_tools.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Without GND, check, test and suggest print skip: and exit 0 (1 with --require); a check that could not run exits 2. It runs components_index.py facts and phase_tool.py facts as subprocesses and loads phase_tool.py with importlib (subsystem.rule_check), and keeps its own copy of phase_tool's PLAN_KEYS. In a dvt-milestone install its default phase_script is missing (that plugin ships no phase_tool.py), so check --phase cannot run there. check --base relays the index script's note: line when facts were read at the upstream of a base that is behind it.
-- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (test skips a rule about plans without the phase tool; a bad settings file exits 2); does and verbs still true
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (test skips a rule about plans without the phase tool; a bad settings file exits 2) and its review repairs at 43f6d83 (every value of the settings checked for its type, the loop inside the file branch); does and verbs still true
 
 ## Moving work between assistants and machines
 
@@ -367,7 +367,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - tests: tests/test_review_tool.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). A brief refuses a credential file it is asked to name and leaves out one (or a rename of one) a diff would bring in. run refuses when a file changed since the brief, and a round is never run twice. post's preview already calls gh. A settings file it cannot use (an unknown key, not a JSON object) exits 2, as the docstring says (since issue-sweep phase 3). Since vasiloglou/dev-tools#35 the brief of a phase or pr subject also carries a standing check, whatever the question: look for code fitted to its examples, and report it only with an input that breaks it (the diff of that change was read beside this entry on 2026-11-23).
-- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file is a Stop, exit 2; the docstring's exit codes); does and verbs still true
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file is a Stop, exit 2; the docstring's exit codes) and its review repairs at 43f6d83 (every value of the settings checked for its type); does and verbs still true
 
 ## The phase workflow
 
@@ -381,7 +381,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - part_of: subsystem.phase_status, subsystem.rule_check
 - tests: tests/test_tools.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index). Every command prints one envelope (--format json|md); status exits 0 even on a usage error, and a phase_tool.settings.json it cannot use is reported in one envelope with error code SETTINGS and exit 2, status included (since issue-sweep phase 3; the module still loads, on the defaults). check --plans runs coder_pool.py show --json for a wave of more than one plan, only to warn (subsystem.phase_status); check runs the project's capabilities_script with runpy. rules_check.py loads this file for its fact types (subsystem.rule_check).
-- reread: 2026-11-23, issue-sweep phase 3: read beside this phase's diff (a bad settings file is one envelope with exit 2; the docstring's exit codes); does and verbs still true
+- reread: 2026-11-23, issue-sweep close: read beside phase 3's diff (a bad settings file is one envelope with exit 2; the docstring's exit codes) and its review repairs at 43f6d83 (every value checked for its type; the settings envelope after the parser); does and verbs still true
 
 ### phase.coder_pool
 - does: Say which coding assistants Implement may use and how many tracks at once: merge the team's and the developer's TOML files, keep the coders on PATH, fall back to claude, and give each account's model, effort and env (coder_pool.py show)
