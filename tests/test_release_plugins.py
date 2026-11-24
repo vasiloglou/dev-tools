@@ -19,6 +19,9 @@ def git(repo: Path, *args: str) -> str:
 def repo(tmp_path):
     for name in COPIED:
         shutil.copytree(ROOT / name, tmp_path / name, ignore=shutil.ignore_patterns("__pycache__"))
+    # The repository's own ignores, or the bytecode the script's imports write makes the tree dirty
+    # wherever PYTHONDONTWRITEBYTECODE is not set.
+    shutil.copy2(ROOT / ".gitignore", tmp_path / ".gitignore")
     # Start every test from 0.1.0 with no release, whatever version this repository is at.
     (tmp_path / "devtools/PLUGIN_VERSION").write_text("0.1.0\n")
     subprocess.run([sys.executable, str(tmp_path / "devtools/build_plugins.py")], cwd=tmp_path, check=True,
