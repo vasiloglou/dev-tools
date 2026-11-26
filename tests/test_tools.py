@@ -53,16 +53,21 @@ ROADMAP = """# Roadmap
 """
 
 
-@pytest.fixture
-def project(tmp_path):
+def new_project(tmp_path, *init):
+    """A project that took the skills, in a new repository made with `git init` and the arguments `init`."""
     root = tmp_path / "widget"
     (root / "src/widget").mkdir(parents=True)
     (root / "src/widget/__init__.py").write_text('"""widget."""\n')
     config = (ROOT / "examples/phase-project.devtools.toml").read_text().replace("myapp", "widget")
     (root / ".devtools.toml").write_text(config)
-    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", *init, str(root)], check=True)
     assert sync.main(["apply", "--project", str(root)]) == 0
     return root
+
+
+@pytest.fixture
+def project(tmp_path):
+    return new_project(tmp_path)
 
 
 def tool(project, *args, script=".claude/skills/process-phase/scripts/phase_tool.py"):
@@ -1725,7 +1730,12 @@ def test_changed_does_not_call_a_regrouped_import_new(project):
     path.write_text(path.read_text().replace("src/widget/report.py, src/widget/rows.py", "src/widget/report.py"))
     catalog(project, entry("core.rows", "Build rows", "src/widget/rows.py"))
     code, out = tool(project, "changed", "--base", "main", "--strict", script=INDEX)
-    assert code == 0 and "warn:" not in out, out
+    assert "warn:" not in out, out
+    # The regrouping is no new caller, but it is a change to the component that gave the module up: the
+    # owner's ruling of 2026-11-26 on review pr-51-r1 (test_changed_asks_both_components_when_a_module_moves...).
+    assert code == 1 and "reread: core.report (only modules edited): src/widget/rows.py\n" in out, out
+    assert tool(project, "changed", "--base", "main", script=INDEX)[0] == 0
+
 
 def test_the_baseline_cannot_take_a_new_module_in_exchange_for_an_old_one(project):
     for name in ("a", "b"):
@@ -2265,7 +2275,9 @@ def code_moved(project, sizes=""):
     catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py") + sizes,
             entry("core.rows", "Build report rows", "src/widget/rows.py"), FLOW)
     commit(project)
-    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(text):\n    """Read a size."""\n')
+    # The new name is one the entry's sentence already speaks of, so the line carries no lead about names
+    # (test_changed_names_the_public_names_the_entry_does_not_speak_of).
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef format_count(count):\n    """Format it."""\n')
     assert tool(project, "write", script=INDEX)[0] == 0
 
 
@@ -2307,7 +2319,9 @@ def test_changed_names_every_other_field_that_was_edited(project):
     code_moved(project)
     edit_catalog(project, SIZES_MODULES,
                  "- modules: src/widget/sizes.py, src/widget/__init__.py\n- notes: parse reads a size back.\n")
-    assert "reread: core.sizes (only modules, notes edited): src/widget/sizes.py" in rereads(project)[1]
+    # The file the entry took in is named beside the one that was edited, though it does not differ itself.
+    assert ("reread: core.sizes (only modules, notes edited): src/widget/__init__.py, src/widget/sizes.py"
+            in rereads(project)[1])
 
 
 @pytest.mark.parametrize("old, new", [
@@ -2382,6 +2396,7 @@ def test_review_does_not_date_an_entry_from_an_empty_reread_line(project):
 BOTH_MODULES = "- modules: src/widget/sizes.py, src/widget/parse.py\n"
 ROWS_MODULES = "- modules: src/widget/rows.py\n"
 SYSTEM_LINE = "reread: subsystem.report (entry not edited): its members changed: core.sizes"
+STILL_PARSE = "; removed public names still in does or verbs: parse"  # core.sizes says it parses, in two_modules
 
 
 def two_modules(project, flow=FLOW):
@@ -2403,7 +2418,7 @@ def test_changed_asks_the_component_that_gave_up_a_deleted_module(project):
     edit_catalog(project, BOTH_MODULES, SIZES_MODULES)
     code, lines, out = rereads(project, "--strict")
     assert code == 1, out
-    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py", SYSTEM_LINE], out
+    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py" + STILL_PARSE, SYSTEM_LINE], out
     edit_catalog(project, "- does: Format and parse a byte count\n", "- does: Format a byte count\n")
     code, lines, out = rereads(project, "--strict")
     assert code == 0 and lines == [SYSTEM_LINE], out
@@ -2419,30 +2434,141 @@ def test_changed_asks_for_a_renamed_module_under_both_of_its_names(project):
                      SYSTEM_LINE], out
 
 
-def test_changed_asks_both_components_when_an_edited_module_moves_from_one_to_the_other(project):
+@pytest.mark.parametrize("rewritten", [True, False])
+def test_changed_asks_both_components_when_a_module_moves_from_one_to_the_other(project, rewritten):
+    # The component that gave the module up no longer does what the module did, and the one that took it does
+    # more than its sentence says, whether or not the file itself was edited: the owner's ruling of 2026-11-26
+    # on Q6 of review pr-51-r1's record. Each line says which names to look for.
     two_modules(project)
-    (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n\n\ndef parse(text, base=1024):\n    """Read."""\n')
+    if rewritten:
+        (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n\n\ndef parse(text, base=1024):\n    """Read."""\n')
     edit_catalog(project, BOTH_MODULES, SIZES_MODULES)
     edit_catalog(project, ROWS_MODULES, "- modules: src/widget/rows.py, src/widget/parse.py\n")
     code, lines, out = rereads(project, "--strict")
     assert code == 1, out
-    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py",
-                     "reread: core.rows (only modules edited): src/widget/parse.py",
+    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py" + STILL_PARSE,
+                     "reread: core.rows (only modules edited): src/widget/parse.py"
+                     "; new public names not in does or verbs: parse",
                      "reread: subsystem.report (entry not edited): its members changed: core.sizes, core.rows"], out
+    assert rereads(project)[0] == 0, "without --strict a reread line fails nothing"
+    edit_catalog(project, "- does: Format and parse a byte count\n", "- does: Format a byte count\n")
+    edit_catalog(project, "- does: Build report rows\n", "- does: Build report rows and parse a size\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and [line.split(":")[1] for line in lines] == [" subsystem.report (entry not edited)"], out
 
 
-@pytest.mark.parametrize("sizes, rows", [
-    ("- modules: src/widget/parse.py, src/widget/sizes.py\n", ROWS_MODULES),
-    (SIZES_MODULES, "- modules: src/widget/rows.py, src/widget/parse.py\n"),
-])
-def test_changed_asks_nothing_for_a_file_that_does_not_differ(project, sizes, rows):
-    # The same files named another way, and a module regrouped into another entry without an edit: no file
-    # of either component differs, so neither is asked (test_changed_does_not_call_a_regrouped_import_new).
+def test_changed_asks_nothing_when_modules_names_the_same_files_another_way(project):
     two_modules(project)
-    edit_catalog(project, BOTH_MODULES, sizes)
-    edit_catalog(project, ROWS_MODULES, rows)
+    edit_catalog(project, BOTH_MODULES, "- modules: src/widget/parse.py, src/widget/sizes.py\n")
     code, lines, out = rereads(project, "--strict")
     assert code == 0 and lines == [], out
+    edit_catalog(project, "- modules: src/widget/parse.py, src/widget/sizes.py\n", "- modules: src/widget/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, "a folder that takes in __init__.py and rows.py is not the same files"
+    assert lines[0] == "reread: core.sizes (only modules edited): src/widget/__init__.py, src/widget/rows.py", out
+
+
+def test_changed_asks_a_component_that_takes_in_a_module_no_entry_held(project):
+    two_modules(project)
+    edit_catalog(project, ROWS_MODULES, "- modules: src/widget/rows.py, src/widget/__init__.py\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.rows (only modules edited): src/widget/__init__.py",
+                     "reread: subsystem.report (entry not edited): its members changed: core.rows"], out
+
+
+@pytest.mark.parametrize("line, new, said", [
+    ("- owner_team: café\n", "- owner_team: Δ\n", "only owner_team edited"),
+    ("- audit-owner: café\n", "- audit-owner: Δ\n", "only other lines edited"),
+    ("- owner2: café\n", "- owner2: Δ\n", "only other lines edited"),
+    ("Kept for the report.\n", "Kept for the report and the export.\n", "only other lines edited"),
+    ("- notes: One.\n- owner2: café\n", "- notes: Two.\n- owner2: Δ\n", "only notes, other lines edited"),
+    ("- notes: One.\n", "- notes: One.\n\n\n", "entry not edited"),
+    ("\n## The rows\n\nWhat builds a row.\n", "\n## The rows\n\nWhat builds a row, by area.\n", "entry not edited"),
+])
+def test_changed_says_an_entry_was_edited_when_the_edited_line_is_no_field(project, line, new, said):
+    # Review pr-51-r1, F3: a line whose key the field reader does not take (a digit, a hyphen), or that has no
+    # key, was read as nothing, so the label said `entry not edited` of an entry that was. What follows the
+    # next heading is the catalog's, not the entry's, and blank space is no edit.
+    code_moved(project, sizes=line)
+    edit_catalog(project, line, new)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert "reread: core.sizes (%s): src/widget/sizes.py" % said in lines, out
+
+
+def test_review_dates_an_entry_in_a_sha256_repository(tmp_path):
+    # Review pr-51-r1, F5: the commit id of a blame line was read as 40 digits, so in a repository made with
+    # --object-format=sha256 (64 digits) no entry had a date and `review` listed no description as old.
+    project = new_project(tmp_path, "--object-format=sha256")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    assert len(subprocess.run(["git", "rev-parse", "HEAD"], cwd=project, capture_output=True, text=True,
+                              check=True).stdout.strip()) == 64
+    assert older_than_code(project) == []
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since "), lead
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [], out
+
+
+def names_changed(project, source, does="Format a byte count"):
+    """A committed catalog as in code_moved, then sizes.py rewritten as `source`; the line of core.sizes."""
+    code_moved(project)
+    if does != "Format a byte count":
+        edit_catalog(project, "- does: Format a byte count\n", "- does: %s\n" % does)
+        commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n' + source)
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    return next(line for line in lines if line.startswith("reread: core.sizes ")).partition("src/widget/sizes.py")[2]
+
+
+def test_changed_names_the_public_names_the_entry_does_not_speak_of(project):
+    # Issue 50, part 4: most descriptions found wrong after a reread lacked a public name the change had added.
+    # A name is spoken of when each of its words is in does or verbs, whatever its case and underscores; a
+    # private name and a method ask for no verb.
+    lead = names_changed(project, "\n\ndef parse(text):\n    pass\n\n\ndef format_count(count):\n    pass\n"
+                                  "\n\ndef byte_counts():\n    pass\n\n\nclass ByteFormat:\n    def render(self):\n"
+                                  "        pass\n\n\nclass SizeTable:\n    pass\n\n\ndef _helper():\n    pass\n")
+    assert lead == "; new public names not in does or verbs: SizeTable, parse"
+
+
+def test_changed_names_the_removed_names_the_entry_still_speaks_of(project):
+    # The other half: a name the change removed that does or verbs still speak of is a sentence that may say too
+    # much. A removed name they never spoke of is nothing to look for, and neither is one with no word of its own.
+    lead = names_changed(project, "\n\ndef unit(count):\n    pass\n")
+    assert lead == "; new public names not in does or verbs: unit", "format_count went, and no line says so: " + lead
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef format_count(count):\n    pass\n'
+                                                 '\n\ndef parse(text):\n    pass\n\n\ndef to():\n    pass\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert "reread: core.sizes (entry not edited): src/widget/sizes.py; removed public names still in does or verbs: " \
+           "format_count" in lines, out
+
+
+def test_changed_does_not_name_a_public_name_that_moved_inside_the_component(project):
+    two_modules(project)
+    (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n')
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(text):\n    """Read a size."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert lines[0] == "reread: core.sizes (entry not edited): src/widget/parse.py, src/widget/sizes.py", out
+
+
+def test_changed_shows_eight_names_and_counts_the_rest(project):
+    lead = names_changed(project, "".join("\n\ndef probe_%02d():\n    pass\n" % n for n in range(11)))
+    assert lead == "; new public names not in does or verbs: " + ", ".join("probe_%02d" % n for n in range(8)) + ", +3 more"
+
 
 
 def test_changed_tells_a_subsystem_of_a_member_removed_with_its_code(project):

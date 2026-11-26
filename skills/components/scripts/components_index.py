@@ -157,6 +157,8 @@ GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
 # them, and `changed` asks for no reread of an entry when one of them holds words it did not hold at the
 # base (`answered`).
 DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
+FIELD = r'^- ([a-z_]+):[ \t]*(.*)$'  # a field line of an entry: a key of lower-case letters and underscores
+NOT_FIELDS = frozenset({'id', '_repeated', '_rest'})  # what `parse_components` adds to an entry's fields
 # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
 CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
                      'duplicates', 'external', 'distinct_from', 'reread'})
@@ -232,10 +234,16 @@ def read_components(root: Path) -> list[dict]:
 
 
 def parse_components(text: str) -> list[dict]:
+    """The entries of a catalog: each field line as a key, with `id`, and the two keys of NOT_FIELDS."""
     entries = []
     for match in re.finditer(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', text, re.M | re.S):
-        pairs = re.findall(r'^- ([a-z_]+):[ \t]*(.*)$', match[2], re.M)
+        pairs = re.findall(FIELD, match[2], re.M)
         entry = dict(pairs)
+        # What the entry holds beside its fields, up to the next heading or generated block: a line whose key
+        # FIELD does not take (`- owner2: x`) is prose, and `changed` still says the entry was edited.
+        own = re.split(r'^(?:#|<!--)', match[2], maxsplit=1, flags=re.M)[0]
+        rest = re.sub(FIELD, '', own, flags=re.M).splitlines()
+        entry['_rest'] = '\n'.join(line.rstrip() for line in rest if line.strip())
         keys = [key for key, _ in pairs]
         repeated = sorted({key for key in keys if keys.count(key) > 1} & CHECKED)
         if repeated:
@@ -425,6 +433,16 @@ def symbols(tree: ast.AST, prefix: str = '', methods: bool = True, private: bool
 
 def parse(path: Path) -> ast.Module:
     return parse_source(path.read_bytes(), str(path))
+
+
+def public_names(data: bytes | None, name: str) -> set[str]:
+    """The public top-level names Python source defines; none for no source."""
+    return set() if data is None else {row['id'] for row in symbols(parse_source(data, name), methods=False)}
+
+
+def name_words(name: str) -> set[str]:
+    """The words of an identifier as `tokens` reads prose: `run_guarded_cases` and `RunGuardedCases` alike."""
+    return tokens(re.sub(r'(?<=[a-z0-9])(?=[A-Z])', ' ', name))
 
 
 def parse_source(data: bytes, name: str) -> ast.Module:
@@ -1178,10 +1196,11 @@ def changed(root: Path, base: str, strict: bool) -> int:
 
     Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
     line, which an author answers in the entry (`answered`). A component gets the line when a file
-    that differs is one it holds now or held at the base; a file that does not differ asks nothing,
-    whichever entry it moved to. A subsystem's `reread:` line is printed and never fails: a
-    component many subsystems share would otherwise ask for an answer from each of them on every
-    change.
+    it holds now, or held at the base, differs, and when its modules line took a file in or gave
+    one up, edited or not. The line ends with a lead, which fails nothing: the public names those
+    files gained that the entry's does and verbs do not speak of, and the ones they lost that it
+    still speaks of. A subsystem's `reread:` line is printed and never fails: a component many
+    subsystems share would otherwise ask for an answer from each of them on every change.
     """
     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
     entries = read_components(root)
@@ -1217,11 +1236,41 @@ def changed(root: Path, base: str, strict: bool) -> int:
 
     before = {e['id']: e for e in old_entries}
     now = {e['id']: e for e in entries}
-    # A file that differs is the code of the component that holds it now and of the one that held it at the
-    # base: a module deleted, renamed or given to another component is a change to the one that had it. A
-    # component the change removed is kept, so that a subsystem that had it is told its member changed.
-    touched = {name: sorted(p for p in status if any(covers(e.get(name, {'id': name}), p) for e in (now, before)))
-               for name, entry in {**before, **now}.items() if not subsystem(entry)}
+
+    def code_paths(name):
+        """The files that say a component's code is not what it was at the base: one that differs and that the
+        entry holds now or held there (a module edited, deleted or renamed), and one that does not differ but
+        that its modules line took in or gave up (a module regrouped into another entry)."""
+        new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
+        paths = {p for p in status if covers(new, p) or covers(old, p)}
+        if new.get('modules', '') != old.get('modules', ''):
+            named = module_paths(new.get('modules', ''))[0] | module_paths(old.get('modules', ''))[0]
+            paths |= {p for p in (package | named) - status.keys()
+                      if covers(new, p) != covers(old, p) and (root / p).is_file()}
+        return sorted(paths)
+
+    def source(path, at_base):
+        """A file's bytes at the base or now; None where it is not there."""
+        if at_base and path in overrides:  # a .py file that differs: what it held at the base
+            return None if overrides[path] is None else overrides[path].encode('utf-8')
+        return (root / path).read_bytes() if (root / path).is_file() else None
+
+    def names_lead(old, entry, paths):
+        """What to look for in the reread: the public names the entry's files gained that does and verbs do
+        not speak of, and the ones they lost that does and verbs still speak of. A name is spoken of when
+        each of its words is there."""
+        python = [p for p in paths if p.endswith('.py')]
+        had = set().union(*(public_names(source(p, True), p) for p in python if covers(old, p)))
+        has = set().union(*(public_names(source(p, False), p) for p in python if covers(entry, p)))
+        said = tokens(entry.get('does', '') + ' ' + entry.get('verbs', ''))
+        new = sorted(n for n in has - had if not name_words(n) <= said)
+        lost = sorted(n for n in had - has if name_words(n) and name_words(n) <= said)
+        return ''.join(f'; {label}: {some(found, 8)}' for label, found in (
+            ('new public names not in does or verbs', new),
+            ('removed public names still in does or verbs', lost)) if found)
+
+    # A component the change removed is kept: a subsystem that had it is told its member changed.
+    touched = {name: code_paths(name) for name, entry in {**before, **now}.items() if not subsystem(entry)}
     rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
     for entry in entries:
         name, old = entry['id'], before.get(entry['id'])
@@ -1229,8 +1278,9 @@ def changed(root: Path, base: str, strict: bool) -> int:
             continue  # written in this change, or read in it
         # An edit to any other field (notes, tests, modules) does not say the description was read, and neither
         # does a dating field deleted or left empty.
-        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
+        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - NOT_FIELDS
                         if old.get(key) != entry.get(key))
+        others += ['other lines'] if old['_rest'] != entry['_rest'] else []
         gone = sorted(key for key in DATING if old.get(key, '').strip() and not entry.get(key, '').strip())
         state = ', '.join(filter(None, (f'only {", ".join(others)} edited' if others else '',
                                         f'{", ".join(gone)} removed' if gone else ''))) or 'entry not edited'
@@ -1242,7 +1292,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
         elif touched[name]:
             paths = touched[name]
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
-            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}')
+            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}{names_lead(old, entry, paths)}')
 
     notes = [said] if said else []
     if strict and rereads:
@@ -1361,7 +1411,7 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
     blame = git(root, 'blame', '--line-porcelain', '--', BASE + 'COMPONENTS.md', check=False)
     newest, commit, stamp, current = {}, '', 0, None
     for line in blame.splitlines():
-        head = re.fullmatch(r'([0-9a-f]{40}) \d+ \d+(?: \d+)?', line)
+        head = re.fullmatch(r'([0-9a-f]{40}(?:[0-9a-f]{24})?) \d+ \d+(?: \d+)?', line)  # SHA-1, or SHA-256
         if head:
             commit = head[1]
         elif line.startswith('committer-time '):
@@ -1600,7 +1650,7 @@ def show(root: Path, name: str) -> list[str]:
     if entry is None:
         close = [e['id'] for e in entries if e['id'].startswith(name)]
         raise ValueError(f'no component {name}' + (f'; did you mean: {", ".join(close[:8])}' if close else ''))
-    lines = [f'### {name}'] + [f'- {key}: {value}' for key, value in entry.items() if key not in {'id', '_repeated'}]
+    lines = [f'### {name}'] + [f'- {key}: {value}' for key, value in entry.items() if key not in NOT_FIELDS]
     if subsystem(entry):
         return lines
     components = [e for e in entries if not subsystem(e)]

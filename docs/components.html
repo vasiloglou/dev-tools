@@ -159,7 +159,7 @@ src/shelf/units.py
       <ul>
         <li><strong>Fail:</strong> a new file no component has claimed, or generated pages that no longer match the source.</li>
         <li><strong>Warning:</strong> new code that calls a component marked as retired or as a duplicate.</li>
-        <li><strong>Reread:</strong> the code of a component changed and its description did not. A script cannot tell whether a sentence is still true, so it names the entry and the agent reads it beside the change, then corrects the description or marks the entry as reread. In its strict form the check fails until one of the two is done.</li>
+        <li><strong>Reread:</strong> the code of a component changed and its description did not. A script cannot tell whether a sentence is still true, so it names the entry and the agent reads it beside the change, then corrects the description or marks the entry as reread. In its strict form the check fails until one of the two is done. The line also names the new classes and functions the description does not mention. A flow that includes the component is named too, as advice that never fails the check.</li>
       </ul>
       <p>The same command runs in automated checks; an example job for GitHub ships with the skills. Both workflows run it: the phase workflow when a phase closes, the milestone workflow before a phase is recorded.</p>
     </div>

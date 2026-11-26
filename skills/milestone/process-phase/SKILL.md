@@ -294,7 +294,8 @@ command and exit verbatim:
 python scripts/components_index.py changed --base <the phase's base commit> --strict
 ```
 
-Fix every `fail:`. For each `reread:` line, read the entry beside the diff. If
+Fix every `fail:`. For each `reread:` line, read the entry beside the diff; the
+end of the line names the public names to look for. If
 the phase changed what the component does, edit the entry's `does` or `verbs`;
 if it did not, add or update the entry's `reread:` line (the `components` skill,
 "Before a PR"). Name those entries in the record too. A sentence in the record
