@@ -1,0 +1,78 @@
+{
+  "base": null,
+  "claims": [
+    "C1. Each predicate P1 to P7 in 005-close.md holds on the code, tests and records as they stand at this commit.",
+    "C2. Each of the nine repairs of 24003fd (F1 to F9 as 004-pr-51-r2.md describes them; see git show 24003fd) does what that record says, and each has a test in tests/test_tools.py that fails on the code before 24003fd (git show 24003fd^:skills/components/scripts/components_index.py).",
+    "C3. 24003fd breaks none of the behaviour that 001 to 003 record and their tests hold: build a legal catalog and change of the class each repair touches (paths spelled differently, entries ending at a heading or a comment, names git would quote, files moved between components) that the tests lack, run components_index.py changed and review on it, and report a wrong result with the input.",
+    "C4. The question sweep holds every open question and every deferred refactor that 001 to 004 raise, once each, with a disposition that is true.",
+    "C5. Nothing in the records or the README says a gate exited 0, a review ran, or something was pushed, posted, merged or tagged where it did not."
+  ],
+  "created": "2026-11-26T22:02:02.316701+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/milestones/reread-answers/005-close.md",
+      "sha256": "ec3b9918673179b63706feffbc58f1d1172dc3bceebcf910ee51a336e2114bba"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/README.md",
+      "sha256": "da08a9223721d086e463a9cce0a786944cb804a4bea699608c620d099c892daf"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/001-issue-50.md",
+      "sha256": "7b4b36272a1b399125d71ef96f4af82e1decc678745d81b507b883fc25c90d2a"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/002-pr-51-r1.md",
+      "sha256": "39948ff1e752e3e14b45a1077d78f30f1cf1db5130ca138f1b7c2b990e6e4703"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/003-rulings.md",
+      "sha256": "2e1947e0dde94f4075802cf17737a3e7c1da9a6ca2d4066a0b4f7a5e056c19c8"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/004-pr-51-r2.md",
+      "sha256": "c255e30ae1edf1dec1651a5b39a8cc4e09de57256ac96b0308c995c0ef52cf95"
+    },
+    {
+      "path": ".planning/milestones/reread-answers/notes/issue-50.md",
+      "sha256": "b9e52bbfa75d714c492d8d082eb8dae109d92a4cd393c56e33690b8b7c944bea"
+    },
+    {
+      "path": ".planning/reviews/pr-51-r1/FINDINGS.md",
+      "sha256": "1fe8e39151fd27601e90f77eae01e70fc9358698999753af59aee917688a4a13"
+    },
+    {
+      "path": ".planning/reviews/pr-51-r2/FINDINGS.md",
+      "sha256": "dd1a542d02afa7eada6fa694784e46360ac352a1dad40b247905395d1e13aad8"
+    },
+    {
+      "path": "skills/components/scripts/components_index.py",
+      "sha256": "b1131276e324cfbcfaf8620db8b0e5e8c0e9eebf119aaa54204fceadbedf2811"
+    },
+    {
+      "path": "tests/test_tools.py",
+      "sha256": "9d648b58f9108fdbad3480840414f30f509cbfe365dbf03c5738d7408c1d5ba2"
+    },
+    {
+      "path": "skills/components/SKILL.md",
+      "sha256": "a6dd3b7fe863b31a37c429e15989cfec1d60f99f32de50529c387da733845056"
+    },
+    {
+      "path": "skills/milestone/process-phase/SKILL.md",
+      "sha256": "103e6f5482493fd631971a89bfb0262c2de7d38b19ad2a91f3e88bff440c12bd"
+    },
+    {
+      "path": "skills/phase/process-phase/references/close.md",
+      "sha256": "cc5dc9512acf930ffa9099c2f4e4edea88109a0b23def26ed5b27689b52575f1"
+    }
+  ],
+  "head": "d82c87ed449c2d66aa3e723855a33c42d37f3437",
+  "left_out": [],
+  "notes": [],
+  "pr": null,
+  "question": "Does the evidence of this milestone support closing it: does each completion predicate P1 to P7 of the close record hold on the code as it stands, and does the code changed in 24003fd, which no review round has read, do what 004-pr-51-r2.md says it does, without breaking what the earlier records say?",
+  "subject": "close",
+  "version": 1
+}
