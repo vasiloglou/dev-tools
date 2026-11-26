@@ -2358,24 +2358,41 @@ def test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields(project
     assert code == 0, out
     expected = ["reread: subsystem.report (%s): its members changed: core.sizes" % said] if said else []
     assert lines == expected, out
+    assert ("1 to reread, 1 of them subsystem(s)" if said else "0 to reread\n") in out, out
+    # A subsystem's line is advice: with its member answered, the strict form prints the same and accepts it.
+    assert tool(project, "changed", "--base", "main", "--strict", script=INDEX) == (0, out)
 
 
-def test_strict_changed_fails_while_a_reread_line_is_unanswered(project):
+def test_strict_changed_fails_while_a_components_reread_line_is_unanswered(project):
+    component = "reread: core.sizes (entry not edited): src/widget/sizes.py"
+    system = "reread: subsystem.report (entry not edited): its members changed: core.sizes"
+    asked = "note: --strict fails while a component's reread: line is unanswered"
     code_moved(project)
     code, lines, out = rereads(project)
-    assert code == 0 and len(lines) == 2 and "0 to fix, 0 warning(s), 2 to reread" in out, out
+    assert code == 0 and lines == [component, system], out
+    assert "0 to fix, 0 warning(s), 2 to reread, 1 of them subsystem(s)\n" in out, out
     assert "--strict" not in out, "the plain form says nothing about the strict one"
     code, lines, out = rereads(project, "--strict")
-    assert code == 1 and len(lines) == 2 and "0 to fix, 0 warning(s), 2 to reread" in out, out
-    assert "note: --strict fails while a reread: line is unanswered" in out, out
+    assert code == 1 and lines == [component, system] and asked in out, out
 
-    # One of the two answered: still refused. Both answered, without a sentence edited: accepted.
-    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
-    code, lines, out = rereads(project, "--strict")
-    assert code == 1 and lines == ["reread: subsystem.report (entry not edited): its members changed: core.sizes"], out
+    # The subsystem answered and the component not: still refused, for the component.
     edit_catalog(project, "- notes: One pass.\n", "- notes: One pass.\n- reread: 2026-11-26, flow unchanged\n")
     code, lines, out = rereads(project, "--strict")
-    assert code == 0 and lines == [] and "0 to reread" in out and "note:" not in out, out
+    assert code == 1 and lines == [component] and asked in out and "1 to reread\n" in out, out
+    # The component answered, without a sentence edited: accepted.
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [] and "0 to reread\n" in out and "note:" not in out, out
+
+
+def test_strict_changed_prints_a_subsystems_reread_line_and_does_not_fail_on_it(project):
+    # A component many subsystems share would ask each of them for an answer on every change: the line is advice.
+    code_moved(project)
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0, out
+    assert lines == ["reread: subsystem.report (entry not edited): its members changed: core.sizes"], out
+    assert "1 to reread, 1 of them subsystem(s)\n" in out and "note:" not in out, out
 
 
 def test_strict_changed_accepts_a_change_that_touches_no_component(project):

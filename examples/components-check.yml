@@ -1,7 +1,8 @@
 # Checks the component index on every pull request: the generated pages match the source,
-# every new module has a component, no new code calls a retired component, and every entry
+# every new module has a component, no new code calls a retired component, and every component
 # whose code changed was answered for (its does or verbs edited, or its reread: line updated).
 # The last one is new in plugin 0.1.8: before it --strict did not fail on a reread: line.
+# A subsystem's reread: line is printed and never fails the job.
 # Without --strict the job fails only on what is wrong, and prints the reread: lines.
 # Copy to .github/workflows/ (or sync it; see phase-project.devtools.toml).
 name: component index

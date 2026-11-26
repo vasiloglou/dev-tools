@@ -1168,8 +1168,10 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
 def changed(root: Path, base: str, strict: bool) -> int:
     """Check the index against the files that differ from the merge base with `base`.
 
-    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a `reread:` line, which
-    an author answers by editing one of the entry's DATING fields.
+    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
+    line, which an author answers by editing one of the entry's DATING fields. A subsystem's
+    `reread:` line is printed and never fails: a component many subsystems share would otherwise
+    ask for an answer from each of them on every change.
     """
     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
     entries = read_components(root)
@@ -1205,7 +1207,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
 
     before = {e['id']: e for e in old_entries}
     touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
-    rereads = []
+    rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
     for entry in entries:
         name, old = entry['id'], before.get(entry['id'])
         if old is None or any(old.get(key) != entry.get(key) for key in DATING):
@@ -1217,7 +1219,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
         if subsystem(entry):
             members = [m for m in values(entry, 'components') if touched.get(m)]
             if members:
-                rereads.append(f'{name} ({state}): its members changed: {", ".join(members)}')
+                advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
         elif touched[name]:
             paths = touched[name]
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
@@ -1225,13 +1227,14 @@ def changed(root: Path, base: str, strict: bool) -> int:
 
     notes = [said] if said else []
     if strict and rereads:
-        notes.append("--strict fails while a reread: line is unanswered: edit the entry's does or verbs, "
-                     'or add or update its reread: line')
-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', notes)):
+        notes.append("--strict fails while a component's reread: line is unanswered: edit the entry's does or "
+                     'verbs, or add or update its reread: line')
+    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads + advisory), ('note', notes)):
         for row in rows:
             print(f'{prefix}: {row}')
+    of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
+          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
     return int(bool(fails or (strict and (warns or rereads))))
 
 
@@ -1637,8 +1640,8 @@ def main(argv: list[str] | None = None) -> int:
     diff = commands.add_parser('changed')
     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
     diff.add_argument('--strict', dest='strict_changed', action='store_true',
-                      help='also fail on a new caller of a deprecated or duplicate component, '
-                           'and on a reread: line left unanswered')
+                      help='also fail on a new caller of a deprecated or duplicate component, and on a '
+                           "component's reread: line left unanswered (a subsystem's never fails)")
     rows = commands.add_parser('facts')
     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')

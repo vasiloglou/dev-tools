@@ -79,14 +79,14 @@ Generate and search the component catalog using source ASTs, never package impor
 | `resolve_base(root, base) -> tuple[str, str]` | function | 1114 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
 | `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1146 | The checkout as it was at the merge base with `base`. |
 | `changed(root, base, strict) -> int` | function | 1168 | Check the index against the files that differ from the merge base with `base`. |
-| `facts(root, base, modules, notes) -> dict` | function | 1263 | The catalog and the import graph as rows of facts, for a rule checker. |
-| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1332 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
-| `is_retired(entry) -> bool` | function | 1362 | (no docstring) |
-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1366 | Package module -> the files in tests/ and the extra source directories that import it. |
-| `some(items, cap) -> str` | function | 1384 | (no docstring) |
-| `review(root, areas, everything) -> list[str]` | function | 1389 | Leads for a review of the index. Each one is a place to look, not a finding. |
-| `show(root, name) -> list[str]` | function | 1574 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
-| `main(argv) -> int` | function | 1617 | (no docstring) |
+| `facts(root, base, modules, notes) -> dict` | function | 1266 | The catalog and the import graph as rows of facts, for a rule checker. |
+| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1335 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+| `is_retired(entry) -> bool` | function | 1365 | (no docstring) |
+| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1369 | Package module -> the files in tests/ and the extra source directories that import it. |
+| `some(items, cap) -> str` | function | 1387 | (no docstring) |
+| `review(root, areas, everything) -> list[str]` | function | 1392 | Leads for a review of the index. Each one is a place to look, not a finding. |
+| `show(root, name) -> list[str]` | function | 1577 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+| `main(argv) -> int` | function | 1620 | (no docstring) |
 
 ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
 Components: components.rules

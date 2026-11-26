@@ -299,10 +299,12 @@ the phase changed what the component does, edit the entry's `does` or `verbs`;
 if it did not, add or update the entry's `reread:` line (the `components` skill,
 "Before a PR"). Name those entries in the record too. A sentence in the record
 alone does not answer the line: the index keeps no trace of it, and from plugin
-0.1.8 `--strict` exits 1 while a `reread:` line is left. For a `warn:` (a new
+0.1.8 `--strict` exits 1 while a component's `reread:` line is left. A
+subsystem's line (`its members changed`) is advice and never fails: answer it
+the same way when the phase changed the flow. For a `warn:` (a new
 caller of a retired component), call the replacement, or record the reason in
-the boundary section and, once no `reread:` line is left, rerun without
-`--strict`, saying so. In a
+the boundary section and, once no component's `reread:` line is left, rerun
+without `--strict`, saying so. In a
 project with rules of its own (`docs/components/rules.json`), also run
 `python .claude/skills/components/scripts/rules_check.py check --base <the phase's base commit>`
 and list it the same way: fix every `fail:`, record the reason for a `warn:`
