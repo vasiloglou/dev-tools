@@ -11,7 +11,8 @@
     components_index.py draft [--only PATH] [--by-importers]
                                              stub entries for the modules no component covers
     components_index.py list [AREA]          the component ids by area, each with its one-line description
-    components_index.py changed --base REF   check the index against the files changed since REF
+    components_index.py changed --base REF [--strict]
+                                             check the index against the files changed since REF
     components_index.py facts [--base REF] [--modules] [--out FILE]
                                              the catalog and the import graph as JSON rows, for a rule checker
     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
@@ -152,6 +153,9 @@ ROOT = checkout_root() if PLUGIN else Path(__file__).resolve().parents[len(Path(
 BASE = SETTINGS['docs_dir'].strip('/') + '/'
 VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
 GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
+# The fields that say an entry was read against its code: `review` dates an entry from the newest of
+# them, and `changed` asks for no reread of an entry when one of them differs from the base.
+DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
 # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
 CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
                      'duplicates', 'external', 'distinct_from', 'reread'})
@@ -1162,7 +1166,11 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
 
 
 def changed(root: Path, base: str, strict: bool) -> int:
-    """Check the index against the files that differ from the merge base with `base`."""
+    """Check the index against the files that differ from the merge base with `base`.
+
+    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a `reread:` line, which
+    an author answers by editing one of the entry's DATING fields.
+    """
     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
     entries = read_components(root)
     files, fails = build_index(root)
@@ -1195,31 +1203,36 @@ def changed(root: Path, base: str, strict: bool) -> int:
             evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
 
-    def authored(entry):
-        return {k: v for k, v in entry.items() if k not in GENERATED}
-
-    before = {e['id']: authored(e) for e in old_entries}
+    before = {e['id']: e for e in old_entries}
     touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
     rereads = []
     for entry in entries:
-        name = entry['id']
-        if before.get(name) != authored(entry):
-            continue  # written or edited in this change
+        name, old = entry['id'], before.get(entry['id'])
+        if old is None or any(old.get(key) != entry.get(key) for key in DATING):
+            continue  # written in this change, or read in it: a dating field differs
+        # An edit to any other field (notes, tests, modules) does not say the description was read.
+        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
+                        if old.get(key) != entry.get(key))
+        state = f'only {", ".join(others)} edited' if others else 'entry not edited'
         if subsystem(entry):
             members = [m for m in values(entry, 'components') if touched.get(m)]
             if members:
-                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
+                rereads.append(f'{name} ({state}): its members changed: {", ".join(members)}')
         elif touched[name]:
             paths = touched[name]
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
-            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
+            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}')
 
-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
+    notes = [said] if said else []
+    if strict and rereads:
+        notes.append("--strict fails while a reread: line is unanswered: edit the entry's does or verbs, "
+                     'or add or update its reread: line')
+    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', notes)):
         for row in rows:
             print(f'{prefix}: {row}')
     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
           f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
-    return int(bool(fails or (strict and warns)))
+    return int(bool(fails or (strict and (warns or rereads))))
 
 
 # What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
@@ -1336,7 +1349,7 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
             if text.startswith('### '):
                 current = text[4:].strip()
             field = re.match(r'- ([a-z_]+):', text)
-            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
+            if not current or not (field and field[1] in DATING):
                 continue
             earlier = newest.get(current, ('', -1, ''))
             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
@@ -1624,7 +1637,8 @@ def main(argv: list[str] | None = None) -> int:
     diff = commands.add_parser('changed')
     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
     diff.add_argument('--strict', dest='strict_changed', action='store_true',
-                      help='also fail on a new caller of a deprecated or duplicate component')
+                      help='also fail on a new caller of a deprecated or duplicate component, '
+                           'and on a reread: line left unanswered')
     rows = commands.add_parser('facts')
     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')
