@@ -98,11 +98,14 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - facts for rules: components.index
 - fail on a reread line: components.index
 - fetch latest dev-tools: sync.copies
+- field under a later heading: components.index
 - file mode drift: sync.copies
 - file modes: plugins.build
+- file name git quotes: components.index
 - fill tokens: sync.copies
 - find existing code: components.index
 - findings ledger: review.rounds
+- folder moved to another component: components.index
 - forbidden imports: components.rules
 - force overwrite: sync.copies
 - gate problems: phase.state
@@ -176,6 +179,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - parked phases: migrate.from_gsd
 - parse cache: components.index
 - patch version: plugins.release
+- path spelling: components.index
 - paused phase: handoff.notes
 - phase branch: phase.state
 - phase diff review: review.rounds
@@ -242,6 +246,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - skill lint: phase.state
 - slash commands in note: handoff.notes
 - snapshot of the checkout: handoff.notes
+- source encoding: components.index
 - stale local main: components.index
 - standing check for code fitted to its examples: review.rounds
 - starter catalog: components.index
@@ -274,6 +279,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - upstream commit: sync.copies
 - validate catalog: components.index
 - what would be lost: handoff.notes
+- where an entry ends: components.index
 - which areas may import which: components.rules
 - which coders are on path: phase.coder_pool
 - workstreams: migrate.from_gsd
@@ -331,8 +337,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## The component index
 
 ### components.index
-- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread of a component when a file it holds now or held at the base differs or its modules line took a file in or gave one up, unless does, verbs, flow or reread holds new words (one deleted or left empty is no answer, and review dates nothing from an empty one), names the public names the files gained that does and verbs do not speak of and the ones they lost that are still spoken of, says other lines when an edited line of the entry is no field, and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, module removed from a component, module moved to another component, deleted reread line, new public names not in verbs, removed names still described, edited line that is no field, sha256 repository, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
+- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread of a component when a file it holds now or held at the base differs or its modules line took a tracked file in or gave one up (two spellings of a path being one file), unless does, verbs, flow or reread holds new words (one deleted or left empty is no answer, and review dates nothing from an empty one), names the public names the files gained that does and verbs do not speak of and the ones they lost that are still spoken of, says other lines when an edited line of the entry is no field, reads an entry up to the next heading of any level, and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
+- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, module removed from a component, module moved to another component, deleted reread line, new public names not in verbs, removed names still described, edited line that is no field, where an entry ends, field under a later heading, path spelling, folder moved to another component, file name git quotes, source encoding, sha256 repository, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
 - status: canonical
 - modules: skills/components/scripts/components_index.py
 - uses: (none)
