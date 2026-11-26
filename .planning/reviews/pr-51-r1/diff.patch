@@ -1,0 +1,1337 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index 7fbf69e..b368c5f 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -94,6 +94,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - exclude files: sync.copies
+ - external libraries: components.index
+ - facts for rules: components.index
++- fail on a reread line: components.index
+ - fetch latest dev-tools: sync.copies
+ - file mode drift: sync.copies
+ - file modes: plugins.build
+@@ -240,6 +241,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - starter config: sync.copies
+ - starter rules: components.rules
+ - state md: phase.state
++- strict changed: components.index
+ - strict check: components.index
+ - suggest rules: components.rules
+ - survey gsd: migrate.from_gsd
+@@ -256,6 +258,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - toml without tomllib: phase.coder_pool
+ - track cap: subsystem.phase_status
+ - tracked files never replaced: handoff.notes
++- unanswered reread line: components.index
+ - unassigned baseline: components.index
+ - unassigned modules: components.index
+ - unfinished phase: migrate.from_gsd
+@@ -321,8 +324,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ ## The component index
+ 
+ ### components.index
+-- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true, and allow_baseline false makes the strict check refuse a baseline (components_index.py)
+-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
++- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread unless does, verbs, flow or reread was edited and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
++- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
+ - status: canonical
+ - modules: skills/components/scripts/components_index.py
+ - uses: (none)
+@@ -433,7 +436,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - members_uses: (none)
+ - flow: components.rules -> phase.state -> components.index
+ - notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
+-- reread: 2026-11-23, issue-sweep phase 3: its members changed (rules_check test skips a rule about plans without the phase tool; a settings file a script cannot use exits 2); the flow and the calls are as described
++- reread: 2026-11-26, issue 50: its member components.index changed (changed asks for a reread unless does, verbs, flow or reread was edited, and with --strict fails while a component's is left; facts is untouched); the flow and the calls are as described
+ 
+ ### subsystem.phase_status
+ - does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
+diff --git a/.devtools/components/modules/skills.md b/.devtools/components/modules/skills.md
+index 5de73ec..91601cf 100644
+--- a/.devtools/components/modules/skills.md
++++ b/.devtools/components/modules/skills.md
+@@ -8,85 +8,85 @@ Generate and search the component catalog using source ASTs, never package impor
+ 
+ | Symbol | Kind | Line | Summary |
+ | --- | --- | --- | --- |
+-| `settings_error(message)` | function | 82 | A settings file this script cannot use: say why on standard error and exit 2, the code for a command |
+-| `read_settings_file(path) -> dict` | function | 89 | The settings a file holds, or `settings_error` when it is not a JSON object. |
+-| `load_settings(path) -> dict` | function | 100 | (no docstring) |
+-| `plugin_root(script)` | function | 121 | The plugin install that holds this script, or None. A plugin keeps it in |
+-| `checkout_root() -> Path` | function | 130 | The git checkout that holds the working directory, or the working directory. |
+-| `catalog(root) -> Path` | function | 185 | (no docstring) |
+-| `external_config(root) -> dict` | function | 192 | Libraries to index, from the optional external.toml. |
+-| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 198 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
+-| `read_components(root) -> list[dict]` | function | 224 | Read component headings and single-line fields, retaining duplicate ids. |
+-| `parse_components(text) -> list[dict]` | function | 229 | (no docstring) |
+-| `values(entry, key) -> list[str]` | function | 243 | (no docstring) |
+-| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 248 | A `modules:` value as (the files it names, the folders it names). |
+-| `covers(entry, path) -> bool` | function | 254 | (no docstring) |
+-| `sources(root, directory)` | function | 259 | (no docstring) |
+-| `counted_modules(root) -> list[str]` | function | 267 | The repo-relative paths every module must have a component for: the package's, and |
+-| `counted_dirs() -> str` | function | 277 | (no docstring) |
+-| `coverage(root, entries) -> tuple[list[str], int]` | function | 281 | (no docstring) |
+-| `validate(root, entries, external_names) -> list[str]` | function | 286 | (no docstring) |
+-| `validate_subsystem(entry, entries) -> list[str]` | function | 332 | (no docstring) |
+-| `docstring(node) -> str` | function | 345 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
+-| `summary(node) -> str` | function | 350 | (no docstring) |
+-| `shorten(text, length) -> str` | function | 354 | (no docstring) |
+-| `signature(node, name) -> str` | function | 358 | (no docstring) |
+-| `tool_kind(node) -> str` | function | 377 | (no docstring) |
+-| `symbols(tree, prefix, methods, private, hidden)` | function | 386 | Public definitions in source order; never descend into function bodies. |
+-| `parse(path) -> ast.Module` | function | 414 | (no docstring) |
+-| `parse_source(data, name) -> ast.Module` | function | 418 | (no docstring) |
+-| `cell(text) -> str` | function | 433 | (no docstring) |
+-| `table(rows) -> list[str]` | function | 437 | (no docstring) |
+-| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 444 | The generated module pages and one search hit per module. |
+-| `file_facts(root, relative, trust) -> list` | function | 484 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
+-| `top_level(rows) -> list[dict]` | function | 517 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
+-| `cache_path(root) -> Path` | function | 522 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
+-| `cache_stamp() -> list` | function | 528 | What the kept facts depend on besides the content of a file. |
+-| `cache_state(root) -> dict` | function | 534 | What earlier runs kept for this checkout, read once per run. |
+-| `save_caches() -> None` | function | 555 | (no docstring) |
+-| `write_cache(root, state) -> None` | function | 562 | (no docstring) |
+-| `external_source(dist, dotted) -> Path` | function | 580 | Locate metadata-owned source first, or probe only the top-level package spec. |
+-| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 602 | (no docstring) |
+-| `verb_block(entries) -> str` | function | 637 | (no docstring) |
+-| `subsystem(entry) -> bool` | function | 648 | (no docstring) |
+-| `import_nodes(tree)` | function | 652 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
+-| `raw_imports(tree) -> list` | function | 664 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
+-| `text_imports(text, name) -> list` | function | 672 | The imports of source that is not a file here (a file as it was at another commit). |
+-| `resolve_imports(tree, path, available) -> set[str]` | function | 677 | Resolve only the project's own modules; from-import symbols fall back to their base. |
+-| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 703 | The files of the package, optionally at a base revision: the components that hold each |
+-| `component_graph(root, entries, overrides, files) -> dict` | function | 727 | Map component pairs to sorted module evidence, optionally at a base revision. |
+-| `private(path) -> bool` | function | 740 | Whether a package file is private by its name: the file, or a folder above it inside the |
+-| `relations(entries, edges) -> dict` | function | 747 | (no docstring) |
+-| `direct_edges(edges) -> dict` | function | 762 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
+-| `cycle_groups(pairs) -> list[list[str]]` | function | 767 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
+-| `listing(ids, cap) -> str` | function | 802 | (no docstring) |
+-| `rewrite(text, entries, edges) -> str` | function | 809 | Replace only generated fields, preserving the authored catalog content. |
+-| `graph_text(entries, edges) -> str` | function | 831 | (no docstring) |
+-| `components_text(root, entries, edges) -> str` | function | 849 | (no docstring) |
+-| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 860 | (no docstring) |
+-| `tokens(text) -> set[str]` | function | 870 | (no docstring) |
+-| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 878 | Search the recorded catalog even without the dependency installed. |
+-| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 899 | The hits that share a word with the query, best first, each with its ``matched`` words. |
+-| `coverage_line(root, entries) -> str` | function | 939 | (no docstring) |
+-| `generated_paths(root) -> set[str]` | function | 946 | (no docstring) |
+-| `external_skips(root) -> dict[str, str]` | function | 951 | Explain recorded inventories that cannot be reproduced by this installation. |
+-| `stale_files(root, files) -> list[str]` | function | 968 | Return sorted stale or missing index paths without writing or printing. |
+-| `write_or_check(root, check, strict) -> int` | function | 978 | (no docstring) |
+-| `git(root, *args, check) -> str` | function | 1011 | Output of a git command run in `root`; '' when it fails and `check` is off. |
+-| `files_at(root, commit, paths) -> dict[str, str]` | function | 1023 | The text each path (relative to `root`) had at a commit, read with one git process. |
+-| `package_imports(root) -> dict[str, set[str]]` | function | 1045 | Each package module -> the package modules it imports at run time. |
+-| `draft(root, entries, only, by_importers) -> list[str]` | function | 1051 | Stub entries for the modules no component covers: a starting point, never a catalog. |
+-| `resolve_base(root, base) -> tuple[str, str]` | function | 1110 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
+-| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1142 | The checkout as it was at the merge base with `base`. |
+-| `changed(root, base, strict) -> int` | function | 1164 | Check the index against the files that differ from the merge base with `base`. |
+-| `facts(root, base, modules, notes) -> dict` | function | 1250 | The catalog and the import graph as rows of facts, for a rule checker. |
+-| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1319 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+-| `is_retired(entry) -> bool` | function | 1349 | (no docstring) |
+-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1353 | Package module -> the files in tests/ and the extra source directories that import it. |
+-| `some(items, cap) -> str` | function | 1371 | (no docstring) |
+-| `review(root, areas, everything) -> list[str]` | function | 1376 | Leads for a review of the index. Each one is a place to look, not a finding. |
+-| `show(root, name) -> list[str]` | function | 1561 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+-| `main(argv) -> int` | function | 1604 | (no docstring) |
++| `settings_error(message)` | function | 83 | A settings file this script cannot use: say why on standard error and exit 2, the code for a command |
++| `read_settings_file(path) -> dict` | function | 90 | The settings a file holds, or `settings_error` when it is not a JSON object. |
++| `load_settings(path) -> dict` | function | 101 | (no docstring) |
++| `plugin_root(script)` | function | 122 | The plugin install that holds this script, or None. A plugin keeps it in |
++| `checkout_root() -> Path` | function | 131 | The git checkout that holds the working directory, or the working directory. |
++| `catalog(root) -> Path` | function | 189 | (no docstring) |
++| `external_config(root) -> dict` | function | 196 | Libraries to index, from the optional external.toml. |
++| `layers_config(root, areas) -> tuple[dict[str, int], list[tuple[str, str]]]` | function | 202 | Area ranks and forbidden (from, to) area pairs, from the optional layers.toml. |
++| `read_components(root) -> list[dict]` | function | 228 | Read component headings and single-line fields, retaining duplicate ids. |
++| `parse_components(text) -> list[dict]` | function | 233 | (no docstring) |
++| `values(entry, key) -> list[str]` | function | 247 | (no docstring) |
++| `module_paths(modules) -> tuple[frozenset, tuple]` | function | 252 | A `modules:` value as (the files it names, the folders it names). |
++| `covers(entry, path) -> bool` | function | 258 | (no docstring) |
++| `sources(root, directory)` | function | 263 | (no docstring) |
++| `counted_modules(root) -> list[str]` | function | 271 | The repo-relative paths every module must have a component for: the package's, and |
++| `counted_dirs() -> str` | function | 281 | (no docstring) |
++| `coverage(root, entries) -> tuple[list[str], int]` | function | 285 | (no docstring) |
++| `validate(root, entries, external_names) -> list[str]` | function | 290 | (no docstring) |
++| `validate_subsystem(entry, entries) -> list[str]` | function | 336 | (no docstring) |
++| `docstring(node) -> str` | function | 349 | The whole docstring, or '' when there is none; a docstring of spaces is none. |
++| `summary(node) -> str` | function | 354 | (no docstring) |
++| `shorten(text, length) -> str` | function | 358 | (no docstring) |
++| `signature(node, name) -> str` | function | 362 | (no docstring) |
++| `tool_kind(node) -> str` | function | 381 | (no docstring) |
++| `symbols(tree, prefix, methods, private, hidden)` | function | 390 | Public definitions in source order; never descend into function bodies. |
++| `parse(path) -> ast.Module` | function | 418 | (no docstring) |
++| `parse_source(data, name) -> ast.Module` | function | 422 | (no docstring) |
++| `cell(text) -> str` | function | 437 | (no docstring) |
++| `table(rows) -> list[str]` | function | 441 | (no docstring) |
++| `module_inventory(root, entries, cache) -> tuple[dict, list[dict]]` | function | 448 | The generated module pages and one search hit per module. |
++| `file_facts(root, relative, trust) -> list` | function | 488 | [summary, has a docstring, public symbol rows, imports, whole docstring, private symbol rows] of one |
++| `top_level(rows) -> list[dict]` | function | 521 | The symbol rows without the methods: what `symbols(tree, methods=False)` gives. |
++| `cache_path(root) -> Path` | function | 526 | Where the facts read from the source files are kept: outside the checkout, one file per checkout. |
++| `cache_stamp() -> list` | function | 532 | What the kept facts depend on besides the content of a file. |
++| `cache_state(root) -> dict` | function | 538 | What earlier runs kept for this checkout, read once per run. |
++| `save_caches() -> None` | function | 559 | (no docstring) |
++| `write_cache(root, state) -> None` | function | 566 | (no docstring) |
++| `external_source(dist, dotted) -> Path` | function | 584 | Locate metadata-owned source first, or probe only the top-level package spec. |
++| `external_inventory(root) -> tuple[dict, list[dict], dict, list[str]]` | function | 606 | (no docstring) |
++| `verb_block(entries) -> str` | function | 641 | (no docstring) |
++| `subsystem(entry) -> bool` | function | 652 | (no docstring) |
++| `import_nodes(tree)` | function | 656 | Walk runtime imports, excluding TYPE_CHECKING bodies but retaining else arms. |
++| `raw_imports(tree) -> list` | function | 668 | The runtime imports of a module as [level, module, names]; level -1 is a plain `import`. |
++| `text_imports(text, name) -> list` | function | 676 | The imports of source that is not a file here (a file as it was at another commit). |
++| `resolve_imports(tree, path, available) -> set[str]` | function | 681 | Resolve only the project's own modules; from-import symbols fall back to their base. |
++| `module_graph(root, entries, overrides) -> tuple[dict, dict]` | function | 707 | The files of the package, optionally at a base revision: the components that hold each |
++| `component_graph(root, entries, overrides, files) -> dict` | function | 731 | Map component pairs to sorted module evidence, optionally at a base revision. |
++| `private(path) -> bool` | function | 744 | Whether a package file is private by its name: the file, or a folder above it inside the |
++| `relations(entries, edges) -> dict` | function | 751 | (no docstring) |
++| `direct_edges(edges) -> dict` | function | 766 | The edges without the imports a package __init__ makes: re-exporting its own modules is not a tangle. |
++| `cycle_groups(pairs) -> list[list[str]]` | function | 771 | The groups of two or more names that reach each other along (caller, callee) pairs, largest first. |
++| `listing(ids, cap) -> str` | function | 806 | (no docstring) |
++| `rewrite(text, entries, edges) -> str` | function | 813 | Replace only generated fields, preserving the authored catalog content. |
++| `graph_text(entries, edges) -> str` | function | 835 | (no docstring) |
++| `components_text(root, entries, edges) -> str` | function | 853 | (no docstring) |
++| `build_index(root) -> tuple[dict[str, str], list[str]]` | function | 864 | (no docstring) |
++| `tokens(text) -> set[str]` | function | 874 | (no docstring) |
++| `recorded_external(root) -> tuple[list[dict], dict[str, str]]` | function | 882 | Search the recorded catalog even without the dependency installed. |
++| `search(root, query, limit, *, entries, modules, external, cache) -> list[dict]` | function | 903 | The hits that share a word with the query, best first, each with its ``matched`` words. |
++| `coverage_line(root, entries) -> str` | function | 943 | (no docstring) |
++| `generated_paths(root) -> set[str]` | function | 950 | (no docstring) |
++| `external_skips(root) -> dict[str, str]` | function | 955 | Explain recorded inventories that cannot be reproduced by this installation. |
++| `stale_files(root, files) -> list[str]` | function | 972 | Return sorted stale or missing index paths without writing or printing. |
++| `write_or_check(root, check, strict) -> int` | function | 982 | (no docstring) |
++| `git(root, *args, check) -> str` | function | 1015 | Output of a git command run in `root`; '' when it fails and `check` is off. |
++| `files_at(root, commit, paths) -> dict[str, str]` | function | 1027 | The text each path (relative to `root`) had at a commit, read with one git process. |
++| `package_imports(root) -> dict[str, set[str]]` | function | 1049 | Each package module -> the package modules it imports at run time. |
++| `draft(root, entries, only, by_importers) -> list[str]` | function | 1055 | Stub entries for the modules no component covers: a starting point, never a catalog. |
++| `resolve_base(root, base) -> tuple[str, str]` | function | 1114 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
++| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str]` | function | 1146 | The checkout as it was at the merge base with `base`. |
++| `changed(root, base, strict) -> int` | function | 1168 | Check the index against the files that differ from the merge base with `base`. |
++| `facts(root, base, modules, notes) -> dict` | function | 1266 | The catalog and the import graph as rows of facts, for a rule checker. |
++| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1335 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
++| `is_retired(entry) -> bool` | function | 1365 | (no docstring) |
++| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1369 | Package module -> the files in tests/ and the extra source directories that import it. |
++| `some(items, cap) -> str` | function | 1387 | (no docstring) |
++| `review(root, areas, everything) -> list[str]` | function | 1392 | Leads for a review of the index. Each one is a place to look, not a finding. |
++| `show(root, name) -> list[str]` | function | 1577 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
++| `main(argv) -> int` | function | 1620 | (no docstring) |
+ 
+ ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
+ Components: components.rules
+diff --git a/.planning/milestones/reread-answers/001-issue-50.md b/.planning/milestones/reread-answers/001-issue-50.md
+new file mode 100644
+index 0000000..56fd9dd
+--- /dev/null
++++ b/.planning/milestones/reread-answers/001-issue-50.md
+@@ -0,0 +1,285 @@
++---
++milestone: reread-answers
++station: "issue 50, parts 1 to 3 -- recorded after the code was written"
++skill: "n/a -- a fix made from issue 50 outside process-milestone and process-phase; this record was asked for afterwards"
++scope: issue-50
++date: 2026-11-26
++gates:
++  - command: "uv run --no-project --with pytest python -m pytest tests -q"
++    exit: 0
++    output: "552 passed in 483.76s (0:08:03)"
++  - command: "python3 devtools/build_plugins.py --check"
++    exit: 0
++  - command: "python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict"
++    exit: 0
++  - command: "python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main --strict"
++    exit: 0
++    output: "changed against origin/main (31249da): 18 file(s) differ; 0 to fix, 0 warning(s), 0 to reread"
++  - command: "devtools/ci_local.sh"
++    exit: 0
++    output: "macos-3.14: 552 passed; linux-3.11: 548 passed, 4 skipped; linux-3.14: 548 passed, 4 skipped"
++  - command: "python3 devtools/release_plugins.py status"
++    exit: 1
++    output: "0.1.8 is ready: after the merge, run `release_plugins.py tag` on main"
++    note: "exit 1 is this command's way of saying a release is due; 0.1.8 is not tagged"
++evidence:
++  - path: skills/components/scripts/components_index.py
++    sha256: fd0a93c29d2aed1e7cd529daa2e6ea93449fe750a9c01876f6a81c6c3b9dff4d
++  - path: tests/test_tools.py
++    sha256: 03ce24acbe126e6b877187690f28ca14ab90bef77349b5b26a7e33d56fb2218c
++  - path: skills/components/SKILL.md
++    sha256: d2f7b3564ab53b388328528ac797a5271e72bc3156115f03e095f96c9f07175d
++  - path: skills/milestone/process-phase/SKILL.md
++    sha256: 81bc25711e63191c34b44393649886eee34c12f935581b53752cb19d1af36880
++  - path: skills/phase/process-phase/references/close.md
++    sha256: b015b7d2242670e187e8d17529f9af7123cd33550e706f6b31a8b79aa8fc9892
++  - path: examples/components-check.yml
++    sha256: f59cbf5ce0b2542fddf2fe790bfbd3ff3bc5ec7a0aca145e6659982abe70b440
++  - path: docs/components.html
++    sha256: 73f84def29c336957919b45ec44bfaaba8106d1a05a6d9b56d591d7d38b861c8
++  - path: devtools/PLUGIN_VERSION
++    sha256: 76f81f64ece28d0bcfe39dd35f6d14f3c87fe000b77aee11561e18d1919f607e
++  - path: .devtools/components/COMPONENTS.md
++    sha256: b4af6f3284e14744372bd75f33cc690c33526e5665ca0a2a78c299b63060c812
++---
++
++# Claim
++
++At `8ae1e84` (pull request vasiloglou/dev-tools#51, on `origin/main` `31249da`), `changed`
++and `review` read one set of fields to decide whether an entry was read, `changed --strict`
++exits 1 while a component's `reread:` line is left and 0 on a subsystem's, and the two
++`process-phase` texts send the answer to a `reread:` line into the entry. The six gates
++above ran on that commit with the exits shown.
++
++**This record was written after the code.** Both commits were made and pushed before it
++existed. It is a retrospective record of what happened, not the record of a phase run
++under `process-phase`. "What the lane requires and this change does not have", below, lists
++what is missing.
++
++## Why there is a record
++
++`.devtools/project.md` ("Which lane a piece of work takes") puts "a change to what a gate
++refuses" in the evidence lane, as a milestone. `changed --strict` now refuses what it
++accepted before. The change was made as a fix with a pull request and no record. The
++owner was then asked whether it needs a milestone record and ruled that it does.
++
++## The owner's words
++
++These are the only approvals. Each was typed in the session that started this one and
++relayed to this session on 2026-11-26; this session did not see them typed.
++
++| The owner said | In reply to | What it covers |
++|---|---|---|
++| "you should file a detailed issue and then start fixing it" | the findings that became issue 50 | filing issue 50 and starting the fix |
++| "go og" (read as "go on") | a recommendation to keep `--strict` failing on a component's unanswered `reread:` line, with subsystem lines advisory | the `--strict` decision and the subsystem decision below |
++| "create a milestone record" | "Does the dev-tools gate change need a milestone record, or do you accept it as a fix?" | this record |
++
++None of them is a ruling on a plan or a spec at a digest, so none is written above as a
++`ruling:` gate. No plan gate, no owner gate on a spec and no close ruling took place.
++
++## The report, and its reproduction
++
++Issue 50 (opened 2026-11-26, open): a downstream project's `components_index.py review`
++listed 103 of 266 components under "Descriptions older than their code"; 74 had been read
++and were accurate, and the index kept no trace of it. Those numbers are the issue's. They
++were not reproduced here.
++
++Parts 2 and 3 were reproduced as tests before the fix. Run in the working tree, with
++`skills/components/scripts/components_index.py` as it is at `31249da` and
++`tests/test_tools.py` as it was then committed in `95551f0`:
++
++    $ uv run --no-project --with pytest python -m pytest tests/test_tools.py -q -k "changed"
++    FAILED tests/test_tools.py::test_changed_still_asks_for_a_reread_when_only_another_field_was_edited[notes-- notes: parse reads a size back.\n]
++    FAILED tests/test_tools.py::test_changed_still_asks_for_a_reread_when_only_another_field_was_edited[tests-- tests: tests/test_sizes.py\n]
++    FAILED tests/test_tools.py::test_changed_still_asks_for_a_reread_when_only_another_field_was_edited[in-- in: a byte count\n]
++    FAILED tests/test_tools.py::test_changed_still_asks_for_a_reread_when_only_another_field_was_edited[out-- out: text\n]
++    FAILED tests/test_tools.py::test_changed_still_asks_for_a_reread_when_only_another_field_was_edited[distinct_from-- distinct_from: core.rows\n]
++    FAILED tests/test_tools.py::test_changed_names_every_other_field_that_was_edited
++    FAILED tests/test_tools.py::test_changed_asks_for_no_reread_of_an_entry_written_in_the_change
++    FAILED tests/test_tools.py::test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields[- notes: One pass.\n-- notes: One pass over the rows.\n-only notes edited]
++    FAILED tests/test_tools.py::test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields[- components: core.sizes, core.rows\n-- components: core.rows, core.sizes\n-only components edited]
++    FAILED tests/test_tools.py::test_strict_changed_fails_while_a_reread_line_is_unanswered
++    10 failed, 29 passed, 117 deselected in 107.06s (0:01:47)
++
++Part 1 is a sentence, read in `skills/milestone/process-phase/SKILL.md` at `31249da`:
++"either edit it or state in the record that it is still accurate". Nothing ran to
++reproduce it.
++
++## What shipped
++
++### `95551f0`: 18 files, 389 insertions, 163 deletions
++
++- `skills/components/scripts/components_index.py`
++  - `DATING`, the set `does`, `verbs`, `flow`, `reread`. `entry_commits` (which `review`
++    dates an entry from) and `changed` both read it. Before, `changed` compared every
++    hand-written field and `entry_commits` held its own list of four.
++  - `changed`: a `reread:` line is printed for an entry whose modules changed unless one of
++    the `DATING` fields differs from the base. With another field edited the line names it
++    (`only notes edited`); with none it reads `entry not edited`, as before. An entry
++    absent at the base is skipped, as before.
++  - `changed --strict` exits 1 while a `reread:` line is left, and prints a `note:` line
++    saying how to answer it.
++- `skills/milestone/process-phase/SKILL.md`, step 6, and
++  `skills/phase/process-phase/references/close.md`: a `reread:` line is answered by editing
++  the entry's `does` or `verbs` or by adding or updating its `reread:` line, and the entries
++  are named in the record (the commit body, in the phase workflow) too.
++- `skills/components/SKILL.md`: the `changed` row of the command table, the `reread` field,
++  "Before a PR".
++- `examples/components-check.yml` (its comment) and `docs/components.html` (the "Reread"
++  bullet).
++- `tests/test_tools.py`: the ten tests above, and ten more cases that hold before and after
++  the fix.
++- Plugins 0.1.7 to 0.1.8 (`release_plugins.py bump`), rebuilt.
++- `.devtools/components/`: `components.index` has its `does` and `verbs` edited,
++  `subsystem.rule_check` its `reread:` line updated, the pages regenerated. Before those
++  two answers the new rule printed two `reread:` lines for dev-tools itself.
++
++### `8ae1e84`: 14 files, 124 insertions, 72 deletions
++
++- `changed`: a subsystem's `reread:` line is still printed, by the same rule, after the
++  components' lines, and no longer counts toward the exit. The `note:` line appears only
++  when a component's line is left. The summary line says how many of the lines are
++  subsystems (`2 to reread, 1 of them subsystem(s)`); with none it reads as before.
++- The same texts as above, the `--strict` help string, and the tests for the exit code.
++- Plugins rebuilt, still 0.1.8.
++
++Run in the working tree, with the script as it is at `95551f0` and `tests/test_tools.py`
++as it was then committed in `8ae1e84`:
++
++    $ uv run --no-project --with pytest python -m pytest tests/test_tools.py -q -k "strict_changed or subsystem_whose_member"
++    FAILED tests/test_tools.py::test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields[- notes: One pass.\n-- notes: One pass.\n-entry not edited]
++    FAILED tests/test_tools.py::test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields[- notes: One pass.\n-- notes: One pass over the rows.\n-only notes edited]
++    FAILED tests/test_tools.py::test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields[- components: core.sizes, core.rows\n-- components: core.rows, core.sizes\n-only components edited]
++    FAILED tests/test_tools.py::test_strict_changed_fails_while_a_components_reread_line_is_unanswered
++    FAILED tests/test_tools.py::test_strict_changed_prints_a_subsystems_reread_line_and_does_not_fail_on_it
++    5 failed, 4 passed, 148 deselected in 13.10s
++
++## Decisions
++
++| Decision | What was chosen | Why | Who |
++|---|---|---|---|
++| Which fields say an entry was read | `does`, `verbs`, `flow`, `reread`: the narrower of the two rules, the one `review` already had | An edit to `notes`, `tests` or `modules` does not say the description was read. Of the issue's 103 listed entries, 14 had only such fields edited | Proposed by issue 50; implemented as proposed |
++| Where an unanswered `reread:` line fails | Under the existing `--strict`, not under a new flag | The two shipped places that run the check (`examples/components-check.yml`, the milestone `process-phase` gate) already name `--strict`; a new flag would leave every existing gate silent until each project edited it | Recommended to the owner; "go og" |
++| Whether a subsystem's line fails | It does not. It is printed and is advice | A project with many subsystems that share common components would have to answer most of its subsystems on every code change, and the answers would become rote | Recommended to the owner; "go og" |
++| The text of the line | `entry not edited` kept where nothing was edited | The capture in `docs/components.html` shows that line, and it stays true | This session |
++
++`95551f0` made a subsystem's line fail too. `8ae1e84` withdrew that after the owner's
++second reply.
++
++## Gate output (verbatim)
++
++On `8ae1e84`, with `origin/main` at `31249da`. The index and plugin commands were run
++again on the clean tree at `8ae1e84` when this record was written. The test suite and
++`ci_local.sh` were run once, on `8ae1e84`, before the record was asked for.
++
++    $ uv run --no-project --with pytest python -m pytest tests -q
++    552 passed in 483.76s (0:08:03)
++    (exit 0)
++
++    $ python3 devtools/build_plugins.py --check
++    (exit 0)
++
++    $ python3 plugins/dvt-milestone/skills/components/scripts/components_index.py --check --strict
++    (exit 0)
++
++    $ python3 plugins/dvt-milestone/skills/components/scripts/components_index.py changed --base origin/main --strict
++    changed against origin/main (31249da): 18 file(s) differ; 0 to fix, 0 warning(s), 0 to reread
++    (exit 0)
++
++    $ devtools/ci_local.sh
++    ci_local: head 8ae1e84, base origin/main 31249da, in <tmp>/dev-tools-ci.o7lxPX
++    macos-3.14: exit 0, 552 passed in 280.32s (0:04:40) (<tmp>/dev-tools-ci.o7lxPX/macos-3.14.log)
++    linux-3.11: exit 0, 548 passed, 4 skipped in 144.19s (0:02:24) (<tmp>/dev-tools-ci.o7lxPX/linux-3.11.log)
++    linux-3.14: exit 0, 548 passed, 4 skipped in 156.84s (0:02:36) (<tmp>/dev-tools-ci.o7lxPX/linux-3.14.log)
++    (exit 0)
++
++    $ python3 devtools/release_plugins.py status
++    version in the tree: 0.1.8
++    released: 0.1.7 (plugins-v0.1.7)
++    6 plugin file(s) changed since plugins-v0.1.7
++    0.1.8 is ready: after the merge, run `release_plugins.py tag` on main
++    (exit 1)
++
++The `ci_local.sh` lines are edited in one respect: the temporary folder of the machine it
++ran on is written `<tmp>`. Its logs are outside history and were not kept.
++
++The `gates` workflow on GitHub, cited by its runs and read once on 2026-11-26: each
++concluded "success".
++
++- `95551f0`: https://github.com/vasiloglou/dev-tools/actions/runs/45797605146
++- `8ae1e84`: https://github.com/vasiloglou/dev-tools/actions/runs/45808053255
++
++## The standing design rules, as the change stands
++
++A spec discharges these by name before the code. There was no spec; this is where each
++one stands afterwards.
++
++| Rule | Where it stands |
++|---|---|
++| A script change comes with a test | `changed` and `entry_commits` of `components_index.py`; the tests quoted above as failing without each commit, in `tests/test_tools.py` |
++| The plugins are rebuilt, and released under a new version | 0.1.7 to 0.1.8; `build_plugins.py --check` exited 0. Not tagged: that is the owner's, after the merge |
++| A wording change says what prompted it | Issue 50, part 1: the sentence quoted under "The report", and the downstream project's 31 planning files that say "still accurate" beside one `reread:` line in its index (the issue's counts) |
++| Shared skills stay general | The rules added to `skills/` hold in any project with a component index. Nothing in them is about dev-tools |
++| Both agents read the same file | The changed skill files name the `components` skill and the command, and no tool. They were read, and built for both plugins; they were not run in Claude Code or in Codex |
++| Captures on the site are real output | No capture was replaced. The capture in `docs/components.html` shows the plain form with one `entry not edited` line and no subsystem, which prints the same; `test_changed_names_what_a_change_left_out_of_the_index` asserts that text. The capture's own project was not run again |
++| The page that describes it is updated too | `docs/components.html`, the "Reread" bullet, in `95551f0` |
++
++## What the lane requires and this change does not have
++
++Listed so that nothing reads as done. None of these was written or run afterwards to fill
++the gap.
++
++- **A milestone plan** (`notes/reread-answers-plan.md`, sections 0 to 10), its independent
++  plan review, and the plan gate with its record. None exists.
++- **A phase spec** (`notes/phase-1-spec.md`) approved at an owner gate before any code,
++  with the harvest of obligations and carryovers. None exists. The code was written first.
++- **A review round of the diff** by the other tool (`notes/reviews/`), with its findings
++  ledger. None was run, for the code or for the skill text. No `review-pr` round was run
++  on pull request 51 either.
++- **A close**: the close review, the question sweep and the close record. The milestone is
++  not closed.
++
++## Refactoring review
++
++- **Executed:** the two lists of the fields that date an entry (one in `entry_commits`,
++  one implied by `changed` comparing every hand-written field) are one set, `DATING`. That
++  is the fix for part 2 itself, not work beside it.
++- **Otherwise none needed:** the change is inside `changed` and one line of
++  `entry_commits`; it adds no function and no module, and the tests reuse the helpers of
++  `tests/test_tools.py` (`catalog`, `entry`, `commit`, `tool`).
++
++## Boundary -- what this result did NOT establish
++
++- The order of events: code, pull request, then this record. No approval preceded the
++  code except the owner's word to start fixing issue 50, and no reader other than the
++  session that wrote it has reviewed the diff.
++- `--strict` checks that someone answered for a component's entry. It does not check that
++  the answer is right: a `reread:` line can be written without reading anything.
++- A subsystem's `reread:` line can be left unanswered for good. Nothing fails on it and
++  `review` does not date a subsystem.
++- The change was not run on a project that already gates on `changed --strict`, nor on the
++  project the issue came from. What it costs such a project on its next change is not
++  measured.
++- The built plugins were not installed and run in Claude Code or in Codex.
++- The gates above ran on `8ae1e84`. The commit that adds this record adds files under
++  `.planning/` only; the runs made after it are in the pull request, not here.
++- The owner's words are quoted as relayed by another session.
++
++## Open questions
++
++| # | Question | Whose |
++|---|---|---|
++| Q1 | Part 4 of issue 50: should a `reread:` line name the public names a change added that the entry's `does` and `verbs` do not mention? Not decided and not built; the issue stays open for it | The owner |
++| Q2 | dev-tools' own gate still runs the plain `changed --base origin/main` (`.github/workflows/gates.yml`, `devtools/ci_local.sh`, `.devtools/project.md`; `tests/test_ci_local.py` keeps the first two in step). Should it run `--strict`? | The owner |
++| Q3 | Tagging 0.1.8 (`release_plugins.py tag`), after the merge | The owner |
++| Q4 | Is this one record enough for the lane, or does the milestone also get what is listed as missing: a review round of the diff, and a close? | The owner |
++
++## Refuted premises
++
++- `skills/components/SKILL.md` at `31249da`, "Before a PR": "A `reread:` line never fails
++  the check: the script cannot tell whether a sentence is still true." The second half
++  holds. The first did not follow from it once the `reread:` field (plugin 0.1.7) let an
++  author answer without editing a sentence: the script can require an answer without
++  judging it. What refuted it is issue 50's count of phase records closing with `reread:`
++  lines unanswered. That evidence is the issue's, on GitHub; it is not in this
++  repository's history, and the claim is weaker for it.
+diff --git a/.planning/milestones/reread-answers/README.md b/.planning/milestones/reread-answers/README.md
+new file mode 100644
+index 0000000..f68ef32
+--- /dev/null
++++ b/.planning/milestones/reread-answers/README.md
+@@ -0,0 +1,25 @@
++# Milestone: reread-answers
++
++A `reread:` line from the component index's `changed` is answered in the entry, `changed`
++and `review` read one rule for whether an entry was read, and `changed --strict` fails
++while a component's line is left unanswered (issue 50, parts 1 to 3).
++
++**This milestone was recorded after the fact.** The change was made as a fix, in pull
++request vasiloglou/dev-tools#51, before any of this folder existed. The owner then ruled
++that a change to what a gate refuses needs a milestone record
++(`.devtools/project.md`, "Which lane a piece of work takes"), and
++[001-issue-50.md](001-issue-50.md) is that record.
++
++- **Plan:** none. No milestone plan was written, reviewed or gated.
++- **Phase specs:** none. The code was written before any spec.
++- **Review rounds:** none.
++- **Ruled by the owner, 2026-11-26** (as relayed to the session that did the work): to
++  file issue 50 and start fixing it; to keep `--strict` as the switch with subsystem lines
++  advisory ("go og", in reply to that recommendation); to create a milestone record.
++- **Closed:** no. There has been no close review, question sweep or close record.
++- **Next action:** the owner's: rule Q1 to Q4 of the record (part 4 of issue 50,
++  dev-tools' own gate, tagging 0.1.8, whether the milestone gets a review round and a
++  close), and merge or amend the pull request.
++- **Records:** [001-issue-50.md](001-issue-50.md): what shipped in `95551f0` and
++  `8ae1e84`, the reproduction, the gates with their exits, the decisions, and what the
++  lane requires that this change does not have.
+diff --git a/devtools/PLUGIN_VERSION b/devtools/PLUGIN_VERSION
+index 1180819..699c6c6 100644
+--- a/devtools/PLUGIN_VERSION
++++ b/devtools/PLUGIN_VERSION
+@@ -1 +1 @@
+-0.1.7
++0.1.8
+diff --git a/docs/components.html b/docs/components.html
+index 92b881e..59bb824 100644
+--- a/docs/components.html
++++ b/docs/components.html
+@@ -159,7 +159,7 @@ <h3>Checked against what the change touched</h3>
+       <ul>
+         <li><strong>Fail:</strong> a new file no component has claimed, or generated pages that no longer match the source.</li>
+         <li><strong>Warning:</strong> new code that calls a component marked as retired or as a duplicate.</li>
+-        <li><strong>Reread:</strong> the code of a component changed and its description did not. A script cannot tell whether a sentence is still true, so it names the entry and the agent reads it beside the change.</li>
++        <li><strong>Reread:</strong> the code of a component changed and its description did not. A script cannot tell whether a sentence is still true, so it names the entry and the agent reads it beside the change, then corrects the description or marks the entry as reread. In its strict form the check fails until one of the two is done.</li>
+       </ul>
+       <p>The same command runs in automated checks; an example job for GitHub ships with the skills. Both workflows run it: the phase workflow when a phase closes, the milestone workflow before a phase is recorded.</p>
+     </div>
+diff --git a/examples/components-check.yml b/examples/components-check.yml
+index 1e4ce63..5eaebac 100644
+--- a/examples/components-check.yml
++++ b/examples/components-check.yml
+@@ -1,5 +1,9 @@
+ # Checks the component index on every pull request: the generated pages match the source,
+-# every new module has a component, and no new code calls a retired component.
++# every new module has a component, no new code calls a retired component, and every component
++# whose code changed was answered for (its does or verbs edited, or its reread: line updated).
++# The last one is new in plugin 0.1.8: before it --strict did not fail on a reread: line.
++# A subsystem's reread: line is printed and never fails the job.
++# Without --strict the job fails only on what is wrong, and prints the reread: lines.
+ # Copy to .github/workflows/ (or sync it; see phase-project.devtools.toml).
+ name: component index
+ 
+diff --git a/plugins/dvt-milestone/.claude-plugin/plugin.json b/plugins/dvt-milestone/.claude-plugin/plugin.json
+index 2d08d9f..d4d50a8 100644
+--- a/plugins/dvt-milestone/.claude-plugin/plugin.json
++++ b/plugins/dvt-milestone/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-milestone",
+-  "version": "0.1.7",
++  "version": "0.1.8",
+   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-milestone/skills/components/SKILL.md b/plugins/dvt-milestone/skills/components/SKILL.md
+index d10fb80..359b399 100644
+--- a/plugins/dvt-milestone/skills/components/SKILL.md
++++ b/plugins/dvt-milestone/skills/components/SKILL.md
+@@ -59,7 +59,7 @@ the main checkout's), because writing and checking read their installed versions
+ | `stats [--write-baseline]` | Prints the coverage line, then each package module no component covers. `--write-baseline` records that list in `unassigned-baseline.txt` and refuses when it holds a module the recorded list did not, or when `allow_baseline` is false. Files under a `tests` or `fixtures` folder and files named `fake_*` are not counted as package modules |
+ | `list [<area>]` | Prints the ids by area, each with its `does` |
+ | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
+-| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while its hand-written fields did not, and each subsystem with such a member; then a summary line. Exits 1 on any `fail`, and with `--strict` on any `warn`. Needs git |
++| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while none of its `does`, `verbs`, `flow` and `reread` lines did, and each subsystem with such a member (an edit to another field does not answer it: the line then reads `only notes edited` in place of `entry not edited`); then a summary line, which says how many of the lines to reread are subsystems. Exits 1 on any `fail`, and with `--strict` on any `warn` and on any `reread:` line of a component (from plugin 0.1.8; before it a `reread:` line never failed). A subsystem's `reread:` line is printed and never fails. Needs git |
+ | `facts [--base <ref>] [--out <file>]` | Prints the catalog and the import graph as one JSON document of facts, for a rule checker (see "Project rules" below): which components are listed, their status, area and tests, which component uses which, which of those imports lie inside a loop, the members of each subsystem, and the ranks and forbidden pairs of `layers.toml`. With `--base` the catalog and the code are those of the merge base with `<ref>`; the layers are always today's. Needs no checker installed |
+ | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
+ | `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does`, `verbs` or `reread` line last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, loops of imports through three or more components, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. With `count_extra_dirs` the groups read from the modules themselves (the same name, no docstring, over 12 modules, `defines main`) cover the extra folders too; the groups built from the import graph stay within the package. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
+@@ -111,7 +111,7 @@ The id is two lower-case parts joined by one dot (each `[a-z][a-z0-9_]*`) and is
+ | `duplicates` | no | Repo-relative paths, which must exist, of the modules that duplicate this component, in whole or in one function |
+ | `distinct_from` | no | Ids of existing components that look like this one and are separate on purpose (a reference implementation beside the production one, a fallback). `review` stops reporting a name the two share; say why in `notes` |
+ | `checked` | no | `partial` when the entry was written without reading all of its code. `review` lists these first for rereading; remove the line once it is checked |
+-| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and `changed` counts it as an edit. Update it, do not add a second |
++| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and a line added or updated in a change answers that change's `reread:` line from `changed`. Update it, do not add a second |
+ | `external` | with `status: external`; otherwise optional | Dotted names `<module>.<name>` that appear in an `external/` page, so the module must be listed in `external.toml` |
+ | `in`, `out`, `notes`, any other key | no | Free text: kept as written, not validated, not searched |
+ | `uses`, `used_by`, `part_of` | generated | Written after the `modules:` line from the runtime imports between component modules (imports under `TYPE_CHECKING` are ignored). `used_by` shows at most 12 names here; the full list is in `graph.md` |
+@@ -237,11 +237,29 @@ The index must change in the same commit as the code.
+   - `warn: new caller of <id>` You added an import of a retired component. Call its
+     replacement instead (the entry's `status` or `notes` names it). If the import must
+     stay, say why in the PR body.
+-  - `reread: <id>` The code of that component changed and its entry did not. Open the
+-    entry and the diff of the listed files. If the change added, removed or altered what
+-    the component does, edit `does`, `verbs`, `modules` or `tests`; if it did not, leave
+-    the entry's other lines, add or update its `reread:` line, and say so in the PR body ("fs.scan reread, still accurate"). A `reread:`
+-    line never fails the check: the script cannot tell whether a sentence is still true.
++  - `reread: <id>` The code of that component changed and its description did not. Open
++    the entry and the diff of the listed files. If the change added, removed or altered
++    what the component does, edit `does` or `verbs`, and `modules` or `tests` where they
++    changed too; if it did not, leave the entry's other lines, add or update its `reread:`
++    line, and say so in the PR body ("fs.scan reread, still accurate"). Only `does`,
++    `verbs`, `flow` and `reread` answer the line: they are the fields `review` dates an
++    entry from. An edit to `notes`, `tests` or `modules` alone does not, and the line
++    then says `only notes edited`. A sentence in the PR body or in a record does not
++    either: the index keeps no trace of it.
++
++  - `reread: subsystem.<name> (...): its members changed: <ids>` A component of that
++    subsystem changed. Read its `flow` and `notes` when the change altered which
++    component calls which, or what the flow as a whole does, and answer it the same way.
++    This line is advice and never fails: a component many subsystems share would
++    otherwise ask each of them for an answer on every change.
++
++  The script cannot tell whether a sentence is still true, so the command above exits 0
++  with `reread:` lines left. `changed --strict` exits 1 while a component's line is
++  left, as it does for a `warn:`. It checks that someone answered for the entry, not
++  that the answer is right.
++  **This is new in plugin 0.1.8:** before it `--strict` failed on `fail:` and `warn:`
++  only, so a project that already gates on `--strict` now has to answer every
++  component's `reread:` line. Use `--strict` when closing a phase and in CI.
+ 
+   The PR body gets one line: what you searched before writing, what you reused, and the
+   summary line the check printed. A project can run the same command in its CI
+diff --git a/plugins/dvt-milestone/skills/components/scripts/components_index.py b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+index ef70027..469d286 100644
+--- a/plugins/dvt-milestone/skills/components/scripts/components_index.py
++++ b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+@@ -11,7 +11,8 @@
+     components_index.py draft [--only PATH] [--by-importers]
+                                              stub entries for the modules no component covers
+     components_index.py list [AREA]          the component ids by area, each with its one-line description
+-    components_index.py changed --base REF   check the index against the files changed since REF
++    components_index.py changed --base REF [--strict]
++                                             check the index against the files changed since REF
+     components_index.py facts [--base REF] [--modules] [--out FILE]
+                                              the catalog and the import graph as JSON rows, for a rule checker
+     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
+@@ -152,6 +153,9 @@ def checkout_root() -> Path:
+ BASE = SETTINGS['docs_dir'].strip('/') + '/'
+ VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
+ GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
++# The fields that say an entry was read against its code: `review` dates an entry from the newest of
++# them, and `changed` asks for no reread of an entry when one of them differs from the base.
++DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
+ # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
+ CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
+                      'duplicates', 'external', 'distinct_from', 'reread'})
+@@ -1162,7 +1166,13 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+ 
+ 
+ def changed(root: Path, base: str, strict: bool) -> int:
+-    """Check the index against the files that differ from the merge base with `base`."""
++    """Check the index against the files that differ from the merge base with `base`.
++
++    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
++    line, which an author answers by editing one of the entry's DATING fields. A subsystem's
++    `reread:` line is printed and never fails: a component many subsystems share would otherwise
++    ask for an answer from each of them on every change.
++    """
+     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
+     entries = read_components(root)
+     files, fails = build_index(root)
+@@ -1195,31 +1205,37 @@ def imported_before(path, target):
+             evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
+             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
+ 
+-    def authored(entry):
+-        return {k: v for k, v in entry.items() if k not in GENERATED}
+-
+-    before = {e['id']: authored(e) for e in old_entries}
++    before = {e['id']: e for e in old_entries}
+     touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
+-    rereads = []
++    rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
+     for entry in entries:
+-        name = entry['id']
+-        if before.get(name) != authored(entry):
+-            continue  # written or edited in this change
++        name, old = entry['id'], before.get(entry['id'])
++        if old is None or any(old.get(key) != entry.get(key) for key in DATING):
++            continue  # written in this change, or read in it: a dating field differs
++        # An edit to any other field (notes, tests, modules) does not say the description was read.
++        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
++                        if old.get(key) != entry.get(key))
++        state = f'only {", ".join(others)} edited' if others else 'entry not edited'
+         if subsystem(entry):
+             members = [m for m in values(entry, 'components') if touched.get(m)]
+             if members:
+-                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
++                advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
+         elif touched[name]:
+             paths = touched[name]
+             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
+-            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
++            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}')
+ 
+-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
++    notes = [said] if said else []
++    if strict and rereads:
++        notes.append("--strict fails while a component's reread: line is unanswered: edit the entry's does or "
++                     'verbs, or add or update its reread: line')
++    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads + advisory), ('note', notes)):
+         for row in rows:
+             print(f'{prefix}: {row}')
++    of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
+     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
+-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
+-    return int(bool(fails or (strict and warns)))
++          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
++    return int(bool(fails or (strict and (warns or rereads))))
+ 
+ 
+ # What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
+@@ -1336,7 +1352,7 @@ def descends(commit, other):
+             if text.startswith('### '):
+                 current = text[4:].strip()
+             field = re.match(r'- ([a-z_]+):', text)
+-            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
++            if not current or not (field and field[1] in DATING):
+                 continue
+             earlier = newest.get(current, ('', -1, ''))
+             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
+@@ -1624,7 +1640,8 @@ def main(argv: list[str] | None = None) -> int:
+     diff = commands.add_parser('changed')
+     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
+     diff.add_argument('--strict', dest='strict_changed', action='store_true',
+-                      help='also fail on a new caller of a deprecated or duplicate component')
++                      help='also fail on a new caller of a deprecated or duplicate component, and on a '
++                           "component's reread: line left unanswered (a subsystem's never fails)")
+     rows = commands.add_parser('facts')
+     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
+     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')
+diff --git a/plugins/dvt-milestone/skills/process-phase/SKILL.md b/plugins/dvt-milestone/skills/process-phase/SKILL.md
+index a07b1cd..de31ac0 100644
+--- a/plugins/dvt-milestone/skills/process-phase/SKILL.md
++++ b/plugins/dvt-milestone/skills/process-phase/SKILL.md
+@@ -296,10 +296,17 @@ command and exit verbatim:
+ python ${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py changed --base <the phase's base commit> --strict
+ ```
+ 
+-Fix every `fail:`. For a `warn:` (a new caller of a retired component), call the
+-replacement or record the reason in the boundary section and rerun without
+-`--strict`, saying so. For each `reread:` line, read the entry beside the diff
+-and either edit it or state in the record that it is still accurate. In a
++Fix every `fail:`. For each `reread:` line, read the entry beside the diff. If
++the phase changed what the component does, edit the entry's `does` or `verbs`;
++if it did not, add or update the entry's `reread:` line (the `components` skill,
++"Before a PR"). Name those entries in the record too. A sentence in the record
++alone does not answer the line: the index keeps no trace of it, and from plugin
++0.1.8 `--strict` exits 1 while a component's `reread:` line is left. A
++subsystem's line (`its members changed`) is advice and never fails: answer it
++the same way when the phase changed the flow. For a `warn:` (a new
++caller of a retired component), call the replacement, or record the reason in
++the boundary section and, once no component's `reread:` line is left, rerun
++without `--strict`, saying so. In a
+ project with rules of its own (`docs/components/rules.json`), also run
+ `python ${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/rules_check.py check --base <the phase's base commit>`
+ and list it the same way: fix every `fail:`, record the reason for a `warn:`
+diff --git a/plugins/dvt-phase/.claude-plugin/plugin.json b/plugins/dvt-phase/.claude-plugin/plugin.json
+index e6f0654..7f32c46 100644
+--- a/plugins/dvt-phase/.claude-plugin/plugin.json
++++ b/plugins/dvt-phase/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-phase",
+-  "version": "0.1.7",
++  "version": "0.1.8",
+   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-phase/skills/components/SKILL.md b/plugins/dvt-phase/skills/components/SKILL.md
+index da482e7..3cf7fe3 100644
+--- a/plugins/dvt-phase/skills/components/SKILL.md
++++ b/plugins/dvt-phase/skills/components/SKILL.md
+@@ -59,7 +59,7 @@ the main checkout's), because writing and checking read their installed versions
+ | `stats [--write-baseline]` | Prints the coverage line, then each package module no component covers. `--write-baseline` records that list in `unassigned-baseline.txt` and refuses when it holds a module the recorded list did not, or when `allow_baseline` is false. Files under a `tests` or `fixtures` folder and files named `fake_*` are not counted as package modules |
+ | `list [<area>]` | Prints the ids by area, each with its `does` |
+ | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
+-| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while its hand-written fields did not, and each subsystem with such a member; then a summary line. Exits 1 on any `fail`, and with `--strict` on any `warn`. Needs git |
++| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while none of its `does`, `verbs`, `flow` and `reread` lines did, and each subsystem with such a member (an edit to another field does not answer it: the line then reads `only notes edited` in place of `entry not edited`); then a summary line, which says how many of the lines to reread are subsystems. Exits 1 on any `fail`, and with `--strict` on any `warn` and on any `reread:` line of a component (from plugin 0.1.8; before it a `reread:` line never failed). A subsystem's `reread:` line is printed and never fails. Needs git |
+ | `facts [--base <ref>] [--out <file>]` | Prints the catalog and the import graph as one JSON document of facts, for a rule checker (see "Project rules" below): which components are listed, their status, area and tests, which component uses which, which of those imports lie inside a loop, the members of each subsystem, and the ranks and forbidden pairs of `layers.toml`. With `--base` the catalog and the code are those of the merge base with `<ref>`; the layers are always today's. Needs no checker installed |
+ | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
+ | `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does`, `verbs` or `reread` line last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, loops of imports through three or more components, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. With `count_extra_dirs` the groups read from the modules themselves (the same name, no docstring, over 12 modules, `defines main`) cover the extra folders too; the groups built from the import graph stay within the package. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
+@@ -111,7 +111,7 @@ The id is two lower-case parts joined by one dot (each `[a-z][a-z0-9_]*`) and is
+ | `duplicates` | no | Repo-relative paths, which must exist, of the modules that duplicate this component, in whole or in one function |
+ | `distinct_from` | no | Ids of existing components that look like this one and are separate on purpose (a reference implementation beside the production one, a fallback). `review` stops reporting a name the two share; say why in `notes` |
+ | `checked` | no | `partial` when the entry was written without reading all of its code. `review` lists these first for rereading; remove the line once it is checked |
+-| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and `changed` counts it as an edit. Update it, do not add a second |
++| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and a line added or updated in a change answers that change's `reread:` line from `changed`. Update it, do not add a second |
+ | `external` | with `status: external`; otherwise optional | Dotted names `<module>.<name>` that appear in an `external/` page, so the module must be listed in `external.toml` |
+ | `in`, `out`, `notes`, any other key | no | Free text: kept as written, not validated, not searched |
+ | `uses`, `used_by`, `part_of` | generated | Written after the `modules:` line from the runtime imports between component modules (imports under `TYPE_CHECKING` are ignored). `used_by` shows at most 12 names here; the full list is in `graph.md` |
+@@ -237,11 +237,29 @@ The index must change in the same commit as the code.
+   - `warn: new caller of <id>` You added an import of a retired component. Call its
+     replacement instead (the entry's `status` or `notes` names it). If the import must
+     stay, say why in the PR body.
+-  - `reread: <id>` The code of that component changed and its entry did not. Open the
+-    entry and the diff of the listed files. If the change added, removed or altered what
+-    the component does, edit `does`, `verbs`, `modules` or `tests`; if it did not, leave
+-    the entry's other lines, add or update its `reread:` line, and say so in the PR body ("fs.scan reread, still accurate"). A `reread:`
+-    line never fails the check: the script cannot tell whether a sentence is still true.
++  - `reread: <id>` The code of that component changed and its description did not. Open
++    the entry and the diff of the listed files. If the change added, removed or altered
++    what the component does, edit `does` or `verbs`, and `modules` or `tests` where they
++    changed too; if it did not, leave the entry's other lines, add or update its `reread:`
++    line, and say so in the PR body ("fs.scan reread, still accurate"). Only `does`,
++    `verbs`, `flow` and `reread` answer the line: they are the fields `review` dates an
++    entry from. An edit to `notes`, `tests` or `modules` alone does not, and the line
++    then says `only notes edited`. A sentence in the PR body or in a record does not
++    either: the index keeps no trace of it.
++
++  - `reread: subsystem.<name> (...): its members changed: <ids>` A component of that
++    subsystem changed. Read its `flow` and `notes` when the change altered which
++    component calls which, or what the flow as a whole does, and answer it the same way.
++    This line is advice and never fails: a component many subsystems share would
++    otherwise ask each of them for an answer on every change.
++
++  The script cannot tell whether a sentence is still true, so the command above exits 0
++  with `reread:` lines left. `changed --strict` exits 1 while a component's line is
++  left, as it does for a `warn:`. It checks that someone answered for the entry, not
++  that the answer is right.
++  **This is new in plugin 0.1.8:** before it `--strict` failed on `fail:` and `warn:`
++  only, so a project that already gates on `--strict` now has to answer every
++  component's `reread:` line. Use `--strict` when closing a phase and in CI.
+ 
+   The PR body gets one line: what you searched before writing, what you reused, and the
+   summary line the check printed. A project can run the same command in its CI
+diff --git a/plugins/dvt-phase/skills/components/scripts/components_index.py b/plugins/dvt-phase/skills/components/scripts/components_index.py
+index ef70027..469d286 100644
+--- a/plugins/dvt-phase/skills/components/scripts/components_index.py
++++ b/plugins/dvt-phase/skills/components/scripts/components_index.py
+@@ -11,7 +11,8 @@
+     components_index.py draft [--only PATH] [--by-importers]
+                                              stub entries for the modules no component covers
+     components_index.py list [AREA]          the component ids by area, each with its one-line description
+-    components_index.py changed --base REF   check the index against the files changed since REF
++    components_index.py changed --base REF [--strict]
++                                             check the index against the files changed since REF
+     components_index.py facts [--base REF] [--modules] [--out FILE]
+                                              the catalog and the import graph as JSON rows, for a rule checker
+     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
+@@ -152,6 +153,9 @@ def checkout_root() -> Path:
+ BASE = SETTINGS['docs_dir'].strip('/') + '/'
+ VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
+ GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
++# The fields that say an entry was read against its code: `review` dates an entry from the newest of
++# them, and `changed` asks for no reread of an entry when one of them differs from the base.
++DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
+ # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
+ CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
+                      'duplicates', 'external', 'distinct_from', 'reread'})
+@@ -1162,7 +1166,13 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+ 
+ 
+ def changed(root: Path, base: str, strict: bool) -> int:
+-    """Check the index against the files that differ from the merge base with `base`."""
++    """Check the index against the files that differ from the merge base with `base`.
++
++    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
++    line, which an author answers by editing one of the entry's DATING fields. A subsystem's
++    `reread:` line is printed and never fails: a component many subsystems share would otherwise
++    ask for an answer from each of them on every change.
++    """
+     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
+     entries = read_components(root)
+     files, fails = build_index(root)
+@@ -1195,31 +1205,37 @@ def imported_before(path, target):
+             evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
+             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
+ 
+-    def authored(entry):
+-        return {k: v for k, v in entry.items() if k not in GENERATED}
+-
+-    before = {e['id']: authored(e) for e in old_entries}
++    before = {e['id']: e for e in old_entries}
+     touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
+-    rereads = []
++    rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
+     for entry in entries:
+-        name = entry['id']
+-        if before.get(name) != authored(entry):
+-            continue  # written or edited in this change
++        name, old = entry['id'], before.get(entry['id'])
++        if old is None or any(old.get(key) != entry.get(key) for key in DATING):
++            continue  # written in this change, or read in it: a dating field differs
++        # An edit to any other field (notes, tests, modules) does not say the description was read.
++        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
++                        if old.get(key) != entry.get(key))
++        state = f'only {", ".join(others)} edited' if others else 'entry not edited'
+         if subsystem(entry):
+             members = [m for m in values(entry, 'components') if touched.get(m)]
+             if members:
+-                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
++                advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
+         elif touched[name]:
+             paths = touched[name]
+             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
+-            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
++            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}')
+ 
+-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
++    notes = [said] if said else []
++    if strict and rereads:
++        notes.append("--strict fails while a component's reread: line is unanswered: edit the entry's does or "
++                     'verbs, or add or update its reread: line')
++    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads + advisory), ('note', notes)):
+         for row in rows:
+             print(f'{prefix}: {row}')
++    of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
+     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
+-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
+-    return int(bool(fails or (strict and warns)))
++          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
++    return int(bool(fails or (strict and (warns or rereads))))
+ 
+ 
+ # What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
+@@ -1336,7 +1352,7 @@ def descends(commit, other):
+             if text.startswith('### '):
+                 current = text[4:].strip()
+             field = re.match(r'- ([a-z_]+):', text)
+-            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
++            if not current or not (field and field[1] in DATING):
+                 continue
+             earlier = newest.get(current, ('', -1, ''))
+             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
+@@ -1624,7 +1640,8 @@ def main(argv: list[str] | None = None) -> int:
+     diff = commands.add_parser('changed')
+     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
+     diff.add_argument('--strict', dest='strict_changed', action='store_true',
+-                      help='also fail on a new caller of a deprecated or duplicate component')
++                      help='also fail on a new caller of a deprecated or duplicate component, and on a '
++                           "component's reread: line left unanswered (a subsystem's never fails)")
+     rows = commands.add_parser('facts')
+     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
+     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')
+diff --git a/plugins/dvt-phase/skills/process-phase/references/close.md b/plugins/dvt-phase/skills/process-phase/references/close.md
+index 21f0da6..2d3e5b2 100644
+--- a/plugins/dvt-phase/skills/process-phase/references/close.md
++++ b/plugins/dvt-phase/skills/process-phase/references/close.md
+@@ -20,7 +20,7 @@ Update the rest by hand, and show each change to the user:
+ - `MIGRATION.md`: set the status for modules moved, shimmed or frozen.
+ - `RISKS.md`: record the spike verdicts, and the new status of each RK row this phase owned.
+ - `STATE.md` digest: add lessons `LS-NN`, one line each, phrased as a rule for the next phases.
+-- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets its entry's `does` and `verbs` corrected so the search finds it next time. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py`, and confirm `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py --check --strict` is clean (the index matches the source and every module has a component). Then run `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py changed --base <base_branch>` on the phase branch: fix every `fail:`, remove or justify each `warn: new caller of` a deprecated or duplicate component, and for each `reread:` line read the entry beside the phase's diff and edit it or note in the close commit body that it is still accurate. A project with rules of its own (`docs/components/rules.json`; `components` skill, "Project rules") then runs `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/rules_check.py check --base <base_branch>`: fix every `fail:`, and fix or justify each `warn:` in the close commit body. Exit 2 (a line starting `rules_check:`) means the check did not run: fix the cause, it is not a pass. A `skip:` line means the checker is not installed here; say so. A project with another component check of its own (`.devtools/project.md`) runs that as well.
++- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets its entry's `does` and `verbs` corrected so the search finds it next time. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py`, and confirm `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py --check --strict` is clean (the index matches the source and every module has a component). Then run `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/components_index.py changed --base <base_branch>` on the phase branch: fix every `fail:`, remove or justify each `warn: new caller of` a deprecated or duplicate component, and for each `reread:` line read the entry beside the phase's diff, then edit its `does` or `verbs` or, when they are still true, add or update the entry's `reread:` line (`components` skill, "Before a PR"), and name those entries in the close commit body. A note in the commit body alone does not answer the line. A subsystem's line (`its members changed`) is advice: answer it the same way when the phase changed the flow. When no `warn:` is left, confirm with `changed --base <base_branch> --strict`, which from plugin 0.1.8 exits 1 while a component's `reread:` line is left and never fails on a subsystem's. A project with rules of its own (`docs/components/rules.json`; `components` skill, "Project rules") then runs `${CLAUDE_PLUGIN_ROOT}/skills/components/scripts/rules_check.py check --base <base_branch>`: fix every `fail:`, and fix or justify each `warn:` in the close commit body. Exit 2 (a line starting `rules_check:`) means the check did not run: fix the cause, it is not a pass. A `skip:` line means the checker is not installed here; say so. A project with another component check of its own (`.devtools/project.md`) runs that as well.
+ 
+ ## 1b. Reuse verification
+ 
+diff --git a/skills/components/SKILL.md b/skills/components/SKILL.md
+index bd99e0b..d56377a 100644
+--- a/skills/components/SKILL.md
++++ b/skills/components/SKILL.md
+@@ -57,7 +57,7 @@ the main checkout's), because writing and checking read their installed versions
+ | `stats [--write-baseline]` | Prints the coverage line, then each package module no component covers. `--write-baseline` records that list in `unassigned-baseline.txt` and refuses when it holds a module the recorded list did not, or when `allow_baseline` is false. Files under a `tests` or `fixtures` folder and files named `fake_*` are not counted as package modules |
+ | `list [<area>]` | Prints the ids by area, each with its `does` |
+ | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
+-| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while its hand-written fields did not, and each subsystem with such a member; then a summary line. Exits 1 on any `fail`, and with `--strict` on any `warn`. Needs git |
++| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while none of its `does`, `verbs`, `flow` and `reread` lines did, and each subsystem with such a member (an edit to another field does not answer it: the line then reads `only notes edited` in place of `entry not edited`); then a summary line, which says how many of the lines to reread are subsystems. Exits 1 on any `fail`, and with `--strict` on any `warn` and on any `reread:` line of a component (from plugin 0.1.8; before it a `reread:` line never failed). A subsystem's `reread:` line is printed and never fails. Needs git |
+ | `facts [--base <ref>] [--out <file>]` | Prints the catalog and the import graph as one JSON document of facts, for a rule checker (see "Project rules" below): which components are listed, their status, area and tests, which component uses which, which of those imports lie inside a loop, the members of each subsystem, and the ranks and forbidden pairs of `layers.toml`. With `--base` the catalog and the code are those of the merge base with `<ref>`; the layers are always today's. Needs no checker installed |
+ | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
+ | `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does`, `verbs` or `reread` line last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, loops of imports through three or more components, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. With `count_extra_dirs` the groups read from the modules themselves (the same name, no docstring, over 12 modules, `defines main`) cover the extra folders too; the groups built from the import graph stay within the package. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
+@@ -109,7 +109,7 @@ The id is two lower-case parts joined by one dot (each `[a-z][a-z0-9_]*`) and is
+ | `duplicates` | no | Repo-relative paths, which must exist, of the modules that duplicate this component, in whole or in one function |
+ | `distinct_from` | no | Ids of existing components that look like this one and are separate on purpose (a reference implementation beside the production one, a fallback). `review` stops reporting a name the two share; say why in `notes` |
+ | `checked` | no | `partial` when the entry was written without reading all of its code. `review` lists these first for rereading; remove the line once it is checked |
+-| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and `changed` counts it as an edit. Update it, do not add a second |
++| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and a line added or updated in a change answers that change's `reread:` line from `changed`. Update it, do not add a second |
+ | `external` | with `status: external`; otherwise optional | Dotted names `<module>.<name>` that appear in an `external/` page, so the module must be listed in `external.toml` |
+ | `in`, `out`, `notes`, any other key | no | Free text: kept as written, not validated, not searched |
+ | `uses`, `used_by`, `part_of` | generated | Written after the `modules:` line from the runtime imports between component modules (imports under `TYPE_CHECKING` are ignored). `used_by` shows at most 12 names here; the full list is in `graph.md` |
+@@ -235,11 +235,29 @@ The index must change in the same commit as the code.
+   - `warn: new caller of <id>` You added an import of a retired component. Call its
+     replacement instead (the entry's `status` or `notes` names it). If the import must
+     stay, say why in the PR body.
+-  - `reread: <id>` The code of that component changed and its entry did not. Open the
+-    entry and the diff of the listed files. If the change added, removed or altered what
+-    the component does, edit `does`, `verbs`, `modules` or `tests`; if it did not, leave
+-    the entry's other lines, add or update its `reread:` line, and say so in the PR body ("fs.scan reread, still accurate"). A `reread:`
+-    line never fails the check: the script cannot tell whether a sentence is still true.
++  - `reread: <id>` The code of that component changed and its description did not. Open
++    the entry and the diff of the listed files. If the change added, removed or altered
++    what the component does, edit `does` or `verbs`, and `modules` or `tests` where they
++    changed too; if it did not, leave the entry's other lines, add or update its `reread:`
++    line, and say so in the PR body ("fs.scan reread, still accurate"). Only `does`,
++    `verbs`, `flow` and `reread` answer the line: they are the fields `review` dates an
++    entry from. An edit to `notes`, `tests` or `modules` alone does not, and the line
++    then says `only notes edited`. A sentence in the PR body or in a record does not
++    either: the index keeps no trace of it.
++
++  - `reread: subsystem.<name> (...): its members changed: <ids>` A component of that
++    subsystem changed. Read its `flow` and `notes` when the change altered which
++    component calls which, or what the flow as a whole does, and answer it the same way.
++    This line is advice and never fails: a component many subsystems share would
++    otherwise ask each of them for an answer on every change.
++
++  The script cannot tell whether a sentence is still true, so the command above exits 0
++  with `reread:` lines left. `changed --strict` exits 1 while a component's line is
++  left, as it does for a `warn:`. It checks that someone answered for the entry, not
++  that the answer is right.
++  **This is new in plugin 0.1.8:** before it `--strict` failed on `fail:` and `warn:`
++  only, so a project that already gates on `--strict` now has to answer every
++  component's `reread:` line. Use `--strict` when closing a phase and in CI.
+ 
+   The PR body gets one line: what you searched before writing, what you reused, and the
+   summary line the check printed. A project can run the same command in its CI
+diff --git a/skills/components/scripts/components_index.py b/skills/components/scripts/components_index.py
+index ef70027..469d286 100644
+--- a/skills/components/scripts/components_index.py
++++ b/skills/components/scripts/components_index.py
+@@ -11,7 +11,8 @@
+     components_index.py draft [--only PATH] [--by-importers]
+                                              stub entries for the modules no component covers
+     components_index.py list [AREA]          the component ids by area, each with its one-line description
+-    components_index.py changed --base REF   check the index against the files changed since REF
++    components_index.py changed --base REF [--strict]
++                                             check the index against the files changed since REF
+     components_index.py facts [--base REF] [--modules] [--out FILE]
+                                              the catalog and the import graph as JSON rows, for a rule checker
+     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
+@@ -152,6 +153,9 @@ def checkout_root() -> Path:
+ BASE = SETTINGS['docs_dir'].strip('/') + '/'
+ VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
+ GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
++# The fields that say an entry was read against its code: `review` dates an entry from the newest of
++# them, and `changed` asks for no reread of an entry when one of them differs from the base.
++DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
+ # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
+ CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
+                      'duplicates', 'external', 'distinct_from', 'reread'})
+@@ -1162,7 +1166,13 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+ 
+ 
+ def changed(root: Path, base: str, strict: bool) -> int:
+-    """Check the index against the files that differ from the merge base with `base`."""
++    """Check the index against the files that differ from the merge base with `base`.
++
++    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
++    line, which an author answers by editing one of the entry's DATING fields. A subsystem's
++    `reread:` line is printed and never fails: a component many subsystems share would otherwise
++    ask for an answer from each of them on every change.
++    """
+     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
+     entries = read_components(root)
+     files, fails = build_index(root)
+@@ -1195,31 +1205,37 @@ def imported_before(path, target):
+             evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
+             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
+ 
+-    def authored(entry):
+-        return {k: v for k, v in entry.items() if k not in GENERATED}
+-
+-    before = {e['id']: authored(e) for e in old_entries}
++    before = {e['id']: e for e in old_entries}
+     touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
+-    rereads = []
++    rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
+     for entry in entries:
+-        name = entry['id']
+-        if before.get(name) != authored(entry):
+-            continue  # written or edited in this change
++        name, old = entry['id'], before.get(entry['id'])
++        if old is None or any(old.get(key) != entry.get(key) for key in DATING):
++            continue  # written in this change, or read in it: a dating field differs
++        # An edit to any other field (notes, tests, modules) does not say the description was read.
++        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
++                        if old.get(key) != entry.get(key))
++        state = f'only {", ".join(others)} edited' if others else 'entry not edited'
+         if subsystem(entry):
+             members = [m for m in values(entry, 'components') if touched.get(m)]
+             if members:
+-                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
++                advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
+         elif touched[name]:
+             paths = touched[name]
+             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
+-            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
++            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}')
+ 
+-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
++    notes = [said] if said else []
++    if strict and rereads:
++        notes.append("--strict fails while a component's reread: line is unanswered: edit the entry's does or "
++                     'verbs, or add or update its reread: line')
++    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads + advisory), ('note', notes)):
+         for row in rows:
+             print(f'{prefix}: {row}')
++    of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
+     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
+-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
+-    return int(bool(fails or (strict and warns)))
++          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
++    return int(bool(fails or (strict and (warns or rereads))))
+ 
+ 
+ # What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
+@@ -1336,7 +1352,7 @@ def descends(commit, other):
+             if text.startswith('### '):
+                 current = text[4:].strip()
+             field = re.match(r'- ([a-z_]+):', text)
+-            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
++            if not current or not (field and field[1] in DATING):
+                 continue
+             earlier = newest.get(current, ('', -1, ''))
+             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
+@@ -1624,7 +1640,8 @@ def main(argv: list[str] | None = None) -> int:
+     diff = commands.add_parser('changed')
+     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
+     diff.add_argument('--strict', dest='strict_changed', action='store_true',
+-                      help='also fail on a new caller of a deprecated or duplicate component')
++                      help='also fail on a new caller of a deprecated or duplicate component, and on a '
++                           "component's reread: line left unanswered (a subsystem's never fails)")
+     rows = commands.add_parser('facts')
+     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
+     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')
+diff --git a/skills/milestone/process-phase/SKILL.md b/skills/milestone/process-phase/SKILL.md
+index 345480f..594b32c 100644
+--- a/skills/milestone/process-phase/SKILL.md
++++ b/skills/milestone/process-phase/SKILL.md
+@@ -294,10 +294,17 @@ command and exit verbatim:
+ python scripts/components_index.py changed --base <the phase's base commit> --strict
+ ```
+ 
+-Fix every `fail:`. For a `warn:` (a new caller of a retired component), call the
+-replacement or record the reason in the boundary section and rerun without
+-`--strict`, saying so. For each `reread:` line, read the entry beside the diff
+-and either edit it or state in the record that it is still accurate. In a
++Fix every `fail:`. For each `reread:` line, read the entry beside the diff. If
++the phase changed what the component does, edit the entry's `does` or `verbs`;
++if it did not, add or update the entry's `reread:` line (the `components` skill,
++"Before a PR"). Name those entries in the record too. A sentence in the record
++alone does not answer the line: the index keeps no trace of it, and from plugin
++0.1.8 `--strict` exits 1 while a component's `reread:` line is left. A
++subsystem's line (`its members changed`) is advice and never fails: answer it
++the same way when the phase changed the flow. For a `warn:` (a new
++caller of a retired component), call the replacement, or record the reason in
++the boundary section and, once no component's `reread:` line is left, rerun
++without `--strict`, saying so. In a
+ project with rules of its own (`docs/components/rules.json`), also run
+ `python .claude/skills/components/scripts/rules_check.py check --base <the phase's base commit>`
+ and list it the same way: fix every `fail:`, record the reason for a `warn:`
+diff --git a/skills/phase/process-phase/references/close.md b/skills/phase/process-phase/references/close.md
+index 04629e2..95460e7 100644
+--- a/skills/phase/process-phase/references/close.md
++++ b/skills/phase/process-phase/references/close.md
+@@ -20,7 +20,7 @@ Update the rest by hand, and show each change to the user:
+ - `MIGRATION.md`: set the status for modules moved, shimmed or frozen.
+ - `RISKS.md`: record the spike verdicts, and the new status of each RK row this phase owned.
+ - `STATE.md` digest: add lessons `LS-NN`, one line each, phrased as a rule for the next phases.
+-- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets its entry's `does` and `verbs` corrected so the search finds it next time. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `scripts/components_index.py`, and confirm `scripts/components_index.py --check --strict` is clean (the index matches the source and every module has a component). Then run `scripts/components_index.py changed --base <base_branch>` on the phase branch: fix every `fail:`, remove or justify each `warn: new caller of` a deprecated or duplicate component, and for each `reread:` line read the entry beside the phase's diff and edit it or note in the close commit body that it is still accurate. A project with rules of its own (`docs/components/rules.json`; `components` skill, "Project rules") then runs `.claude/skills/components/scripts/rules_check.py check --base <base_branch>`: fix every `fail:`, and fix or justify each `warn:` in the close commit body. Exit 2 (a line starting `rules_check:`) means the check did not run: fix the cause, it is not a pass. A `skip:` line means the checker is not installed here; say so. A project with another component check of its own (`references/project.md`) runs that as well.
++- `docs/components/` (`components` skill, Update): every module the phase added is assigned to a component; duplicates found during the phase are marked `duplicate-of` with a consolidation todo; any capability the phase rebuilt by mistake gets its entry's `does` and `verbs` corrected so the search finds it next time. Subsystems whose flow the phase changed get their `flow:` and `components:` updated; a new end-to-end flow gets a `subsystem.*` entry. Regenerate with `scripts/components_index.py`, and confirm `scripts/components_index.py --check --strict` is clean (the index matches the source and every module has a component). Then run `scripts/components_index.py changed --base <base_branch>` on the phase branch: fix every `fail:`, remove or justify each `warn: new caller of` a deprecated or duplicate component, and for each `reread:` line read the entry beside the phase's diff, then edit its `does` or `verbs` or, when they are still true, add or update the entry's `reread:` line (`components` skill, "Before a PR"), and name those entries in the close commit body. A note in the commit body alone does not answer the line. A subsystem's line (`its members changed`) is advice: answer it the same way when the phase changed the flow. When no `warn:` is left, confirm with `changed --base <base_branch> --strict`, which from plugin 0.1.8 exits 1 while a component's `reread:` line is left and never fails on a subsystem's. A project with rules of its own (`docs/components/rules.json`; `components` skill, "Project rules") then runs `.claude/skills/components/scripts/rules_check.py check --base <base_branch>`: fix every `fail:`, and fix or justify each `warn:` in the close commit body. Exit 2 (a line starting `rules_check:`) means the check did not run: fix the cause, it is not a pass. A `skip:` line means the checker is not installed here; say so. A project with another component check of its own (`references/project.md`) runs that as well.
+ 
+ ## 1b. Reuse verification
+ 
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index 1d15585..0ef9df4 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -2251,6 +2251,158 @@ def test_changed_takes_a_reread_line_as_an_edit_of_the_entry(project):
+     assert code == 0 and "reread:" not in out, out
+ 
+ 
++FLOW = ("\n### subsystem.report\n- does: Print sizes\n- verbs: report\n- status: canonical\n"
++        "- components: core.sizes, core.rows\n- flow: core.rows -> core.sizes\n- notes: One pass.\n")
++
++
++def code_moved(project, sizes=""):
++    """A committed catalog of two components and a subsystem of both, then a change to the module of
++    core.sizes with the index regenerated. `sizes` is added to the core.sizes entry before the commit."""
++    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
++    (project / "src/widget/rows.py").write_text('"""Rows."""\n')
++    (project / "tests").mkdir()
++    (project / "tests/test_sizes.py").write_text("")
++    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py") + sizes,
++            entry("core.rows", "Build report rows", "src/widget/rows.py"), FLOW)
++    commit(project)
++    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(text):\n    """Read a size."""\n')
++    assert tool(project, "write", script=INDEX)[0] == 0
++
++
++def edit_catalog(project, old, new):
++    path = project / "docs/components/COMPONENTS.md"
++    text = path.read_text()
++    assert old in text, old
++    path.write_text(text.replace(old, new))
++    code, out = tool(project, "write", script=INDEX)
++    assert code == 0, out
++
++
++def rereads(project, *args):
++    code, out = tool(project, "changed", "--base", "main", *args, script=INDEX)
++    return code, [line for line in out.splitlines() if line.startswith("reread: ")], out
++
++
++SIZES_MODULES = "- modules: src/widget/sizes.py\n"
++
++
++@pytest.mark.parametrize("field, line", [
++    ("notes", "- notes: parse reads a size back.\n"),
++    ("tests", "- tests: tests/test_sizes.py\n"),
++    ("in", "- in: a byte count\n"),
++    ("out", "- out: text\n"),
++    ("distinct_from", "- distinct_from: core.rows\n"),
++])
++def test_changed_still_asks_for_a_reread_when_only_another_field_was_edited(project, field, line):
++    # Issue 50: `review` dates an entry from does, verbs, flow and reread only, so an edit to any other
++    # field left the entry on its list while `changed` printed nothing.
++    code_moved(project)
++    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + line)
++    code, lines, out = rereads(project)
++    assert code == 0, out
++    assert "reread: core.sizes (only %s edited): src/widget/sizes.py" % field in lines, out
++
++
++def test_changed_names_every_other_field_that_was_edited(project):
++    code_moved(project)
++    edit_catalog(project, SIZES_MODULES,
++                 "- modules: src/widget/sizes.py, src/widget/__init__.py\n- notes: parse reads a size back.\n")
++    assert "reread: core.sizes (only modules, notes edited): src/widget/sizes.py" in rereads(project)[1]
++
++
++@pytest.mark.parametrize("old, new", [
++    ("- does: Format a byte count\n", "- does: Format and parse a byte count\n"),
++    ("- verbs: sizes\n", "- verbs: sizes, parse sizes\n"),
++    (SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside the change, still accurate\n"),
++    (SIZES_MODULES, SIZES_MODULES + "- flow: read, then format\n"),
++])
++def test_changed_asks_for_no_reread_of_an_entry_whose_dating_field_was_edited(project, old, new):
++    code_moved(project)
++    assert "reread: core.sizes (entry not edited): src/widget/sizes.py" in rereads(project)[1]
++    edit_catalog(project, old, new)
++    assert not [line for line in rereads(project)[1] if line.startswith("reread: core.sizes ")]
++
++
++def test_changed_takes_an_updated_reread_line_as_an_answer_and_an_old_one_as_none(project):
++    code_moved(project, sizes="- reread: 2026-11-01, read at the build, still accurate\n")
++    assert "reread: core.sizes (entry not edited): src/widget/sizes.py" in rereads(project)[1], \
++        "a reread line that was already there at the base says nothing about this change"
++    edit_catalog(project, "2026-11-01, read at the build", "2026-11-26, read beside the new parse")
++    assert not [line for line in rereads(project)[1] if line.startswith("reread: core.sizes ")]
++
++
++def test_changed_asks_for_no_reread_of_an_entry_written_in_the_change(project):
++    # The module moves, changed, from the entry that had it to an entry that did not exist at the base.
++    code_moved(project)
++    (project / "src/widget/units.py").write_text('"""Units."""\n')
++    edit_catalog(project, SIZES_MODULES, "- modules: src/widget/units.py\n")
++    catalog(project, entry("core.parse", "Read a size back from text", "src/widget/sizes.py"))
++    code, lines, out = rereads(project)
++    assert code == 0 and not [line for line in lines if "core.parse" in line], out
++    assert "reread: core.sizes (only modules edited): src/widget/units.py" in lines, out
++
++
++@pytest.mark.parametrize("old, new, said", [
++    ("- notes: One pass.\n", "- notes: One pass.\n", "entry not edited"),
++    ("- notes: One pass.\n", "- notes: One pass over the rows.\n", "only notes edited"),
++    ("- components: core.sizes, core.rows\n", "- components: core.rows, core.sizes\n", "only components edited"),
++    ("- flow: core.rows -> core.sizes\n", "- flow: core.rows -> core.sizes -> core.rows\n", None),
++    ("- does: Print sizes\n", "- does: Print and parse sizes\n", None),
++    ("- notes: One pass.\n", "- notes: One pass.\n- reread: 2026-11-26, read beside core.sizes, still accurate\n", None),
++])
++def test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields(project, old, new, said):
++    code_moved(project)
++    edit_catalog(project, "- does: Format a byte count\n", "- does: Format and parse a byte count\n")
++    edit_catalog(project, old, new)
++    code, lines, out = rereads(project)
++    assert code == 0, out
++    expected = ["reread: subsystem.report (%s): its members changed: core.sizes" % said] if said else []
++    assert lines == expected, out
++    assert ("1 to reread, 1 of them subsystem(s)" if said else "0 to reread\n") in out, out
++    # A subsystem's line is advice: with its member answered, the strict form prints the same and accepts it.
++    assert tool(project, "changed", "--base", "main", "--strict", script=INDEX) == (0, out)
++
++
++def test_strict_changed_fails_while_a_components_reread_line_is_unanswered(project):
++    component = "reread: core.sizes (entry not edited): src/widget/sizes.py"
++    system = "reread: subsystem.report (entry not edited): its members changed: core.sizes"
++    asked = "note: --strict fails while a component's reread: line is unanswered"
++    code_moved(project)
++    code, lines, out = rereads(project)
++    assert code == 0 and lines == [component, system], out
++    assert "0 to fix, 0 warning(s), 2 to reread, 1 of them subsystem(s)\n" in out, out
++    assert "--strict" not in out, "the plain form says nothing about the strict one"
++    code, lines, out = rereads(project, "--strict")
++    assert code == 1 and lines == [component, system] and asked in out, out
++
++    # The subsystem answered and the component not: still refused, for the component.
++    edit_catalog(project, "- notes: One pass.\n", "- notes: One pass.\n- reread: 2026-11-26, flow unchanged\n")
++    code, lines, out = rereads(project, "--strict")
++    assert code == 1 and lines == [component] and asked in out and "1 to reread\n" in out, out
++    # The component answered, without a sentence edited: accepted.
++    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
++    code, lines, out = rereads(project, "--strict")
++    assert code == 0 and lines == [] and "0 to reread\n" in out and "note:" not in out, out
++
++
++def test_strict_changed_prints_a_subsystems_reread_line_and_does_not_fail_on_it(project):
++    # A component many subsystems share would ask each of them for an answer on every change: the line is advice.
++    code_moved(project)
++    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
++    code, lines, out = rereads(project, "--strict")
++    assert code == 0, out
++    assert lines == ["reread: subsystem.report (entry not edited): its members changed: core.sizes"], out
++    assert "1 to reread, 1 of them subsystem(s)\n" in out and "note:" not in out, out
++
++
++def test_strict_changed_accepts_a_change_that_touches_no_component(project):
++    code_moved(project)
++    commit(project)
++    (project / "README.md").write_text("widget\n")
++    code, lines, out = rereads(project, "--strict")
++    assert code == 0 and lines == [] and "0 to fix, 0 warning(s), 0 to reread" in out, out
++
++
+ def section(out, title):
+     """The lines of one group of `review`, its heading included."""
+     start = out.index("## " + title)
