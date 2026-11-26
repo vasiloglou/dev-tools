@@ -16,8 +16,10 @@ that a change to what a gate refuses needs a milestone record
 - **Review rounds:** two, of the pull request, both by Codex, both CHANGES_REQUESTED.
   `.planning/reviews/pr-51-r1/` at `8475b62`: five findings, F1 and F2 (blocking) fixed at
   `0c3e0b3`, F3, F4 and F5 at `c6d55ca`. `.planning/reviews/pr-51-r2/` at `6751dbd`: nine
-  findings, all fixed at `24003fd`. **No round has read `24003fd`**: the owner ruled that
-  no third round is run before the merge. No round preceded the code.
+  findings, all fixed at `24003fd`. No round read `24003fd` before the merge, as the owner
+  ruled. The close review, `notes/reviews/close-r1/` at `d82c87e`, read it: nine findings,
+  none repaired in code here (one blocking, F1, a regression of `24003fd`), all listed in
+  [005-close.md](005-close.md). No round preceded the code.
 - **Ruled by the owner, 2026-11-26** (as relayed to the session that did the work): to
   file issue 50 and start fixing it; to keep `--strict` as the switch with subsystem lines
   advisory ("go og", in reply to that recommendation); to create a milestone record; to
@@ -30,12 +32,12 @@ that a change to what a gate refuses needs a milestone record
 - **Ruled by the owner, 2026-11-26** (the same way, after the second round came back):
   "Repair all nine (Recommended)", and "No, merge after gates (Recommended)" to whether a
   third round reads the repairs before the merge.
-- **Closed:** no. There has been no close review, question sweep or close record.
-- **Next action:** as the owner ruled, the merge of the pull request and the 0.1.8 tag,
-  once the gates and `devtools/ci_local.sh` exit 0 on its head. Left to the owner: Q8 to
-  Q11 of the third record (which removed names the line lists, dev-tools' own gate, whether
-  the milestone gets a close, closing issue 50) and Q12 and Q13 of the fourth (a folder
-  named without its `/`, declaring the stop rule for review rounds).
+- **Ruled by the owner, 2026-11-26:** "review and then close".
+- **Closed:** yes, by [005-close.md](005-close.md), after the close review. Pull request
+  vasiloglou/dev-tools#51 is merged (`d82c87e`), plugins 0.1.8 is released
+  (`plugins-v0.1.8`), and issue 50 is closed.
+- **Next action:** the owner's: the carried questions and the proposed issues of
+  [005-close.md](005-close.md), among them the close review's F1 and F2.
 - **Records:** [001-issue-50.md](001-issue-50.md): what shipped in `95551f0` and
   `8ae1e84`, the reproduction, the gates with their exits, the decisions, and what the
   lane requires that this change does not have.
@@ -47,3 +49,5 @@ that a change to what a gate refuses needs a milestone record
   [004-pr-51-r2.md](004-pr-51-r2.md): the second review round, its nine findings as
   reproduced and classed, the count of the two rounds against the stop rule, the owner's
   rulings on it, and the repair in `24003fd` with its tests red and green and the gates.
+  [005-close.md](005-close.md): the close: the predicates, the close review and its nine
+  findings, the question sweep, the residuals and the proposed issues.

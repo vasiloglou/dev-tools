@@ -28,6 +28,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - apply sync: sync.copies
 - archive gsd files: migrate.from_gsd
 - as-is: sync.copies
+- assume-unchanged: sync.copies
 - base behind its upstream: components.index
 - build plugins: plugins.build
 - bump and rebuild plugins: subsystem.release
@@ -112,7 +113,6 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - gemini coder: phase.coder_pool
 - generate index: components.index
 - generate plugins folder: plugins.build
-- git archive: sync.copies
 - git ignores delivered files: sync.copies
 - git numstat: phase.codex_gate
 - github release: plugins.release
@@ -205,6 +205,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - pytest phase option: phase.test_selection
 - pytest plugin: phase.test_selection
 - raise version: plugins.release
+- read the upstream tree: sync.copies
 - rebuild plugins: plugins.build
 - receipt: sync.copies
 - receipt only: sync.copies
@@ -244,9 +245,11 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - show component: components.index
 - show note: handoff.notes
 - skill lint: phase.state
+- skip-worktree: sync.copies
 - slash commands in note: handoff.notes
 - snapshot of the checkout: handoff.notes
 - source encoding: components.index
+- source not a folder: sync.copies
 - stale local main: components.index
 - standing check for code fitted to its examples: review.rounds
 - starter catalog: components.index
@@ -259,6 +262,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - survey gsd: migrate.from_gsd
 - survey project: sync.copies
 - switch assistant: handoff.notes
+- symbolic link in upstream: sync.copies
 - sync skills: sync.copies
 - tag release: plugins.release
 - take over: handoff.notes
@@ -276,6 +280,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - unfinished phase: migrate.from_gsd
 - units not taken: sync.copies
 - untracked files: phase.codex_gate
+- untracked files are own work: sync.copies
 - upstream commit: sync.copies
 - validate catalog: components.index
 - what would be lost: handoff.notes
@@ -283,6 +288,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - which areas may import which: components.rules
 - which coders are on path: phase.coder_pool
 - workstreams: migrate.from_gsd
+- wrong type in config: sync.copies
 <!-- verbs:end -->
 
 ## The plugins
@@ -312,8 +318,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## Taking the skills into a project
 
 ### sync.copies
-- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; it fetches the dev-tools checkout's upstream and reads the upstream's files when the checkout is only behind (resolve_source; --as-is reads it as it is); both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
-- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only, fetch latest dev-tools, upstream commit, as-is, git archive
+- does: Copy dev-tools skills, agents and scripts into a project from its .devtools.toml and keep the copies honest with a receipt: apply writes, updates and deletes them, check finds drift and, against a dev-tools source, says whether the project is current; it fetches the dev-tools checkout's upstream and reads the upstream commit's tree, with git's modes, when the checkout is only behind, with no commit, change, untracked or hidden file of its own where the sync reads (resolve_source; --as-is reads it as it is); both name the shipped units the config does not take that a delivered file names or that are new since the last sync, unless declined; survey finds a project's own copies and prints a starter config, compare shows what an apply would replace (sync.py)
+- verbs: sync skills, copy skills into project, install skills, apply sync, devtools.toml, receipt, devtools-receipt, check copies, hand edit, adopt existing copies, survey project, starter config, compare before replacing, settings files, after_apply, fill tokens, delete files no longer shipped, interrupted apply, dry run sync, force overwrite, file mode drift, exclude files, git ignores delivered files, lines only the project has, units not taken, declined units, named by a delivered file, new units since last sync, project behind dev-tools, not current, check strict, receipt only, fetch latest dev-tools, upstream commit, as-is, read the upstream tree, untracked files are own work, assume-unchanged, skip-worktree, symbolic link in upstream, source not a folder, wrong type in config
 - status: canonical
 - modules: devtools/sync.py
 - uses: (none)
@@ -371,6 +377,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - used_by: (none)
 - tests: tests/test_handoff.py
 - notes: Read in full at 3963a46 (notes/phase-3-reading of component-index), and its phase-1-r3 and r4 repairs (e2b2762, 22d6258). takeover checks and reports the branch already checked out; it does not switch or fetch. It is not ready while an ignored path the note was written with, other than a key file, does not exist here, or while a line of the note's ignored list cannot be parsed; it checks existence only, never that a file can be read, and checks each path as the note wrote it, redacting one that looks like a key only in the report. A missing key file is reported in missing_keys and does not block. write keeps every line it generates to one line: a value that holds a line break (the remote's path, the base, --from, the project's setup command) is JSON-escaped, so it cannot print a snapshot marker or the ignored-files heading on a line of its own (the review of vasiloglou/dev-tools#37, F1). carry and pull are dry runs until --yes and never replace a file the receiving checkout tracks; a pull from another host sends this script over ssh on stdin.
+- reread: 2026-11-26, beside the diff of its module since 27ca753 (code at d82c87e): a settings file it cannot use (not JSON, not an object, an unknown key, a value not of its default's type) now exits 2, doctor reads a refused lookup as absent, and a rest line whose cut line is gone counts as unlisted; the rest is lint and the one-line escaping its notes describe; still accurate.
 
 ## The milestone workflow
 
