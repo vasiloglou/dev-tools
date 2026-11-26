@@ -53,16 +53,21 @@ ROADMAP = """# Roadmap
 """
 
 
-@pytest.fixture
-def project(tmp_path):
+def new_project(tmp_path, *init):
+    """A project that took the skills, in a new repository made with `git init` and the arguments `init`."""
     root = tmp_path / "widget"
     (root / "src/widget").mkdir(parents=True)
     (root / "src/widget/__init__.py").write_text('"""widget."""\n')
     config = (ROOT / "examples/phase-project.devtools.toml").read_text().replace("myapp", "widget")
     (root / ".devtools.toml").write_text(config)
-    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", *init, str(root)], check=True)
     assert sync.main(["apply", "--project", str(root)]) == 0
     return root
+
+
+@pytest.fixture
+def project(tmp_path):
+    return new_project(tmp_path)
 
 
 def tool(project, *args, script=".claude/skills/process-phase/scripts/phase_tool.py"):
@@ -1725,7 +1730,12 @@ def test_changed_does_not_call_a_regrouped_import_new(project):
     path.write_text(path.read_text().replace("src/widget/report.py, src/widget/rows.py", "src/widget/report.py"))
     catalog(project, entry("core.rows", "Build rows", "src/widget/rows.py"))
     code, out = tool(project, "changed", "--base", "main", "--strict", script=INDEX)
-    assert code == 0 and "warn:" not in out, out
+    assert "warn:" not in out, out
+    # The regrouping is no new caller, but it is a change to the component that gave the module up: the
+    # owner's ruling of 2026-11-26 on review pr-51-r1 (test_changed_asks_both_components_when_a_module_moves...).
+    assert code == 1 and "reread: core.report (only modules edited): src/widget/rows.py\n" in out, out
+    assert tool(project, "changed", "--base", "main", script=INDEX)[0] == 0
+
 
 def test_the_baseline_cannot_take_a_new_module_in_exchange_for_an_old_one(project):
     for name in ("a", "b"):
@@ -2249,6 +2259,525 @@ def test_changed_takes_a_reread_line_as_an_edit_of_the_entry(project):
     assert tool(project, "write", script=INDEX)[0] == 0
     code, out = tool(project, "changed", "--base", "main", script=INDEX)
     assert code == 0 and "reread:" not in out, out
+
+
+FLOW = ("\n### subsystem.report\n- does: Print sizes\n- verbs: report\n- status: canonical\n"
+        "- components: core.sizes, core.rows\n- flow: core.rows -> core.sizes\n- notes: One pass.\n")
+
+
+def code_moved(project, sizes=""):
+    """A committed catalog of two components and a subsystem of both, then a change to the module of
+    core.sizes with the index regenerated. `sizes` is added to the core.sizes entry before the commit."""
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    (project / "src/widget/rows.py").write_text('"""Rows."""\n')
+    (project / "tests").mkdir()
+    (project / "tests/test_sizes.py").write_text("")
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py") + sizes,
+            entry("core.rows", "Build report rows", "src/widget/rows.py"), FLOW)
+    commit(project)
+    # The new name is one the entry's sentence already speaks of, so the line carries no lead about names
+    # (test_changed_names_the_public_names_the_entry_does_not_speak_of).
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef format_count(count):\n    """Format it."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+
+
+def edit_catalog(project, old, new):
+    path = project / "docs/components/COMPONENTS.md"
+    text = path.read_text()
+    assert old in text, old
+    path.write_text(text.replace(old, new))
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+
+
+def rereads(project, *args):
+    code, out = tool(project, "changed", "--base", "main", *args, script=INDEX)
+    return code, [line for line in out.splitlines() if line.startswith("reread: ")], out
+
+
+SIZES_MODULES = "- modules: src/widget/sizes.py\n"
+
+
+@pytest.mark.parametrize("field, line", [
+    ("notes", "- notes: parse reads a size back.\n"),
+    ("tests", "- tests: tests/test_sizes.py\n"),
+    ("in", "- in: a byte count\n"),
+    ("out", "- out: text\n"),
+    ("distinct_from", "- distinct_from: core.rows\n"),
+])
+def test_changed_still_asks_for_a_reread_when_only_another_field_was_edited(project, field, line):
+    # Issue 50: `review` dates an entry from does, verbs, flow and reread only, so an edit to any other
+    # field left the entry on its list while `changed` printed nothing.
+    code_moved(project)
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + line)
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert "reread: core.sizes (only %s edited): src/widget/sizes.py" % field in lines, out
+
+
+def test_changed_names_every_other_field_that_was_edited(project):
+    code_moved(project)
+    edit_catalog(project, SIZES_MODULES,
+                 "- modules: src/widget/sizes.py, src/widget/__init__.py\n- notes: parse reads a size back.\n")
+    # The file the entry took in is named beside the one that was edited, though it does not differ itself.
+    assert ("reread: core.sizes (only modules, notes edited): src/widget/__init__.py, src/widget/sizes.py"
+            in rereads(project)[1])
+
+
+@pytest.mark.parametrize("old, new", [
+    ("- does: Format a byte count\n", "- does: Format and parse a byte count\n"),
+    ("- verbs: sizes\n", "- verbs: sizes, parse sizes\n"),
+    (SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside the change, still accurate\n"),
+    (SIZES_MODULES, SIZES_MODULES + "- flow: read, then format\n"),
+])
+def test_changed_asks_for_no_reread_of_an_entry_whose_dating_field_was_edited(project, old, new):
+    code_moved(project)
+    assert "reread: core.sizes (entry not edited): src/widget/sizes.py" in rereads(project)[1]
+    edit_catalog(project, old, new)
+    assert not [line for line in rereads(project)[1] if line.startswith("reread: core.sizes ")]
+
+
+def test_changed_takes_an_updated_reread_line_as_an_answer_and_an_old_one_as_none(project):
+    code_moved(project, sizes="- reread: 2026-11-01, read at the build, still accurate\n")
+    assert "reread: core.sizes (entry not edited): src/widget/sizes.py" in rereads(project)[1], \
+        "a reread line that was already there at the base says nothing about this change"
+    edit_catalog(project, "2026-11-01, read at the build", "2026-11-26, read beside the new parse")
+    assert not [line for line in rereads(project)[1] if line.startswith("reread: core.sizes ")]
+
+
+def test_changed_asks_for_no_reread_of_an_entry_written_in_the_change(project):
+    # The module moves, changed, from the entry that had it to an entry that did not exist at the base.
+    code_moved(project)
+    (project / "src/widget/units.py").write_text('"""Units."""\n')
+    edit_catalog(project, SIZES_MODULES, "- modules: src/widget/units.py\n")
+    catalog(project, entry("core.parse", "Read a size back from text", "src/widget/sizes.py"))
+    code, lines, out = rereads(project)
+    assert code == 0 and not [line for line in lines if "core.parse" in line], out
+    assert "reread: core.sizes (only modules edited): src/widget/sizes.py, src/widget/units.py" in lines, out
+
+
+OLD_REREAD = "- reread: 2026-11-01, read at the build, still accurate\n"
+
+
+@pytest.mark.parametrize("new, said", [
+    ("", "reread removed"),
+    ("- reread:\n", "reread removed"),
+    ("- reread: \t\n", "reread removed"),
+    ("- reread: 2026-11-01, read at the build, still accurate \n", "entry not edited"),
+    ("- notes: parse reads a size back.\n", "only notes edited, reread removed"),
+])
+def test_changed_takes_a_reread_line_deleted_or_emptied_as_no_answer(project, new, said):
+    # Review pr-51-r1, F1: any difference in a dating field counted as an answer, so deleting the old line passed
+    # the strict form, and `review` then dated the entry from its older does and verbs.
+    code_moved(project, sizes=OLD_REREAD)
+    assert rereads(project, "--strict")[0] == 1, "the old line, left as it was, answers nothing"
+    edit_catalog(project, OLD_REREAD, new)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert "reread: core.sizes (%s): src/widget/sizes.py" % said in lines, out
+
+
+def test_review_does_not_date_an_entry_from_an_empty_reread_line(project):
+    # The other half of F1: `changed` takes an empty line as no answer, so `review` must not date the entry from it.
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread:\n")
+    assert older_than_code(project) == [lead], "an empty line not committed yet is not a reading"
+    commit(project)
+    assert older_than_code(project) == [lead]
+    assert lead.endswith(", when its does and verbs were last edited"), lead
+
+
+BOTH_MODULES = "- modules: src/widget/sizes.py, src/widget/parse.py\n"
+ROWS_MODULES = "- modules: src/widget/rows.py\n"
+SYSTEM_LINE = "reread: subsystem.report (entry not edited): its members changed: core.sizes"
+STILL_PARSE = "; removed public names still in does or verbs: parse"  # core.sizes says it parses, in two_modules
+
+
+def two_modules(project, flow=FLOW):
+    """A committed catalog where core.sizes holds sizes.py and parse.py, core.rows holds rows.py, and a
+    subsystem has both components."""
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n\n\ndef parse(text):\n    """Read a size."""\n')
+    (project / "src/widget/rows.py").write_text('"""Rows."""\n')
+    catalog(project, entry("core.sizes", "Format and parse a byte count", "src/widget/sizes.py, src/widget/parse.py"),
+            entry("core.rows", "Build report rows", "src/widget/rows.py"), flow)
+    commit(project)
+
+
+def test_changed_asks_the_component_that_gave_up_a_deleted_module(project):
+    # Review pr-51-r1, F2: the paths were matched against the catalog as it is now, so a module deleted and
+    # dropped from `modules:` was nobody's, and the component that lost what it did was not asked.
+    two_modules(project)
+    (project / "src/widget/parse.py").unlink()
+    edit_catalog(project, BOTH_MODULES, SIZES_MODULES)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py" + STILL_PARSE, SYSTEM_LINE], out
+    edit_catalog(project, "- does: Format and parse a byte count\n", "- does: Format a byte count\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [SYSTEM_LINE], out
+
+
+def test_changed_asks_for_a_renamed_module_under_both_of_its_names(project):
+    two_modules(project)
+    (project / "src/widget/parse.py").rename(project / "src/widget/read.py")
+    edit_catalog(project, BOTH_MODULES, "- modules: src/widget/sizes.py, src/widget/read.py\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py, src/widget/read.py",
+                     SYSTEM_LINE], out
+
+
+@pytest.mark.parametrize("rewritten", [True, False])
+def test_changed_asks_both_components_when_a_module_moves_from_one_to_the_other(project, rewritten):
+    # The component that gave the module up no longer does what the module did, and the one that took it does
+    # more than its sentence says, whether or not the file itself was edited: the owner's ruling of 2026-11-26
+    # on Q6 of review pr-51-r1's record. Each line says which names to look for.
+    two_modules(project)
+    if rewritten:
+        (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n\n\ndef parse(text, base=1024):\n    """Read."""\n')
+    edit_catalog(project, BOTH_MODULES, SIZES_MODULES)
+    edit_catalog(project, ROWS_MODULES, "- modules: src/widget/rows.py, src/widget/parse.py\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.sizes (only modules edited): src/widget/parse.py" + STILL_PARSE,
+                     "reread: core.rows (only modules edited): src/widget/parse.py"
+                     "; new public names not in does or verbs: parse",
+                     "reread: subsystem.report (entry not edited): its members changed: core.sizes, core.rows"], out
+    assert rereads(project)[0] == 0, "without --strict a reread line fails nothing"
+    edit_catalog(project, "- does: Format and parse a byte count\n", "- does: Format a byte count\n")
+    edit_catalog(project, "- does: Build report rows\n", "- does: Build report rows and parse a size\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and [line.split(":")[1] for line in lines] == [" subsystem.report (entry not edited)"], out
+
+
+def test_changed_asks_nothing_when_modules_names_the_same_files_another_way(project):
+    two_modules(project)
+    edit_catalog(project, BOTH_MODULES, "- modules: src/widget/parse.py, src/widget/sizes.py\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [], out
+    edit_catalog(project, "- modules: src/widget/parse.py, src/widget/sizes.py\n", "- modules: src/widget/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, "a folder that takes in __init__.py and rows.py is not the same files"
+    assert lines[0] == "reread: core.sizes (only modules edited): src/widget/__init__.py, src/widget/rows.py", out
+
+
+def test_changed_asks_a_component_that_takes_in_a_module_no_entry_held(project):
+    two_modules(project)
+    edit_catalog(project, ROWS_MODULES, "- modules: src/widget/rows.py, src/widget/__init__.py\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.rows (only modules edited): src/widget/__init__.py",
+                     "reread: subsystem.report (entry not edited): its members changed: core.rows"], out
+
+
+@pytest.mark.parametrize("line, new, said", [
+    ("- owner_team: café\n", "- owner_team: Δ\n", "only owner_team edited"),
+    ("- audit-owner: café\n", "- audit-owner: Δ\n", "only other lines edited"),
+    ("- owner2: café\n", "- owner2: Δ\n", "only other lines edited"),
+    ("Kept for the report.\n", "Kept for the report and the export.\n", "only other lines edited"),
+    ("- notes: One.\n- owner2: café\n", "- notes: Two.\n- owner2: Δ\n", "only notes, other lines edited"),
+    ("- notes: One.\n", "- notes: One.\n\n\n", "entry not edited"),
+    # Review pr-51-r2, F7: a comment, or a line that starts with # and is no heading, does not end the entry.
+    ("<!-- Maintainer note -->\n- owner2: café\n", "<!-- Maintainer note -->\n- owner2: Δ\n", "only other lines edited"),
+    ("#ticket\nKept for the report.\n", "#ticket\nKept for the export.\n", "only other lines edited"),
+    # F8: the parser's own keys are no field's name, so a field named like one of them is a field.
+    ("- _rest: red\n", "- _rest: blue\n", "only _rest edited"),
+    ("- _repeated: red\n", "- _repeated: blue\n", "only _repeated edited"),
+    ("\n## The rows\n\nWhat builds a row.\n", "\n## The rows\n\nWhat builds a row, by area.\n", "entry not edited"),
+])
+def test_changed_says_an_entry_was_edited_when_the_edited_line_is_no_field(project, line, new, said):
+    # Review pr-51-r1, F3: a line whose key the field reader does not take (a digit, a hyphen), or that has no
+    # key, was read as nothing, so the label said `entry not edited` of an entry that was. What follows the
+    # next heading is the catalog's, not the entry's, and blank space is no edit.
+    code_moved(project, sizes=line)
+    edit_catalog(project, line, new)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert "reread: core.sizes (%s): src/widget/sizes.py" % said in lines, out
+
+
+def test_show_prints_a_field_named_like_the_parsers_own_key(project):
+    code_moved(project, sizes="- _rest: red\n")
+    assert "- _rest: red\n" in tool(project, "show", "core.sizes", script=INDEX)[1]
+
+
+def test_changed_asks_both_components_when_a_folder_outside_the_package_moves(project):
+    # Review pr-51-r2, F1: the regrouped files were looked for among the counted modules and the files a
+    # modules line names one by one, so a file reached only through a folder outside the package was not seen.
+    # Any file git tracks counts, whatever its kind.
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    (project / "tools/export").mkdir(parents=True)
+    (project / "tools/export/format.py").write_text('"""Format."""\n\n\ndef export():\n    pass\n')
+    (project / "tools/export/columns.json").write_text("[]\n")
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/export/"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/export/\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/export/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/export/columns.json, tools/export/format.py",
+                     "reread: core.beta (only modules edited): tools/export/columns.json, tools/export/format.py"
+                     "; new public names not in does or verbs: export"], out
+
+
+@pytest.mark.parametrize("spelling", ["./src/widget/a.py", "src/./widget//a.py"])
+def test_changed_reads_two_spellings_of_a_path_as_one_file(project, spelling):
+    # Review pr-51-r2, F2: the catalog check takes both spellings, and the paths were compared as written: a
+    # spelling changed alone asked for a reread of both, and with ./ at the base an edit to the file asked nothing.
+    (project / "src/widget/a.py").write_text('"""a."""\n')
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py\n", "- modules: %s\n" % spelling)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [], out
+    commit(project)
+    (project / "src/widget/a.py").write_text('"""a."""\n# edited\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1 and lines == ["reread: core.alpha (entry not edited): src/widget/a.py"], out
+
+
+def test_a_field_line_under_a_later_heading_is_not_the_entrys(project):
+    # Review pr-51-r2, F3: an entry was read up to the next ###, so a reread: line under a heading that is no
+    # entry answered the component before it in `changed` and dated it in `review`.
+    code_moved(project)
+    path = project / "docs/components/COMPONENTS.md"
+    path.write_text(path.read_text() + "\n### core.last\n- does: Hold the package\n- verbs: package\n"
+                                       "- status: canonical\n- modules: src/widget/__init__.py\n")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    (project / "src/widget/__init__.py").write_text('"""widget, edited."""\n')
+    path.write_text(path.read_text() + "\n## Release checklist\n\n- reread: confirm release notes\n- modules: nowhere.py\n")
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    assert "- modules: nowhere.py\n- uses:" not in path.read_text(), "write adds its lines to entries only"
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1 and "reread: core.last (entry not edited): src/widget/__init__.py" in lines, out
+    commit(project)
+    assert any(line.startswith("core.last: 1 commit(s) to its modules since ") for line in older_than_code(project))
+
+
+def test_changed_reads_the_names_of_a_source_file_in_its_own_encoding(project):
+    # Review pr-51-r2, F4: the base text was decoded as UTF-8, encoded again and then read by its coding line,
+    # so the plain `changed`, which fails nothing, exited 1 on a valid file that is not UTF-8.
+    source = '# coding: shift_jis\n"""日本語"""\n\n\ndef run(): pass\n'.encode("shift_jis")
+    (project / "src/widget/jp.py").write_bytes(source)
+    catalog(project, entry("core.jp", "Run it", "src/widget/jp.py"))
+    commit(project)
+    (project / "src/widget/jp.py").write_bytes(source + b"\n\ndef walk(): pass\n")
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert lines == ["reread: core.jp (entry not edited): src/widget/jp.py; new public names not in does or verbs: walk"], out
+
+
+def test_changed_asks_for_a_file_whose_name_git_would_quote(project):
+    # Review pr-51-r2, F5: git writes a name that holds a quote inside quotes, with a backslash before it, and
+    # that spelling is no file of any component.
+    name = 'src/widget/say"hello.py'
+    (project / name).write_text('"""Say."""\n')
+    (project / "src/widget/été.py").write_text('"""Summer."""\n')
+    catalog(project, entry("core.say", "Say hello", name), entry("core.summer", "Say summer", "src/widget/été.py"))
+    commit(project)
+    (project / name).write_text('"""Say."""\n# a comment\n')
+    (project / "src/widget/été.py").write_text('"""Summer."""\n# a comment\n')
+    (project / 'src/widget/new"one.py').write_text('"""New."""\n')
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ['reread: core.say (entry not edited): src/widget/say"hello.py',
+                     "reread: core.summer (entry not edited): src/widget/été.py"], out
+    assert 'fail: no component: src/widget/new"one.py ' in out, out
+
+
+def test_changed_and_review_agree_on_a_reread_line_after_a_no_break_space(project):
+    # Review pr-51-r2, F6: `changed` took the line as an answer and `review` did not date the entry from it.
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    assert rereads(project, "--strict")[0] == 1
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread:\u00a0still accurate\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [], out
+    commit(project)
+    assert older_than_code(project) == []
+    edit_catalog(project, "- reread:\u00a0still accurate\n", "- reread:\u00a0\n")
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten again."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    assert len(older_than_code(project)) == 1, "a line of blanks only dates nothing, whatever the blank"
+
+
+def test_review_dates_an_entry_in_a_sha256_repository(tmp_path):
+    # Review pr-51-r1, F5: the commit id of a blame line was read as 40 digits, so in a repository made with
+    # --object-format=sha256 (64 digits) no entry had a date and `review` listed no description as old.
+    project = new_project(tmp_path, "--object-format=sha256")
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format a byte count", "src/widget/sizes.py"))
+    commit(project)
+    assert len(subprocess.run(["git", "rev-parse", "HEAD"], cwd=project, capture_output=True, text=True,
+                              check=True).stdout.strip()) == 64
+    assert older_than_code(project) == []
+    (project / "src/widget/sizes.py").write_text('"""Sizes, rewritten."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    [lead] = older_than_code(project)
+    assert lead.startswith("core.sizes: 1 commit(s) to its modules since "), lead
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [], out
+
+
+def names_changed(project, source, does="Format a byte count"):
+    """A committed catalog as in code_moved, then sizes.py rewritten as `source`; the line of core.sizes."""
+    code_moved(project)
+    if does != "Format a byte count":
+        edit_catalog(project, "- does: Format a byte count\n", "- does: %s\n" % does)
+        commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n' + source)
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    return next(line for line in lines if line.startswith("reread: core.sizes ")).partition("src/widget/sizes.py")[2]
+
+
+def test_changed_names_the_public_names_the_entry_does_not_speak_of(project):
+    # Issue 50, part 4: most descriptions found wrong after a reread lacked a public name the change had added.
+    # A name is spoken of when each of its words is in does or verbs, whatever its case and underscores; a
+    # private name and a method ask for no verb.
+    lead = names_changed(project, "\n\ndef parse(text):\n    pass\n\n\ndef format_count(count):\n    pass\n"
+                                  "\n\ndef byte_counts():\n    pass\n\n\nclass ByteFormat:\n    def render(self):\n"
+                                  "        pass\n\n\nclass SizeTable:\n    pass\n\n\ndef _helper():\n    pass\n")
+    assert lead == "; new public names not in does or verbs: SizeTable, parse"
+
+
+def test_changed_names_the_removed_names_the_entry_still_speaks_of(project):
+    # The other half: a name the change removed that does or verbs still speak of is a sentence that may say too
+    # much. A removed name they never spoke of is nothing to look for, and neither is one with no word of its own.
+    lead = names_changed(project, "\n\ndef unit(count):\n    pass\n")
+    assert lead == "; new public names not in does or verbs: unit", "format_count went, and no line says so: " + lead
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef format_count(count):\n    pass\n'
+                                                 '\n\ndef parse(text):\n    pass\n\n\ndef to():\n    pass\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert "reread: core.sizes (entry not edited): src/widget/sizes.py; removed public names still in does or verbs: " \
+           "format_count" in lines, out
+
+
+def test_changed_finds_a_class_the_entry_names_in_its_own_spelling(project):
+    # Review pr-51-r2, F9: the identifier was split at its capital humps and the prose was not, and a run of
+    # capitals was not split from the word after it, so a class the sentence names was listed as left out.
+    does = "Format a byte count, call RenderReport and start an HTTP server"
+    lead = names_changed(project, "\n\ndef format_count(count):\n    pass\n\n\nclass RenderReport:\n    pass\n"
+                                  "\n\nclass HTTPServer:\n    pass\n\n\nclass URLTable:\n    pass\n", does=does)
+    assert lead == "; new public names not in does or verbs: URLTable"
+
+
+def test_changed_does_not_name_a_public_name_that_moved_inside_the_component(project):
+    two_modules(project)
+    (project / "src/widget/parse.py").write_text('"""Parse sizes."""\n')
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(text):\n    """Read a size."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert lines[0] == "reread: core.sizes (entry not edited): src/widget/parse.py, src/widget/sizes.py", out
+
+
+def test_changed_shows_eight_names_and_counts_the_rest(project):
+    lead = names_changed(project, "".join("\n\ndef probe_%02d():\n    pass\n" % n for n in range(11)))
+    assert lead == "; new public names not in does or verbs: " + ", ".join("probe_%02d" % n for n in range(8)) + ", +3 more"
+
+
+
+def test_changed_tells_a_subsystem_of_a_member_removed_with_its_code(project):
+    two_modules(project, flow=FLOW.replace("- flow: core.rows -> core.sizes\n", ""))
+    for name in ("sizes.py", "parse.py"):
+        (project / "src/widget" / name).unlink()
+    path = project / "docs/components/COMPONENTS.md"
+    text = path.read_text()
+    start = text.index("\n### core.sizes\n")
+    path.write_text(text[:start] + text[text.index("\n### ", start + 1):])
+    edit_catalog(project, "- components: core.sizes, core.rows\n", "- components: core.rows\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0, out
+    assert lines == ["reread: subsystem.report (only components edited): its members changed: core.sizes"], out
+
+
+@pytest.mark.parametrize("old, new, said", [
+    ("- notes: One pass.\n", "- notes: One pass.\n", "entry not edited"),
+    ("- notes: One pass.\n", "- notes: One pass over the rows.\n", "only notes edited"),
+    ("- components: core.sizes, core.rows\n", "- components: core.rows, core.sizes\n", "only components edited"),
+    ("- flow: core.rows -> core.sizes\n", "", "flow removed"),
+    ("- flow: core.rows -> core.sizes\n", "- flow: core.rows -> core.sizes -> core.rows\n", None),
+    ("- does: Print sizes\n", "- does: Print and parse sizes\n", None),
+    ("- notes: One pass.\n", "- notes: One pass.\n- reread: 2026-11-26, read beside core.sizes, still accurate\n", None),
+])
+def test_changed_reads_a_subsystem_whose_member_moved_by_the_same_fields(project, old, new, said):
+    code_moved(project)
+    edit_catalog(project, "- does: Format a byte count\n", "- does: Format and parse a byte count\n")
+    edit_catalog(project, old, new)
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    expected = ["reread: subsystem.report (%s): its members changed: core.sizes" % said] if said else []
+    assert lines == expected, out
+    assert ("1 to reread, 1 of them subsystem(s)" if said else "0 to reread\n") in out, out
+    # A subsystem's line is advice: with its member answered, the strict form prints the same and accepts it.
+    assert tool(project, "changed", "--base", "main", "--strict", script=INDEX) == (0, out)
+
+
+def test_strict_changed_fails_while_a_components_reread_line_is_unanswered(project):
+    component = "reread: core.sizes (entry not edited): src/widget/sizes.py"
+    system = "reread: subsystem.report (entry not edited): its members changed: core.sizes"
+    asked = "note: --strict fails while a component's reread: line is unanswered"
+    code_moved(project)
+    code, lines, out = rereads(project)
+    assert code == 0 and lines == [component, system], out
+    assert "0 to fix, 0 warning(s), 2 to reread, 1 of them subsystem(s)\n" in out, out
+    assert "--strict" not in out, "the plain form says nothing about the strict one"
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1 and lines == [component, system] and asked in out, out
+
+    # The subsystem answered and the component not: still refused, for the component.
+    edit_catalog(project, "- notes: One pass.\n", "- notes: One pass.\n- reread: 2026-11-26, flow unchanged\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1 and lines == [component] and asked in out and "1 to reread\n" in out, out
+    # The component answered, without a sentence edited: accepted.
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [] and "0 to reread\n" in out and "note:" not in out, out
+
+
+def test_strict_changed_prints_a_subsystems_reread_line_and_does_not_fail_on_it(project):
+    # A component many subsystems share would ask each of them for an answer on every change: the line is advice.
+    code_moved(project)
+    edit_catalog(project, SIZES_MODULES, SIZES_MODULES + "- reread: 2026-11-26, read beside parse, still accurate\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0, out
+    assert lines == ["reread: subsystem.report (entry not edited): its members changed: core.sizes"], out
+    assert "1 to reread, 1 of them subsystem(s)\n" in out and "note:" not in out, out
+
+
+def test_strict_changed_accepts_a_change_that_touches_no_component(project):
+    code_moved(project)
+    commit(project)
+    (project / "README.md").write_text("widget\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 0 and lines == [] and "0 to fix, 0 warning(s), 0 to reread" in out, out
 
 
 def section(out, title):

@@ -294,10 +294,18 @@ command and exit verbatim:
 python scripts/components_index.py changed --base <the phase's base commit> --strict
 ```
 
-Fix every `fail:`. For a `warn:` (a new caller of a retired component), call the
-replacement or record the reason in the boundary section and rerun without
-`--strict`, saying so. For each `reread:` line, read the entry beside the diff
-and either edit it or state in the record that it is still accurate. In a
+Fix every `fail:`. For each `reread:` line, read the entry beside the diff; the
+end of the line names the public names to look for. If
+the phase changed what the component does, edit the entry's `does` or `verbs`;
+if it did not, add or update the entry's `reread:` line (the `components` skill,
+"Before a PR"). Name those entries in the record too. A sentence in the record
+alone does not answer the line: the index keeps no trace of it, and from plugin
+0.1.8 `--strict` exits 1 while a component's `reread:` line is left. A
+subsystem's line (`its members changed`) is advice and never fails: answer it
+the same way when the phase changed the flow. For a `warn:` (a new
+caller of a retired component), call the replacement, or record the reason in
+the boundary section and, once no component's `reread:` line is left, rerun
+without `--strict`, saying so. In a
 project with rules of its own (`docs/components/rules.json`), also run
 `python .claude/skills/components/scripts/rules_check.py check --base <the phase's base commit>`
 and list it the same way: fix every `fail:`, record the reason for a `warn:`

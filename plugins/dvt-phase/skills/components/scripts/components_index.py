@@ -11,7 +11,8 @@
     components_index.py draft [--only PATH] [--by-importers]
                                              stub entries for the modules no component covers
     components_index.py list [AREA]          the component ids by area, each with its one-line description
-    components_index.py changed --base REF   check the index against the files changed since REF
+    components_index.py changed --base REF [--strict]
+                                             check the index against the files changed since REF
     components_index.py facts [--base REF] [--modules] [--out FILE]
                                              the catalog and the import graph as JSON rows, for a rule checker
     components_index.py review [AREA ...]    list leads for a review of the index (all of it, or ids starting with AREA)
@@ -48,6 +49,7 @@ import io
 import json
 import os
 from importlib import metadata, util
+import posixpath
 import re
 import subprocess
 import sys
@@ -152,6 +154,19 @@ ROOT = checkout_root() if PLUGIN else Path(__file__).resolve().parents[len(Path(
 BASE = SETTINGS['docs_dir'].strip('/') + '/'
 VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
 GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
+# The fields that say an entry was read against its code: `review` dates an entry from the newest of
+# them, and `changed` asks for no reread of an entry when one of them holds words it did not hold at the
+# base (`answered`).
+DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
+FIELD = r'^- ([a-z_]+):[ \t]*(.*)$'  # a field line of an entry: a key of lower-case letters and underscores
+# An entry: its heading, then its lines up to the next heading of any level or the generated verbs block.
+# A comment, or a line that starts with # and is no heading, is a line of the entry.
+ENTRY_END = r'#{1,6}[ \t]|<!-- verbs:begin -->'
+ENTRY = re.compile(rf'^### ([^\n]+)\n(.*?)(?=^(?:{ENTRY_END})|\Z)', re.M | re.S)
+# What `parse_components` adds to an entry's fields. No field can have the last two names (FIELD); a field
+# named `id` gives way to the heading.
+REPEATED, REST = '*repeated', '*rest'
+NOT_FIELDS = frozenset({'id', REPEATED, REST})
 # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
 CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
                      'duplicates', 'external', 'distinct_from', 'reread'})
@@ -227,14 +242,19 @@ def read_components(root: Path) -> list[dict]:
 
 
 def parse_components(text: str) -> list[dict]:
+    """The entries of a catalog (ENTRY): each field line as a key, with the three keys of NOT_FIELDS."""
     entries = []
-    for match in re.finditer(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', text, re.M | re.S):
-        pairs = re.findall(r'^- ([a-z_]+):[ \t]*(.*)$', match[2], re.M)
+    for match in ENTRY.finditer(text):
+        pairs = re.findall(FIELD, match[2], re.M)
         entry = dict(pairs)
+        # What the entry holds beside its fields: a line whose key FIELD does not take (`- owner2: x`) is
+        # prose, and `changed` still says the entry was edited.
+        rest = re.sub(FIELD, '', match[2], flags=re.M).splitlines()
+        entry[REST] = '\n'.join(line.rstrip() for line in rest if line.strip())
         keys = [key for key, _ in pairs]
         repeated = sorted({key for key in keys if keys.count(key) > 1} & CHECKED)
         if repeated:
-            entry['_repeated'] = ', '.join(repeated)
+            entry[REPEATED] = ', '.join(repeated)
         entry['id'] = match[1].strip()
         entries.append(entry)
     return entries
@@ -244,11 +264,20 @@ def values(entry: dict, key: str) -> list[str]:
     return [s.strip() for s in entry.get(key, '').split(',') if s.strip()]
 
 
+def answered(old: dict, entry: dict) -> bool:
+    """Whether an entry says it was read since `old`, the same entry at an earlier commit: one of its DATING
+    fields holds words now that it did not hold there. A field deleted or left empty is no answer: it is no
+    line `entry_commits` dates the entry from."""
+    return any(entry.get(key, '').strip() not in ('', old.get(key, '').strip()) for key in DATING)
+
+
 @functools.lru_cache(maxsize=None)
 def module_paths(modules: str) -> tuple[frozenset, tuple]:
-    """A `modules:` value as (the files it names, the folders it names)."""
-    names = [s.strip() for s in modules.split(',') if s.strip()]
-    return frozenset(n for n in names if not n.endswith('/')), tuple(n for n in names if n.endswith('/'))
+    """A `modules:` value as (the files it names, the folders it names), each path in one spelling:
+    `./src/a.py` and `src//a.py` are `src/a.py`, as git and the file system read them."""
+    names = [(posixpath.normpath(s.strip()), s.strip().endswith('/')) for s in modules.split(',') if s.strip()]
+    return (frozenset(n for n, folder in names if not folder),
+            tuple('' if n == '.' else n + '/' for n, folder in names if folder))
 
 
 def covers(entry: dict, path: str) -> bool:
@@ -297,7 +326,7 @@ def validate(root: Path, entries: list[dict], external_names: set[str]) -> list[
         for key in required:
             if key not in entry or (not entry[key] and key != 'modules'):
                 errors.append(f'{name}: missing {key}')
-        for key in values(entry, '_repeated'):
+        for key in values(entry, REPEATED):
             errors.append(f'{name}: {key} appears twice')
         for key in ('does', 'verbs'):
             if 'TODO' in entry.get(key, ''):
@@ -413,6 +442,18 @@ def symbols(tree: ast.AST, prefix: str = '', methods: bool = True, private: bool
 
 def parse(path: Path) -> ast.Module:
     return parse_source(path.read_bytes(), str(path))
+
+
+def public_names(data: bytes | None, name: str) -> set[str]:
+    """The public top-level names Python source defines; none for no source."""
+    return set() if data is None else {row['id'] for row in symbols(parse_source(data, name), methods=False)}
+
+
+def name_words(text: str) -> set[str]:
+    """The words of an identifier, or of prose that may name one, as `tokens` reads them once the capital
+    humps are apart: `run_guarded_cases`, `RunGuardedCases` and "run guarded cases" alike, and `HTTPServer`
+    as "HTTP server"."""
+    return tokens(re.sub(r'(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])', ' ', text))
 
 
 def parse_source(data: bytes, name: str) -> ast.Module:
@@ -825,7 +866,7 @@ def rewrite(text: str, entries: list[dict], edges: dict) -> str:
             body = re.sub(r'(^- modules:[^\n]*)(?:\n|$)', lambda m: m[1] + '\n' + lines, body, flags=re.M)
         return '### ' + match[1] + '\n' + body
 
-    return re.sub(r'^### ([^\n]+)\n(.*?)(?=^### |\Z)', section, text, flags=re.M | re.S)
+    return ENTRY.sub(section, text)
 
 
 def graph_text(entries: list[dict], edges: dict) -> str:
@@ -1020,8 +1061,8 @@ def git(root: Path, *args: str, check: bool = True) -> str:
     return '' if done.returncode else done.stdout
 
 
-def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, str]:
-    """The text each path (relative to `root`) had at a commit, read with one git process."""
+def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
+    """The bytes each path (relative to `root`) had at a commit, read with one git process."""
     if not paths:
         return {}
     prefix = git(root, 'rev-parse', '--show-prefix').strip()
@@ -1037,7 +1078,7 @@ def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, str]:
         if done.returncode or end < 0 or len(head) != 3 or head[1] != b'blob':
             raise ValueError(f'git cannot read {path} at {commit[:7]}: {done.stderr.decode(errors="replace").strip()}')
         size = int(head[2])
-        texts[path] = out[end + 1:end + 1 + size].decode('utf-8', errors='replace')
+        texts[path] = out[end + 1:end + 1 + size]
         at = end + size + 2
     return texts
 
@@ -1139,31 +1180,43 @@ def resolve_base(root: Path, base: str) -> tuple[str, str]:
                       f'comparing with {upstream}')
 
 
-def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], dict, str]:
+def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], dict, str, dict]:
     """The checkout as it was at the merge base with `base`.
 
     Returns the name `base` resolved to (`resolve_base`), the merge-base commit, {path that
     differs: its git status letter}, the catalog entries there, for each .py file that differs
-    its text there (None when it did not exist): the `overrides` of `component_graph`, and the
-    line `resolve_base` gave ('' when there is none).
+    its text there (None when it did not exist): the `overrides` of `component_graph`, the
+    line `resolve_base` gave ('' when there is none), and the bytes of those files there, for a
+    reader that needs the file's own encoding.
     """
     base, said = resolve_base(root, base)
     anchor = git(root, 'merge-base', base, 'HEAD').strip()
     status = {}
-    for line in git(root, 'diff', '--name-status', '--no-renames', '--relative', anchor).splitlines():
-        code, path = line.split('\t', 1)
-        status[path] = code
-    for path in git(root, 'ls-files', '--others', '--exclude-standard').splitlines():
+    # With -z git writes each name as it is: without it a name that holds a quote, a backslash or a control
+    # character comes quoted, and is no file of any component.
+    fields = git(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor).split('\0')
+    status.update(zip(fields[1::2], fields[0::2]))
+    for path in filter(None, git(root, 'ls-files', '--others', '--exclude-standard', '-z').split('\0')):
         status.setdefault(path, 'A')
     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
-    overrides.update(files_at(root, anchor, [p for p in overrides if status[p] != 'A']))
-    return base, anchor, status, old_entries, overrides, said
+    blobs = files_at(root, anchor, [p for p in overrides if status[p] != 'A'])
+    overrides.update({p: data.decode('utf-8', errors='replace') for p, data in blobs.items()})
+    return base, anchor, status, old_entries, overrides, said, blobs
 
 
 def changed(root: Path, base: str, strict: bool) -> int:
-    """Check the index against the files that differ from the merge base with `base`."""
-    base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
+    """Check the index against the files that differ from the merge base with `base`.
+
+    Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
+    line, which an author answers in the entry (`answered`). A component gets the line when a file
+    it holds now, or held at the base, differs, and when its modules line took a file in or gave
+    one up, edited or not. The line ends with a lead, which fails nothing: the public names those
+    files gained that the entry's does and verbs do not speak of, and the ones they lost that it
+    still speaks of. A subsystem's `reread:` line is printed and never fails: a component many
+    subsystems share would otherwise ask for an answer from each of them on every change.
+    """
+    base, anchor, status, old_entries, overrides, said, blobs = base_snapshot(root, base)
     entries = read_components(root)
     files, fails = build_index(root)
     fails = list(fails)
@@ -1195,31 +1248,77 @@ def changed(root: Path, base: str, strict: bool) -> int:
             evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
 
-    def authored(entry):
-        return {k: v for k, v in entry.items() if k not in GENERATED}
+    before = {e['id']: e for e in old_entries}
+    now = {e['id']: e for e in entries}
+    # Every file git tracks here, named or reached through a folder, in the package or outside it.
+    tracked = [p for p in git(root, 'ls-files', '-z').split('\0') if p]
 
-    before = {e['id']: authored(e) for e in old_entries}
-    touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
-    rereads = []
+    def code_paths(name):
+        """The files that say a component's code is not what it was at the base: one that differs and that the
+        entry holds now or held there (a module edited, deleted or renamed), and one that does not differ but
+        that its modules line took in or gave up (a module regrouped into another entry)."""
+        new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
+        paths = {p for p in status if covers(new, p) or covers(old, p)}
+        if new.get('modules', '') != old.get('modules', ''):
+            paths |= {p for p in tracked if p not in status and covers(new, p) != covers(old, p)}
+        return sorted(paths)
+
+    def source(path, at_base):
+        """A file's bytes at the base or now; None where it is not there."""
+        if at_base and path in overrides:  # a .py file that differs: what it held at the base, in its own encoding
+            return blobs.get(path)
+        return (root / path).read_bytes() if (root / path).is_file() else None
+
+    def names_lead(old, entry, paths):
+        """What to look for in the reread: the public names the entry's files gained that does and verbs do
+        not speak of, and the ones they lost that does and verbs still speak of. A name is spoken of when
+        each of its words is there."""
+        python = [p for p in paths if p.endswith('.py')]
+        had = set().union(*(public_names(source(p, True), p) for p in python if covers(old, p)))
+        has = set().union(*(public_names(source(p, False), p) for p in python if covers(entry, p)))
+        said = name_words(entry.get('does', '') + ' ' + entry.get('verbs', ''))
+        new = sorted(n for n in has - had if not name_words(n) <= said)
+        lost = sorted(n for n in had - has if name_words(n) and name_words(n) <= said)
+        return ''.join(f'; {label}: {some(found, 8)}' for label, found in (
+            ('new public names not in does or verbs', new),
+            ('removed public names still in does or verbs', lost)) if found)
+
+    # A component the change removed is kept: a subsystem that had it is told its member changed.
+    touched = {name: code_paths(name) for name, entry in {**before, **now}.items() if not subsystem(entry)}
+    rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
     for entry in entries:
-        name = entry['id']
-        if before.get(name) != authored(entry):
-            continue  # written or edited in this change
+        name, old = entry['id'], before.get(entry['id'])
+        if old is None or answered(old, entry):
+            continue  # written in this change, or read in it
+        # An edit to any other field (notes, tests, modules) does not say the description was read, and neither
+        # does a dating field deleted or left empty.
+        others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - NOT_FIELDS
+                        if old.get(key) != entry.get(key))
+        others += ['other lines'] if old[REST] != entry[REST] else []
+        gone = sorted(key for key in DATING if old.get(key, '').strip() and not entry.get(key, '').strip())
+        state = ', '.join(filter(None, (f'only {", ".join(others)} edited' if others else '',
+                                        f'{", ".join(gone)} removed' if gone else ''))) or 'entry not edited'
         if subsystem(entry):
-            members = [m for m in values(entry, 'components') if touched.get(m)]
+            listed = dict.fromkeys(values(entry, 'components') + values(old, 'components'))
+            members = [m for m in listed if touched.get(m)]
             if members:
-                rereads.append(f'{name} (entry not edited): its members changed: {", ".join(members)}')
+                advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
         elif touched[name]:
             paths = touched[name]
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
-            rereads.append(f'{name} (entry not edited): {", ".join(paths[:5])}{more}')
+            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}{names_lead(old, entry, paths)}')
 
-    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads), ('note', [said] if said else [])):
+    notes = [said] if said else []
+    if strict and rereads:
+        notes.append("--strict fails while a component's reread: line is unanswered: edit the entry's does or "
+                     'verbs, or add or update its reread: line')
+    for prefix, rows in (('fail', fails), ('warn', warns), ('reread', rereads + advisory), ('note', notes)):
         for row in rows:
             print(f'{prefix}: {row}')
+    of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
     print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads)} to reread')
-    return int(bool(fails or (strict and warns)))
+          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
+    return int(bool(fails or (strict and (warns or rereads))))
 
 
 # What `facts` writes: each value type, and each fact type as (reading, ((role, value type), ...)).
@@ -1266,7 +1365,7 @@ def facts(root: Path, base: str = '', modules: bool = False, notes: list | None 
     ranks, forbidden = layers_config(root, {e['id'].split('.')[0] for e in entries if not subsystem(e)})
     overrides = None
     if base:
-        _, revision, _, entries, overrides, said = base_snapshot(root, base)
+        _, revision, _, entries, overrides, said, _ = base_snapshot(root, base)
         if said and notes is not None:
             notes.append(said)
     else:
@@ -1326,7 +1425,7 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
     blame = git(root, 'blame', '--line-porcelain', '--', BASE + 'COMPONENTS.md', check=False)
     newest, commit, stamp, current = {}, '', 0, None
     for line in blame.splitlines():
-        head = re.fullmatch(r'([0-9a-f]{40}) \d+ \d+(?: \d+)?', line)
+        head = re.fullmatch(r'([0-9a-f]{40}(?:[0-9a-f]{24})?) \d+ \d+(?: \d+)?', line)  # SHA-1, or SHA-256
         if head:
             commit = head[1]
         elif line.startswith('committer-time '):
@@ -1335,8 +1434,11 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
             text = line[1:]
             if text.startswith('### '):
                 current = text[4:].strip()
-            field = re.match(r'- ([a-z_]+):', text)
-            if not current or not (field and field[1] in {'does', 'verbs', 'flow', 'reread'}):
+            elif re.match(ENTRY_END, text):  # the entry ended: what follows is the catalog's, as ENTRY reads it
+                current = None
+            field = re.match(r'- ([a-z_]+):(.*)', text)
+            # A field left empty dates nothing, and the words are found as `answered` finds them.
+            if not current or not (field and field[1] in DATING and field[2].strip()):
                 continue
             earlier = newest.get(current, ('', -1, ''))
             if set(commit) == {'0'}:  # not committed yet: the entry counts as edited now
@@ -1565,7 +1667,7 @@ def show(root: Path, name: str) -> list[str]:
     if entry is None:
         close = [e['id'] for e in entries if e['id'].startswith(name)]
         raise ValueError(f'no component {name}' + (f'; did you mean: {", ".join(close[:8])}' if close else ''))
-    lines = [f'### {name}'] + [f'- {key}: {value}' for key, value in entry.items() if key not in {'id', '_repeated'}]
+    lines = [f'### {name}'] + [f'- {key}: {value}' for key, value in entry.items() if key not in NOT_FIELDS]
     if subsystem(entry):
         return lines
     components = [e for e in entries if not subsystem(e)]
@@ -1624,7 +1726,8 @@ def main(argv: list[str] | None = None) -> int:
     diff = commands.add_parser('changed')
     diff.add_argument('--base', default='main', help='branch or commit the change will merge into')
     diff.add_argument('--strict', dest='strict_changed', action='store_true',
-                      help='also fail on a new caller of a deprecated or duplicate component')
+                      help='also fail on a new caller of a deprecated or duplicate component, and on a '
+                           "component's reread: line left unanswered (a subsystem's never fails)")
     rows = commands.add_parser('facts')
     rows.add_argument('--base', default='', help='write the facts as they were at the merge base with this branch or commit')
     rows.add_argument('--modules', action='store_true', help='also the files: which component holds which, which imports which, which are private')

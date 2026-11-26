@@ -57,7 +57,7 @@ the main checkout's), because writing and checking read their installed versions
 | `stats [--write-baseline]` | Prints the coverage line, then each package module no component covers. `--write-baseline` records that list in `unassigned-baseline.txt` and refuses when it holds a module the recorded list did not, or when `allow_baseline` is false. Files under a `tests` or `fixtures` folder and files named `fake_*` are not counted as package modules |
 | `list [<area>]` | Prints the ids by area, each with its `does` |
 | `draft [--only <path>] [--by-importers]` | Prints one stub entry for each package module no component covers: an id, the module's docstring summary after `TODO`, the test file of the same name when there is one, and indented lines with its public names, what it imports, what imports it and the tests and scripts that import it. `--only` keeps the modules under one path; `--by-importers` puts the most-imported first. Writes nothing. A `does` or `verbs` that still contains `TODO` is a validation error, so a stub cannot be kept as it is |
-| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each entry whose modules changed while its hand-written fields did not, and each subsystem with such a member; then a summary line. Exits 1 on any `fail`, and with `--strict` on any `warn`. Needs git |
+| `changed [--base <ref>] [--strict]` | Compares the working tree with its merge base with `<ref>` (default `main`), untracked files included. When `<ref>` is a local branch strictly behind its upstream (in a worktree nothing moves the local `main`), it compares with the upstream and prints a `note:` line saying so; `facts --base` does the same, with the line on standard error. Nothing is fetched: run `git fetch` first for an upstream that is current. Prints `fail:` for every validation error, every stale generated file and every new package module with no component (the baseline does not excuse a new file); `warn:` for a new import of a `deprecated` or `duplicate-of` component; `reread:` for each component whose code changed (a file it holds now, or held at the base, differs, or its `modules` line took a file in or gave one up, edited or not) while none of its `does`, `verbs`, `flow` and `reread` lines was edited or added, and for each subsystem with a member whose code changed while none of the subsystem's own four lines was, whether or not that member's entry was answered (an edit to another field does not answer a line, and neither does one of those four lines deleted or left empty: the line then reads `only notes edited`, `only other lines edited` for a line that is no field, or `reread removed`, in place of `entry not edited`). A component's line ends with what to look for, which fails nothing: `new public names not in does or verbs: …` for the classes and functions its files gained, and `removed public names still in does or verbs: …` for the ones they lost (a name is in them when each of its words is, `HTTPServer` being "HTTP server"). Then a summary line, which says how many of the lines to reread are subsystems. Exits 1 on any `fail`, and with `--strict` on any `warn` and on any `reread:` line of a component (from plugin 0.1.8; before it a `reread:` line never failed). A subsystem's `reread:` line is printed and never fails. Needs git |
 | `facts [--base <ref>] [--out <file>]` | Prints the catalog and the import graph as one JSON document of facts, for a rule checker (see "Project rules" below): which components are listed, their status, area and tests, which component uses which, which of those imports lie inside a loop, the members of each subsystem, and the ranks and forbidden pairs of `layers.toml`. With `--base` the catalog and the code are those of the merge base with `<ref>`; the layers are always today's. Needs no checker installed |
 | `show <id>` | Prints one component as a reader needs it: the entry, then each of its modules with its length, public names and their lines, the private names and constants it also defines, the package modules it imports and is imported by (each with its component), and the files in `tests/` and the extra source directories that import it |
 | `review [<area> …] [--all]` | Prints leads for a review, in groups: descriptions older than their code (commits to the modules since the entry's `does`, `verbs` or `reread` line last changed, with the commit to compare from), retired components that are still called, retired components nothing calls, components that import each other, loops of imports through three or more components, flow steps that no earlier step imports, entries marked `checked: partial`, components nothing imports, modules nothing imports inside a component that is used, the same public name in two or three components (pairs recorded under `duplicates:` or `distinct_from:` are left out), modules under more than one component, components over 12 modules, components with no tests listed, test files that import one component only and are not in its `tests:`, modules with no docstring, modules with no component, and a line when the catalog has no subsystem. With `count_extra_dirs` the groups read from the modules themselves (the same name, no docstring, over 12 modules, `defines main`) cover the extra folders too; the groups built from the import graph stay within the package. Every group is printed with its count, the first 40 leads of each; `--all` prints them all, and `review <area>` (an id or the start of one, such as `datasets`) prints every lead that names a component of that area. Writes nothing and always exits 0. The first group needs git |
@@ -81,7 +81,7 @@ the result is the same.
 
 ## Entry format
 
-`COMPONENTS.md` is a list of `###` sections; a `##` heading between entries is kept and can group them. Each field is one line, `- <key>: <value>`;
+`COMPONENTS.md` is a list of `###` sections; a `##` heading between entries is kept and can group them. An entry ends at the next heading of any level: a field line written under a `##` heading belongs to no entry. Each field is one line, `- <key>: <value>`;
 a value never continues on a second line, and list values are comma-separated. A field
 is written once: a validated field that appears twice is an error, and of a free-text
 field written twice only the last is kept.
@@ -104,14 +104,14 @@ The id is two lower-case parts joined by one dot (each `[a-z][a-z0-9_]*`) and is
 | `does` | yes | One sentence; searched |
 | `verbs` | yes | Comma-separated; searched, and collected into the verb block |
 | `status` | yes | `canonical`, `experimental`, `deprecated`, `external`, or `duplicate-of <existing id>` |
-| `modules` | yes for a component | Repo-relative paths that exist: a `.py` file, or a folder ending in `/`, which covers everything under it. The value is empty only with `status: external`; the line stays |
+| `modules` | yes for a component | Repo-relative paths that exist: a `.py` file, or a folder ending in `/`, which covers everything under it. `./src/a.py` and `src/a.py` are one path. The value is empty only with `status: external`; the line stays |
 | `tests` | no | Repo-relative paths that exist: the test files whose subject is this component (those named for its modules), about six at most, or a folder ending in `/` that holds only this component's tests. It tells a reader where to see the component used; it is not a coverage record |
 | `duplicates` | no | Repo-relative paths, which must exist, of the modules that duplicate this component, in whole or in one function |
 | `distinct_from` | no | Ids of existing components that look like this one and are separate on purpose (a reference implementation beside the production one, a fallback). `review` stops reporting a name the two share; say why in `notes` |
 | `checked` | no | `partial` when the entry was written without reading all of its code. `review` lists these first for rereading; remove the line once it is checked |
-| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and `changed` counts it as an edit. Update it, do not add a second |
+| `reread` | no | When the entry was last read against its code and found true without an edit: the date, what it was read beside, and "still accurate", in your words. `review` dates the entry from this line as from `does` and `verbs`, and a line added or updated in a change answers that change's `reread:` line from `changed`. A line deleted or left empty answers nothing, and `review` does not date the entry from an empty one. Update it, do not add a second |
 | `external` | with `status: external`; otherwise optional | Dotted names `<module>.<name>` that appear in an `external/` page, so the module must be listed in `external.toml` |
-| `in`, `out`, `notes`, any other key | no | Free text: kept as written, not validated, not searched |
+| `in`, `out`, `notes`, any other key of lower-case letters and underscores | no | Free text: kept as written, not validated, not searched. A line with any other key (`owner2`, `audit-owner`) or with none is no field: it is kept too, and `changed` reports an edit to it as `other lines` |
 | `uses`, `used_by`, `part_of` | generated | Written after the `modules:` line from the runtime imports between component modules (imports under `TYPE_CHECKING` are ignored). `used_by` shows at most 12 names here; the full list is in `graph.md` |
 
 A **subsystem** is an entry whose id is `subsystem.<name>`. It requires `does`, `verbs`,
@@ -235,11 +235,38 @@ The index must change in the same commit as the code.
   - `warn: new caller of <id>` You added an import of a retired component. Call its
     replacement instead (the entry's `status` or `notes` names it). If the import must
     stay, say why in the PR body.
-  - `reread: <id>` The code of that component changed and its entry did not. Open the
-    entry and the diff of the listed files. If the change added, removed or altered what
-    the component does, edit `does`, `verbs`, `modules` or `tests`; if it did not, leave
-    the entry's other lines, add or update its `reread:` line, and say so in the PR body ("fs.scan reread, still accurate"). A `reread:`
-    line never fails the check: the script cannot tell whether a sentence is still true.
+  - `reread: <id>` The code of that component changed and its description did not. Its
+    code changed when a file it holds differs from the base, when a file it held there
+    was deleted or renamed, and when its `modules` line took a file in or gave one up
+    (a file it names, or any tracked file under a folder it names),
+    even a file nobody edited: the entry that gave it up may now say too much, and the
+    one that took it too little. The end of the line says what to look for: the public
+    names those files gained that `does` and `verbs` do not speak of, and the ones they
+    lost that `does` or `verbs` still speak of. It is a lead: a helper that is public
+    by accident needs no verb, and a name the line does not list can still be missing. Open
+    the entry and the diff of the listed files. If the change added, removed or altered
+    what the component does, edit `does` or `verbs`, and `modules` or `tests` where they
+    changed too; if it did not, leave the entry's other lines, add or update its `reread:`
+    line, and say so in the PR body ("fs.scan reread, still accurate"). Only `does`,
+    `verbs`, `flow` and `reread` answer the line: they are the fields `review` dates an
+    entry from. An edit to `notes`, `tests` or `modules` alone does not, and the line
+    then says `only notes edited`. Deleting one of the four lines, or leaving it empty,
+    does not either (`reread removed`): the entry then holds no answer. A sentence in the PR body or in a record does not
+    either: the index keeps no trace of it.
+
+  - `reread: subsystem.<name> (...): its members changed: <ids>` A component of that
+    subsystem changed. Read its `flow` and `notes` when the change altered which
+    component calls which, or what the flow as a whole does, and answer it the same way.
+    This line is advice and never fails: a component many subsystems share would
+    otherwise ask each of them for an answer on every change.
+
+  The script cannot tell whether a sentence is still true, so the command above exits 0
+  with `reread:` lines left. `changed --strict` exits 1 while a component's line is
+  left, as it does for a `warn:`. It checks that someone answered for the entry, not
+  that the answer is right.
+  **This is new in plugin 0.1.8:** before it `--strict` failed on `fail:` and `warn:`
+  only, so a project that already gates on `--strict` now has to answer every
+  component's `reread:` line. Use `--strict` when closing a phase and in CI.
 
   The PR body gets one line: what you searched before writing, what you reused, and the
   summary line the check printed. A project can run the same command in its CI
