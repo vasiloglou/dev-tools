@@ -154,7 +154,8 @@ BASE = SETTINGS['docs_dir'].strip('/') + '/'
 VERBS = re.compile(r'<!-- verbs:begin -->.*?<!-- verbs:end -->', re.S)
 GENERATED = frozenset({'uses', 'used_by', 'part_of', 'members_uses'})
 # The fields that say an entry was read against its code: `review` dates an entry from the newest of
-# them, and `changed` asks for no reread of an entry when one of them differs from the base.
+# them, and `changed` asks for no reread of an entry when one of them holds words it did not hold at the
+# base (`answered`).
 DATING = frozenset({'does', 'verbs', 'flow', 'reread'})
 # Fields the script reads. One of these written twice in an entry is an error (the first would be lost).
 CHECKED = frozenset({'does', 'verbs', 'status', 'modules', 'tests', 'components', 'flow',
@@ -246,6 +247,13 @@ def parse_components(text: str) -> list[dict]:
 
 def values(entry: dict, key: str) -> list[str]:
     return [s.strip() for s in entry.get(key, '').split(',') if s.strip()]
+
+
+def answered(old: dict, entry: dict) -> bool:
+    """Whether an entry says it was read since `old`, the same entry at an earlier commit: one of its DATING
+    fields holds words now that it did not hold there. A field deleted or left empty is no answer: it is no
+    line `entry_commits` dates the entry from."""
+    return any(entry.get(key, '').strip() not in ('', old.get(key, '').strip()) for key in DATING)
 
 
 @functools.lru_cache(maxsize=None)
@@ -1169,9 +1177,11 @@ def changed(root: Path, base: str, strict: bool) -> int:
     """Check the index against the files that differ from the merge base with `base`.
 
     Exits 1 on a `fail:` line; with `strict` also on a `warn:` line and on a component's `reread:`
-    line, which an author answers by editing one of the entry's DATING fields. A subsystem's
-    `reread:` line is printed and never fails: a component many subsystems share would otherwise
-    ask for an answer from each of them on every change.
+    line, which an author answers in the entry (`answered`). A component gets the line when a file
+    that differs is one it holds now or held at the base; a file that does not differ asks nothing,
+    whichever entry it moved to. A subsystem's `reread:` line is printed and never fails: a
+    component many subsystems share would otherwise ask for an answer from each of them on every
+    change.
     """
     base, anchor, status, old_entries, overrides, said = base_snapshot(root, base)
     entries = read_components(root)
@@ -1206,18 +1216,27 @@ def changed(root: Path, base: str, strict: bool) -> int:
             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
 
     before = {e['id']: e for e in old_entries}
-    touched = {e['id']: sorted(p for p in status if covers(e, p)) for e in entries if not subsystem(e)}
+    now = {e['id']: e for e in entries}
+    # A file that differs is the code of the component that holds it now and of the one that held it at the
+    # base: a module deleted, renamed or given to another component is a change to the one that had it. A
+    # component the change removed is kept, so that a subsystem that had it is told its member changed.
+    touched = {name: sorted(p for p in status if any(covers(e.get(name, {'id': name}), p) for e in (now, before)))
+               for name, entry in {**before, **now}.items() if not subsystem(entry)}
     rereads, advisory = [], []  # a component's lines, which --strict refuses, and a subsystem's, which it does not
     for entry in entries:
         name, old = entry['id'], before.get(entry['id'])
-        if old is None or any(old.get(key) != entry.get(key) for key in DATING):
-            continue  # written in this change, or read in it: a dating field differs
-        # An edit to any other field (notes, tests, modules) does not say the description was read.
+        if old is None or answered(old, entry):
+            continue  # written in this change, or read in it
+        # An edit to any other field (notes, tests, modules) does not say the description was read, and neither
+        # does a dating field deleted or left empty.
         others = sorted(key for key in (old.keys() | entry.keys()) - DATING - GENERATED - {'id', '_repeated'}
                         if old.get(key) != entry.get(key))
-        state = f'only {", ".join(others)} edited' if others else 'entry not edited'
+        gone = sorted(key for key in DATING if old.get(key, '').strip() and not entry.get(key, '').strip())
+        state = ', '.join(filter(None, (f'only {", ".join(others)} edited' if others else '',
+                                        f'{", ".join(gone)} removed' if gone else ''))) or 'entry not edited'
         if subsystem(entry):
-            members = [m for m in values(entry, 'components') if touched.get(m)]
+            listed = dict.fromkeys(values(entry, 'components') + values(old, 'components'))
+            members = [m for m in listed if touched.get(m)]
             if members:
                 advisory.append(f'{name} ({state}): its members changed: {", ".join(members)}')
         elif touched[name]:
@@ -1351,7 +1370,7 @@ def entry_commits(root: Path) -> dict[str, tuple[str, int, str]]:
             text = line[1:]
             if text.startswith('### '):
                 current = text[4:].strip()
-            field = re.match(r'- ([a-z_]+):', text)
+            field = re.match(r'- ([a-z_]+):[ \t]*\S', text)  # a field left empty dates nothing: `answered`
             if not current or not (field and field[1] in DATING):
                 continue
             earlier = newest.get(current, ('', -1, ''))

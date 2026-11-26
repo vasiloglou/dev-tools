@@ -75,6 +75,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - declined units: sync.copies
 - deferred ledger: phase.state
 - delete files no longer shipped: sync.copies
+- deleted reread line: components.index
 - deselect tests: phase.test_selection
 - devtools token: plugins.build
 - devtools-receipt: sync.copies
@@ -156,6 +157,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - migrate gsd: migrate.from_gsd
 - migration check: phase.state
 - minor version: plugins.release
+- module removed from a component: components.index
 - move from gsd: migrate.from_gsd
 - named by a delivered file: sync.copies
 - near misses: components.rules
@@ -324,8 +326,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 ## The component index
 
 ### components.index
-- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread unless does, verbs, flow or reread was edited and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
+- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread of a component when a file that differs is one it holds now or held at the base, unless does, verbs, flow or reread holds new words (one deleted or left empty is no answer, and review dates nothing from an empty one), and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
+- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, module removed from a component, deleted reread line, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
 - status: canonical
 - modules: skills/components/scripts/components_index.py
 - uses: (none)
@@ -436,7 +438,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
 - members_uses: (none)
 - flow: components.rules -> phase.state -> components.index
 - notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
-- reread: 2026-11-26, issue 50: its member components.index changed (changed asks for a reread unless does, verbs, flow or reread was edited, and with --strict fails while a component's is left; facts is untouched); the flow and the calls are as described
+- reread: 2026-11-26, issue 50 and review pr-51-r1: its member components.index changed (what changed asks to be reread and what answers it, and review's reading of an empty line; facts is untouched); the flow and the calls are as described
 
 ### subsystem.phase_status
 - does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
