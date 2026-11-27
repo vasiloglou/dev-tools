@@ -1,0 +1,35 @@
+{
+  "base": null,
+  "claims": [
+    "changed --strict asks both components when a file moves between them by a modules edit: a tracked file of any kind, a link without its target included, or a file git ignores that any modules line names or that is a counted module",
+    "git's -z listings and the base-blob requests are handled as bytes, so a carriage return, a line break or bytes that are not UTF-8 in a file's name or in the project's folder name no longer stop changed, and such a file is still the file of its component",
+    "write, --check and changed accept a module whose name is not UTF-8, writing it with a backslash escape, and every command, --help included, escapes output its stream cannot encode instead of stopping",
+    "the tests added fail on main and pass on this head; nothing else changes behaviour"
+  ],
+  "created": "2026-11-27T07:04:22.624716+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-53-r2/diff.patch",
+      "sha256": "659565fb3de078934bd8d649c11407423448541b15c49946779a27cbc1c3994e"
+    },
+    {
+      "path": ".planning/reviews/pr-53-r1/FINDINGS.md",
+      "sha256": "c3f8f0490a2df132c29f10d3661c15c4d6973049991ca5943f27054b61110fb4"
+    }
+  ],
+  "head": "bc308155b963aad350fcc9c7b7629911a5aa604c",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "d82c87ed449c2d66aa3e723855a33c42d37f3437",
+    "head": "0e241de900c9cad4ac2c38ebe6cf363523e87aae",
+    "number": 53,
+    "title": "fix(components): changed asks about an ignored file that moves, and reads git's names as bytes (0.1.9)",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/53"
+  },
+  "question": "Does this change do what it sets out to do for every input of the classes it names, and what does it break?",
+  "subject": "pr",
+  "version": 1
+}
