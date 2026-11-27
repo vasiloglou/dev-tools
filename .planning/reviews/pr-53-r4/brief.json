@@ -1,0 +1,35 @@
+{
+  "base": null,
+  "claims": [
+    "changed --strict asks both components when a file moves between them by a modules edit: a tracked file of any kind, a link without its target included, a file git ignores that any modules line names, or a counted module git ignores",
+    "git's -z listings and the base-blob requests are handled as bytes, so a carriage return, a line break or bytes that are not UTF-8 in a file's name or in the project's folder name no longer stop changed, write or --check, and such a file is still the file of its component",
+    "every line changed and --check print, and each module heading of a generated page, is escaped so that a name is one line and two names never print alike; every command, --help included, escapes output its stream cannot encode instead of stopping",
+    "each behaviour this PR changes has a test that fails on main, except the tracked link without its target, a regression this PR introduced and repaired; nothing else changes behaviour"
+  ],
+  "created": "2026-11-27T07:43:10.730801+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-53-r4/diff.patch",
+      "sha256": "c70bd4dd267713968232890bfcdbe454eda15833519aa8eb07bb3cf92b9bf95d"
+    },
+    {
+      "path": ".planning/reviews/pr-53-r3/FINDINGS.md",
+      "sha256": "df25b19fb816a647b3e193357d1f7b8829f8f9999a0ff949460070772da9d159"
+    }
+  ],
+  "head": "abe61d68dfc52cf8053e30148501e8bef2d505f6",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "d82c87ed449c2d66aa3e723855a33c42d37f3437",
+    "head": "abe61d68dfc52cf8053e30148501e8bef2d505f6",
+    "number": 53,
+    "title": "fix(components): changed asks about an ignored file that moves, and reads git's names as bytes (0.1.9)",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/53"
+  },
+  "question": "Does this change do what it sets out to do for every input of the classes it names, and what does it break?",
+  "subject": "pr",
+  "version": 1
+}
