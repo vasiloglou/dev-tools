@@ -73,24 +73,26 @@ Generate and search the component catalog using source ASTs, never package impor
 | `coverage_line(root, entries) -> str` | function | 980 | (no docstring) |
 | `generated_paths(root) -> set[str]` | function | 987 | (no docstring) |
 | `external_skips(root) -> dict[str, str]` | function | 992 | Explain recorded inventories that cannot be reproduced by this installation. |
-| `stale_files(root, files) -> list[str]` | function | 1009 | Return sorted stale or missing index paths without writing or printing. |
-| `write_or_check(root, check, strict) -> int` | function | 1019 | (no docstring) |
-| `git(root, *args, check) -> str` | function | 1052 | Output of a git command run in `root`; '' when it fails and `check` is off. |
-| `git_paths(root, *args) -> list[str]` | function | 1064 | The fields of a git command run with -z, each a name as the file system spells it. |
-| `files_at(root, commit, paths) -> dict[str, bytes]` | function | 1079 | The bytes each path (relative to `root`) had at a commit, read with one git process. |
-| `package_imports(root) -> dict[str, set[str]]` | function | 1114 | Each package module -> the package modules it imports at run time. |
-| `draft(root, entries, only, by_importers) -> list[str]` | function | 1120 | Stub entries for the modules no component covers: a starting point, never a catalog. |
-| `resolve_base(root, base) -> tuple[str, str]` | function | 1179 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
-| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str, dict]` | function | 1211 | The checkout as it was at the merge base with `base`. |
-| `changed(root, base, strict) -> int` | function | 1236 | Check the index against the files that differ from the merge base with `base`. |
-| `facts(root, base, modules, notes) -> dict` | function | 1380 | The catalog and the import graph as rows of facts, for a rule checker. |
-| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1449 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
-| `is_retired(entry) -> bool` | function | 1482 | (no docstring) |
-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1486 | Package module -> the files in tests/ and the extra source directories that import it. |
-| `some(items, cap) -> str` | function | 1504 | (no docstring) |
-| `review(root, areas, everything) -> list[str]` | function | 1509 | Leads for a review of the index. Each one is a place to look, not a finding. |
-| `show(root, name) -> list[str]` | function | 1694 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
-| `main(argv) -> int` | function | 1737 | (no docstring) |
+| `generated_bytes(text) -> bytes` | function | 1009 | A generated file's text as it is written and checked: UTF-8, with a module name that is not UTF-8 (held as |
+| `stale_files(root, files) -> list[str]` | function | 1015 | Return sorted stale or missing index paths without writing or printing. |
+| `write_or_check(root, check, strict) -> int` | function | 1025 | (no docstring) |
+| `git(root, *args, check) -> str` | function | 1058 | Output of a git command run in `root`; '' when it fails and `check` is off. |
+| `git_bytes(root, *args) -> bytes` | function | 1070 | The output of a git command run in `root`, as the bytes git wrote: no newline translated, no name decoded. |
+| `git_paths(root, *args) -> list[str]` | function | 1081 | The fields of a git command run with -z, each a name as the file system spells it. |
+| `files_at(root, commit, paths) -> dict[str, bytes]` | function | 1090 | The bytes each path (relative to `root`) had at a commit, read with one git process. |
+| `package_imports(root) -> dict[str, set[str]]` | function | 1127 | Each package module -> the package modules it imports at run time. |
+| `draft(root, entries, only, by_importers) -> list[str]` | function | 1133 | Stub entries for the modules no component covers: a starting point, never a catalog. |
+| `resolve_base(root, base) -> tuple[str, str]` | function | 1192 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
+| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str, dict]` | function | 1224 | The checkout as it was at the merge base with `base`. |
+| `changed(root, base, strict) -> int` | function | 1249 | Check the index against the files that differ from the merge base with `base`. |
+| `facts(root, base, modules, notes) -> dict` | function | 1397 | The catalog and the import graph as rows of facts, for a rule checker. |
+| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1466 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+| `is_retired(entry) -> bool` | function | 1499 | (no docstring) |
+| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1503 | Package module -> the files in tests/ and the extra source directories that import it. |
+| `some(items, cap) -> str` | function | 1521 | (no docstring) |
+| `review(root, areas, everything) -> list[str]` | function | 1526 | Leads for a review of the index. Each one is a place to look, not a finding. |
+| `show(root, name) -> list[str]` | function | 1711 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+| `main(argv) -> int` | function | 1754 | (no docstring) |
 
 ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
 Components: components.rules

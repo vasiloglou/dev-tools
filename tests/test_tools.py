@@ -2625,6 +2625,78 @@ def test_changed_asks_both_components_when_a_file_git_ignores_moves(project, ign
                      "reread: core.beta (only modules edited): %s" % ignored], out
 
 
+@pytest.mark.parametrize("move", ["named to folder", "folder to named"])
+def test_changed_asks_both_components_when_an_ignored_file_moves_between_a_name_and_a_folder(project, move):
+    # Review pr-53-r1, F2: the files a modules line names were taken from the entry being asked about only, so
+    # the entry that takes the file through a folder never saw it.
+    (project / ".gitignore").write_text("tools/gen/out.py\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/out.py").write_text('"""Generated."""\n')
+    named, folder = "src/widget/a.py, tools/gen/out.py", "src/widget/b.py, tools/gen/"
+    alpha, beta = (named, "src/widget/b.py") if move == "named to folder" else ("src/widget/a.py", folder)
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", alpha), entry("core.beta", "Do beta", beta))
+    commit(project)
+    edit_catalog(project, "- modules: %s\n" % alpha,
+                 "- modules: %s\n" % ("src/widget/a.py" if move == "named to folder" else named))
+    edit_catalog(project, "- modules: %s\n" % beta,
+                 "- modules: %s\n" % (folder if move == "named to folder" else "src/widget/b.py"))
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/out.py",
+                     "reread: core.beta (only modules edited): tools/gen/out.py"], out
+
+
+def test_changed_asks_both_components_when_a_tracked_link_without_its_target_moves(project):
+    # Review pr-53-r1, F3: a file was kept only when it opened as a regular file, so a link git tracks whose
+    # target is gone was no file of either entry.
+    (project / "tools/gen").mkdir(parents=True)
+    os.symlink("missing.json", project / "tools/gen/latest")
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/latest",
+                     "reread: core.beta (only modules edited): tools/gen/latest"], out
+
+
+def test_changed_reads_a_project_whose_folder_name_holds_a_line_break(tmp_path):
+    # Review pr-53-r1, F4: only the file's own name was looked at for a line break, and the folder of the project
+    # under the top of the checkout was put before it afterwards, so git was asked for two names.
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    project = new_project(outer)
+    shutil.move(str(project / ".git"), str(outer / ".git"))
+    moved = outer / "team\nwidget"
+    project.rename(moved)
+    (moved / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(moved, entry("core.sizes", "Format sizes", "src/widget/sizes.py"))
+    commit(outer)
+    (moved / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(): pass\n')
+    assert tool(moved, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(moved)
+    assert code == 0, out
+    assert lines == ["reread: core.sizes (entry not edited): src/widget/sizes.py; "
+                     "new public names not in does or verbs: parse"], out
+
+
+def test_help_prints_on_a_stream_that_takes_ascii_only(project):
+    # Review pr-53-r1, F6: argparse prints the help before the streams were told to escape what they cannot write.
+    shutil.copy(project / INDEX, project / "scripts/índice.py")
+    shutil.copy(project / INDEX_SETTINGS, project / "scripts/índice.settings.json")
+    env = {**os.environ, "PYTHONIOENCODING": "ascii", "XDG_CACHE_HOME": str(project.parent / "cache")}
+    done = subprocess.run([sys.executable, "scripts/índice.py", "--help"], cwd=project, capture_output=True,
+                          text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    assert "usage: \\xedndice.py" in done.stdout, done.stdout
+
+
 @pytest.mark.parametrize("control", ["\r", "\n"])
 def test_changed_reads_a_file_whose_name_holds_a_line_break(project, control):
     # Close review close-r1, F2: git's -z listings were read as text, which turns a carriage return into a line
