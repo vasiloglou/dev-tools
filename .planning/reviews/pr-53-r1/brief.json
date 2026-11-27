@@ -1,0 +1,31 @@
+{
+  "base": null,
+  "claims": [
+    "changed --strict asks both components when a file git ignores, named one by one in a modules line or a counted module under a folder entry, moves from one component to another",
+    "git's -z listings are read as bytes, so a file name with a carriage return or a line break, or one that is not UTF-8, no longer makes plain changed exit 1, and such a file is still the file of its component",
+    "output a stream cannot encode is printed with a backslash escape instead of stopping the command",
+    "the tests added fail on main and pass on this head; nothing else changes behaviour"
+  ],
+  "created": "2026-11-27T06:52:51.982669+00:00",
+  "deleted": [],
+  "dirty": false,
+  "files": [
+    {
+      "path": ".planning/reviews/pr-53-r1/diff.patch",
+      "sha256": "659565fb3de078934bd8d649c11407423448541b15c49946779a27cbc1c3994e"
+    }
+  ],
+  "head": "0e241de900c9cad4ac2c38ebe6cf363523e87aae",
+  "left_out": [],
+  "notes": [],
+  "pr": {
+    "base": "d82c87ed449c2d66aa3e723855a33c42d37f3437",
+    "head": "0e241de900c9cad4ac2c38ebe6cf363523e87aae",
+    "number": 53,
+    "title": "fix(components): changed asks about an ignored file that moves, and reads git's names as bytes (0.1.9)",
+    "url": "https://github.com/vasiloglou/dev-tools/pull/53"
+  },
+  "question": "Does this change do what it sets out to do for every input of the classes it names, and what does it break?",
+  "subject": "pr",
+  "version": 1
+}

@@ -238,7 +238,8 @@ The index must change in the same commit as the code.
   - `reread: <id>` The code of that component changed and its description did not. Its
     code changed when a file it holds differs from the base, when a file it held there
     was deleted or renamed, and when its `modules` line took a file in or gave one up
-    (a file it names, or any tracked file under a folder it names),
+    (a file it names, whether git tracks it or ignores it, and under a folder it names
+    any file git tracks and any module the index counts),
     even a file nobody edited: the entry that gave it up may now say too much, and the
     one that took it too little. The end of the line says what to look for: the public
     names those files gained that `does` and `verbs` do not speak of, and the ones they

@@ -2601,6 +2601,294 @@ def test_changed_asks_for_a_file_whose_name_git_would_quote(project):
     assert 'fail: no component: src/widget/new"one.py ' in out, out
 
 
+@pytest.mark.parametrize("ignored, alpha, beta", [
+    # A file a modules line names one by one, outside the package.
+    ("tools/gen.py", "src/widget/a.py, tools/gen.py", "src/widget/b.py, tools/gen.py"),
+    # A package module reached through a folder: it is counted, so it needs a component.
+    ("src/widget/gen/out.py", "src/widget/a.py, src/widget/gen/", "src/widget/b.py, src/widget/gen/"),
+])
+def test_changed_asks_both_components_when_a_file_git_ignores_moves(project, ignored, alpha, beta):
+    # Close review close-r1, F1: the regrouped files were looked for among the files git tracks only, so a
+    # file that git ignores moved from one entry to another and `changed --strict` asked neither.
+    (project / ".gitignore").write_text(ignored + "\n")
+    (project / ignored).parent.mkdir(parents=True, exist_ok=True)
+    (project / ignored).write_text('"""Generated."""\n')
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", alpha), entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: %s\n" % alpha, "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: %s\n" % beta)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): %s" % ignored,
+                     "reread: core.beta (only modules edited): %s" % ignored], out
+
+
+@pytest.mark.parametrize("move", ["named to folder", "folder to named"])
+def test_changed_asks_both_components_when_an_ignored_file_moves_between_a_name_and_a_folder(project, move):
+    # Review pr-53-r1, F2: the files a modules line names were taken from the entry being asked about only, so
+    # the entry that takes the file through a folder never saw it.
+    (project / ".gitignore").write_text("tools/gen/out.py\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/out.py").write_text('"""Generated."""\n')
+    named, folder = "src/widget/a.py, tools/gen/out.py", "src/widget/b.py, tools/gen/"
+    alpha, beta = (named, "src/widget/b.py") if move == "named to folder" else ("src/widget/a.py", folder)
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", alpha), entry("core.beta", "Do beta", beta))
+    commit(project)
+    edit_catalog(project, "- modules: %s\n" % alpha,
+                 "- modules: %s\n" % ("src/widget/a.py" if move == "named to folder" else named))
+    edit_catalog(project, "- modules: %s\n" % beta,
+                 "- modules: %s\n" % (folder if move == "named to folder" else "src/widget/b.py"))
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/out.py",
+                     "reread: core.beta (only modules edited): tools/gen/out.py"], out
+
+
+def test_changed_asks_both_components_when_a_tracked_link_without_its_target_moves(project):
+    # Review pr-53-r1, F3: a file was kept only when it opened as a regular file, so a link git tracks whose
+    # target is gone was no file of either entry.
+    (project / "tools/gen").mkdir(parents=True)
+    os.symlink("missing.json", project / "tools/gen/latest")
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/latest",
+                     "reread: core.beta (only modules edited): tools/gen/latest"], out
+
+
+def test_changed_reads_a_project_whose_folder_name_holds_a_line_break(tmp_path):
+    # Review pr-53-r1, F4: only the file's own name was looked at for a line break, and the folder of the project
+    # under the top of the checkout was put before it afterwards, so git was asked for two names.
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    project = new_project(outer)
+    shutil.move(str(project / ".git"), str(outer / ".git"))
+    moved = outer / "team\nwidget"
+    project.rename(moved)
+    (moved / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(moved, entry("core.sizes", "Format sizes", "src/widget/sizes.py"))
+    commit(outer)
+    (moved / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(): pass\n')
+    assert tool(moved, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(moved)
+    assert code == 0, out
+    assert lines == ["reread: core.sizes (entry not edited): src/widget/sizes.py; "
+                     "new public names not in does or verbs: parse"], out
+
+
+def test_help_prints_on_a_stream_that_takes_ascii_only(project):
+    # Review pr-53-r1, F6: argparse prints the help before the streams were told to escape what they cannot write.
+    shutil.copy(project / INDEX, project / "scripts/índice.py")
+    shutil.copy(project / INDEX_SETTINGS, project / "scripts/índice.settings.json")
+    env = {**os.environ, "PYTHONIOENCODING": "ascii", "XDG_CACHE_HOME": str(project.parent / "cache")}
+    done = subprocess.run([sys.executable, "scripts/índice.py", "--help"], cwd=project, capture_output=True,
+                          text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    assert "usage: \\xedndice.py" in done.stdout, done.stdout
+
+
+@pytest.mark.parametrize("control", ["\r", "\n"])
+def test_changed_reads_a_file_whose_name_holds_a_line_break(project, control):
+    # Close review close-r1, F2: git's -z listings were read as text, which turns a carriage return into a line
+    # break, so plain `changed` could not read the file at the base and exited 1. A line break in a name broke
+    # the request to git for the file's bytes.
+    name = "src/widget/a%sfile.py" % control
+    (project / "src/widget/a.py").write_text('"""A."""\n')
+    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n')
+    (project / ("assets/pic%sone.png" % control)).parent.mkdir()
+    (project / ("assets/pic%sone.png" % control)).write_bytes(b"x")
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n\n\ndef even(): pass\n')
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    # Review pr-53-r2, F8: the name is printed with the control character escaped, so it stays one line.
+    escaped = control.encode("unicode_escape").decode()
+    assert lines == ["reread: core.aa (entry not edited): src/widget/a%sfile.py; new public names not in does or "
+                     "verbs: even" % escaped], out
+
+
+def test_changed_prints_a_name_that_holds_a_line_break_as_one_line(project):
+    # Review pr-53-r2, F8: a line break in a name was printed as it is, so the rest of the name read as a line of
+    # its own, and one that began `reread:` read as a second component to reread.
+    name = "src/widget/part\nreread: core.spare (entry not edited): x.py"
+    (project / name).write_text('"""Part."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    (project / name).write_text('"""Part, edited."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.aa (entry not edited): src/widget/part\\nreread: core.spare (entry not "
+                     "edited): x.py"], out
+
+
+def test_changed_asks_both_components_when_an_ignored_link_without_its_target_moves(project):
+    # Review pr-53-r3, F1: a candidate git does not track was kept only when it opened as a regular file, so an
+    # ignored link whose target is gone moved from a name in one entry to a folder in another and asked neither.
+    (project / ".gitignore").write_text("tools/gen/latest.py\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/keep.txt").write_text("kept\n")
+    os.symlink("target.py", project / "tools/gen/latest.py")
+    (project / "tools/gen/target.py").write_text('"""Target."""\n')
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/latest.py"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    (project / "tools/gen/target.py").unlink()
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/latest.py\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/latest.py",
+                     "reread: core.beta (only modules edited): tools/gen/keep.txt, tools/gen/latest.py"], out
+
+
+def test_changed_asks_both_components_when_an_ignored_pipe_moves(project):
+    # Review pr-53-r4, F2: a candidate git does not track was kept when it was a file or a link only, so a named pipe
+    # a modules line names moved silently. Anything here but a folder is kept.
+    (project / ".gitignore").write_text("tools/gen/events\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/keep.txt").write_text("kept\n")
+    os.mkfifo(project / "tools/gen/events")
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/events"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/events\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/events",
+                     "reread: core.beta (only modules edited): tools/gen/events, tools/gen/keep.txt"], out
+
+
+def test_changed_prints_its_summary_as_one_line_for_a_base_with_a_line_break(project):
+    # Review pr-53-r4, F4: the summary line named the base as it was given, so a base spelled with a line break
+    # split it, and the second part could begin `reread:`.
+    (project / "src/widget/a.py").write_text('"""A."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/a.py"))
+    commit(project)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty",
+                    "-m", "keep\nreread: extra"], cwd=project, check=True)
+    code, out = tool(project, "changed", "--base", "HEAD^{/keep\nreread: extra}", script=INDEX)
+    assert code == 0, out
+    assert [line for line in out.splitlines() if line.startswith("changed against ")] == [
+        "changed against HEAD^{/keep\\nreread: extra} (%s): 0 file(s) differ; 0 to fix, 0 warning(s), "
+        "0 to reread" % out.split("(")[1][:7]], out
+    assert not [line for line in out.splitlines() if line.startswith("reread:")], out
+
+
+def test_changed_runs_when_the_base_has_no_catalog_under_a_folder_not_utf8(tmp_path):
+    # Review pr-53-r4, F3: git names the missing catalog with the project's folder, and a folder name that is not
+    # UTF-8 stopped the text read of that message. macOS refuses such a name.
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    raw = os.fsencode(str(outer)) + b"/bad\xff"
+    try:
+        os.mkdir(raw)
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    project = new_project(Path(os.fsdecode(raw)))
+    shutil.move(str(project / ".git"), str(outer / ".git"))
+    subprocess.run(["git", "add", "-A", "--", ".", ":!docs/components"], cwd=project, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "x"],
+                   cwd=project, check=True)
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0, out
+
+
+def test_a_name_with_a_line_break_or_a_backslash_is_one_line_everywhere_it_is_printed(project):
+    # Review pr-53-r3, F3, F4 and F5: a stale page's name and a validation message printed a name as it is, so a
+    # line break split them; a literal backslash-n printed like a line break; a generated page's heading kept the
+    # line break. Every line changed and --check print is escaped whole, and so is a page's heading.
+    folder = "src/widget/west\nreread: extra"
+    (project / folder).mkdir()
+    (project / folder / "x.py").write_text('"""X."""\n')
+    (project / "src/widget/a\nb.py").write_text('"""Break."""\n')
+    (project / "src/widget/a\\nb.py").write_text('"""Backslash."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    text = "".join(p.read_text() for p in (project / "docs/components/modules").glob("*.md"))
+    # Review pr-53-r4, F7: the heading is checked whole.
+    assert "\n# west\\nreread: extra symbol inventory\n" in "\n" + text, text
+    assert "`src/widget/a\\nb.py`" in text and "`src/widget/a\\\\nb.py`" in text, text
+    (project / folder / "y.py").write_text('"""Y."""\n')
+    catalog_file = project / "docs/components/COMPONENTS.md"
+    catalog_file.write_text(catalog_file.read_text().replace("- modules: src/widget/\n",
+                                                             "- modules: src/widget/, gone\u2028here.py\n"))
+    for args in (("--check",), ("changed", "--base", "main")):
+        code, out = tool(project, *args, script=INDEX)
+        assert code == 1, out
+        assert not [line for line in out.splitlines() if line.startswith("reread: extra")], out
+        assert "gone\\u2028here.py" in out, out
+    (project / "src/widget/a\nb.py").write_text('"""Break, edited."""\n')
+    (project / "src/widget/a\\nb.py").write_text('"""Backslash, edited."""\n')
+    edit_catalog(project, "- modules: src/widget/, gone\u2028here.py\n", "- modules: src/widget/\n")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert lines == ["reread: core.aa (entry not edited): src/widget/a\\nb.py, src/widget/a\\\\nb.py, "
+                     "src/widget/west\\nreread: extra/y.py"], out
+
+
+def test_changed_runs_in_a_project_whose_folder_name_is_not_utf8(tmp_path):
+    # Review pr-53-r2, F5: the parse cache is named for the checkout's folder, hashed from its name as UTF-8, so a
+    # folder name that is not UTF-8 stopped the command as it saved the cache. macOS refuses such a name.
+    outer = os.fsencode(str(tmp_path)) + b"/proj\xff"
+    try:
+        os.mkdir(outer)
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    project = new_project(Path(os.fsdecode(outer)))
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format sizes", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(): pass\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert lines == ["reread: core.sizes (entry not edited): src/widget/sizes.py; "
+                     "new public names not in does or verbs: parse"], out
+
+
+def test_changed_prints_a_file_whose_name_is_not_utf8(project):
+    # Close review close-r1, F2: a name git does not spell as UTF-8 stopped plain `changed` with a decoding
+    # error, even for a file no component holds. macOS refuses such a name, and the test with it.
+    raw = os.fsencode(str(project / "src/widget")) + b"/caf\xe9.py"
+    try:
+        with open(raw, "wb") as handle:
+            handle.write(b'"""Cafe."""\n')
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    (project / "assets").mkdir()
+    with open(os.fsencode(str(project / "assets")) + b"/pic\xff.png", "wb") as handle:
+        handle.write(b"x")
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    with open(raw, "ab") as handle:
+        handle.write(b"\n\ndef brew(): pass\n")
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert lines == ["reread: core.aa (entry not edited): src/widget/caf\\udce9.py; "
+                     "new public names not in does or verbs: brew"], out
+
+
 def test_changed_and_review_agree_on_a_reread_line_after_a_no_break_space(project):
     # Review pr-51-r2, F6: `changed` took the line as an answer and `review` did not date the entry from it.
     (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')

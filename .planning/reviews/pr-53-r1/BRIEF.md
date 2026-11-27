@@ -1,0 +1,76 @@
+# Review brief: a pull request
+
+You are an independent reviewer, working in a different tool from the one that produced
+this work. Nothing here asks you to agree with it. Answer from the files themselves, not
+from any summary of them, including this brief's.
+
+## The question
+
+Does this change do what it sets out to do for every input of the classes it names, and what does it break?
+
+## Claims to test
+
+The author claims what follows. For each, try to show where it is false: a claim is
+met only if you looked for the case that breaks it and did not find one.
+
+- C1. changed --strict asks both components when a file git ignores, named one by one in a modules line or a counted module under a folder entry, moves from one component to another
+- C2. git's -z listings are read as bytes, so a file name with a carriage return or a line break, or one that is not UTF-8, no longer makes plain changed exit 1, and such a file is still the file of its component
+- C3. output a stream cannot encode is printed with a backslash escape instead of stopping the command
+- C4. the tests added fail on main and pass on this head; nothing else changes behaviour
+
+## The change under review
+
+Pull request #53, https://github.com/vasiloglou/dev-tools/pull/53, at head `0e241de900c9cad4ac2c38ebe6cf363523e87aae` (base `d82c87ed449c2d66aa3e723855a33c42d37f3437`). Its diff is `.planning/reviews/pr-53-r1/diff.patch`.
+Your checkout is at that head, so the files in it are the PR's.
+
+## What to read
+
+Paths are relative to the repository root, the directory you start in. Before you rely
+on a file, check its SHA-256 (`shasum -a 256 <path>`); if one differs, say so first in
+your answer: you are not reading the bytes this brief names.
+
+| File | SHA-256 |
+|---|---|
+| `.planning/reviews/pr-53-r1/diff.patch` | `659565fb3de078934bd8d649c11407423448541b15c49946779a27cbc1c3994e` |
+
+You may read anything else in the repository that helps you answer.
+
+## A standing check: code fitted to its examples
+
+Whatever the question above, also look in the code this change adds or changes for a
+solution that handles the examples in its tests and fixtures, and not the whole class of
+input it is given:
+
+- a regular expression, string split, slice or index over structured text (JSON, YAML,
+  TOML, source code, paths, command lines) that a parser or an existing reader in this
+  repository already reads;
+- a pattern over output this project renders itself (a report, a table, a log line), where
+  the code could have been handed the data instead;
+- a pattern fitted to the fixtures: it matches every committed example and fails on a
+  legal input with other whitespace, quoting, casing, nesting, Unicode or a line break;
+- a branch on one literal name, file or message, added to make one case pass;
+- a second matcher for something an existing helper already does.
+
+A regular expression is not a finding in itself: one that states the whole grammar of a
+flat token (an identifier, a version number, a hex digest) is the right tool. For each
+suspect, build a legal input that the tests and fixtures lack and run the code on it.
+Report a finding only with that input: what the code returned and what it should have
+returned. A suspicion with no breaking input is style: label it so. In your list of what
+you checked, name each matcher you tried and the input you tried it with.
+
+## Rules
+
+- Read only. Do not edit, create, stage, commit, push or post anything.
+- Do not open `.env` files, keys, tokens, `auth.json` or any other credential file, and do
+  not print environment variables. If you need one, name it and go on without it.
+- A finding names its file and line and the consequence someone would observe. Run what
+  you can to show it; where you only read, say so.
+
+## What to return
+
+1. Findings, each with an id (F1, F2, ...), file and line, what is wrong, the observable
+   consequence, and how to reproduce it. A finding with no observable consequence is
+   style: label it so.
+2. What you checked and found true.
+3. What you could not check, and why.
+4. A last line: `VERDICT: APPROVE` or `VERDICT: CHANGES_REQUESTED`.
