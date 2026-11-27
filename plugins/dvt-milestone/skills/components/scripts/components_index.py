@@ -1061,18 +1061,46 @@ def git(root: Path, *args: str, check: bool = True) -> str:
     return '' if done.returncode else done.stdout
 
 
-def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
-    """The bytes each path (relative to `root`) had at a commit, read with one git process."""
-    if not paths:
-        return {}
-    prefix = git(root, 'rev-parse', '--show-prefix').strip()
+def git_paths(root: Path, *args: str) -> list[str]:
+    """The fields of a git command run with -z, each a name as the file system spells it.
+
+    Read as bytes: read as text, a carriage return in a name becomes a line break, and a name that is not
+    UTF-8 stops the read. Each field is decoded as os.fsdecode does, so the name opens the file it names.
+    """
     try:
-        done = subprocess.run(['git', '-C', str(root), 'cat-file', '--batch'], capture_output=True,
-                              input=''.join(f'{commit}:{prefix}{p}\n' for p in paths).encode('utf-8'))
+        done = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
     except OSError as exc:
         raise ValueError(f'git is not available: {exc}')
-    out, at, texts = done.stdout, 0, {}
-    for path in paths:
+    if done.returncode:
+        raise ValueError(f'git {" ".join(args)}: {done.stderr.decode(errors="replace").strip() or "failed"}')
+    return [os.fsdecode(field) for field in done.stdout.split(b'\0')]
+
+
+def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
+    """The bytes each path (relative to `root`) had at a commit, read with one git process.
+
+    A name that holds a line break cannot be asked for in that one process, which reads a name a line:
+    such a file is read with a git process of its own.
+    """
+    if not paths:
+        return {}
+    prefix = os.fsencode(git(root, 'rev-parse', '--show-prefix').strip())
+    batch = [p for p in paths if '\n' not in p]
+    try:
+        done = subprocess.run(['git', '-C', str(root), 'cat-file', '--batch'], capture_output=True,
+                              input=b''.join(commit.encode() + b':' + prefix + os.fsencode(p) + b'\n' for p in batch))
+        alone = {p: subprocess.run(['git', '-C', str(root), 'cat-file', 'blob',
+                                    commit.encode() + b':' + prefix + os.fsencode(p)], capture_output=True)
+                 for p in paths if p not in batch}
+    except OSError as exc:
+        raise ValueError(f'git is not available: {exc}')
+    texts = {}
+    for path, one in alone.items():
+        if one.returncode:
+            raise ValueError(f'git cannot read {path} at {commit[:7]}: {one.stderr.decode(errors="replace").strip()}')
+        texts[path] = one.stdout
+    out, at = done.stdout, 0
+    for path in batch:
         end = out.find(b'\n', at)
         head = out[at:end].split()
         if done.returncode or end < 0 or len(head) != 3 or head[1] != b'blob':
@@ -1194,9 +1222,9 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
     status = {}
     # With -z git writes each name as it is: without it a name that holds a quote, a backslash or a control
     # character comes quoted, and is no file of any component.
-    fields = git(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor).split('\0')
+    fields = git_paths(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor)
     status.update(zip(fields[1::2], fields[0::2]))
-    for path in filter(None, git(root, 'ls-files', '--others', '--exclude-standard', '-z').split('\0')):
+    for path in filter(None, git_paths(root, 'ls-files', '--others', '--exclude-standard', '-z')):
         status.setdefault(path, 'A')
     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
@@ -1250,8 +1278,9 @@ def changed(root: Path, base: str, strict: bool) -> int:
 
     before = {e['id']: e for e in old_entries}
     now = {e['id']: e for e in entries}
-    # Every file git tracks here, named or reached through a folder, in the package or outside it.
-    tracked = [p for p in git(root, 'ls-files', '-z').split('\0') if p]
+    # The files a regrouping can move: every file git tracks, named or reached through a folder, in the package
+    # or outside it, and the ones git does not track that are counted modules or that a modules line names.
+    tracked = set(filter(None, git_paths(root, 'ls-files', '-z'))) | package
 
     def code_paths(name):
         """The files that say a component's code is not what it was at the base: one that differs and that the
@@ -1260,7 +1289,9 @@ def changed(root: Path, base: str, strict: bool) -> int:
         new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
         paths = {p for p in status if covers(new, p) or covers(old, p)}
         if new.get('modules', '') != old.get('modules', ''):
-            paths |= {p for p in tracked if p not in status and covers(new, p) != covers(old, p)}
+            named = module_paths(new.get('modules', ''))[0] | module_paths(old.get('modules', ''))[0]
+            paths |= {p for p in tracked | named if p not in status and covers(new, p) != covers(old, p)
+                      and (root / p).is_file()}
         return sorted(paths)
 
     def source(path, at_base):
@@ -1740,6 +1771,11 @@ def main(argv: list[str] | None = None) -> int:
     names = commands.add_parser('list')
     names.add_argument('area', nargs='?', default='')
     args = parser.parse_args(argv)
+    # A file name that is not UTF-8 is held as os.fsdecode spells it, which no UTF-8 stream can write: it is
+    # printed with a backslash escape in place of the byte, not stopped on.
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(errors='backslashreplace')
     if args.check and args.command:
         parser.error('--check cannot be combined with a subcommand')
     if args.strict and not args.check:

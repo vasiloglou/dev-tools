@@ -2601,6 +2601,76 @@ def test_changed_asks_for_a_file_whose_name_git_would_quote(project):
     assert 'fail: no component: src/widget/new"one.py ' in out, out
 
 
+@pytest.mark.parametrize("ignored, alpha, beta", [
+    # A file a modules line names one by one, outside the package.
+    ("tools/gen.py", "src/widget/a.py, tools/gen.py", "src/widget/b.py, tools/gen.py"),
+    # A package module reached through a folder: it is counted, so it needs a component.
+    ("src/widget/gen/out.py", "src/widget/a.py, src/widget/gen/", "src/widget/b.py, src/widget/gen/"),
+])
+def test_changed_asks_both_components_when_a_file_git_ignores_moves(project, ignored, alpha, beta):
+    # Close review close-r1, F1: the regrouped files were looked for among the files git tracks only, so a
+    # file that git ignores moved from one entry to another and `changed --strict` asked neither.
+    (project / ".gitignore").write_text(ignored + "\n")
+    (project / ignored).parent.mkdir(parents=True, exist_ok=True)
+    (project / ignored).write_text('"""Generated."""\n')
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", alpha), entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: %s\n" % alpha, "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: %s\n" % beta)
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): %s" % ignored,
+                     "reread: core.beta (only modules edited): %s" % ignored], out
+
+
+@pytest.mark.parametrize("control", ["\r", "\n"])
+def test_changed_reads_a_file_whose_name_holds_a_line_break(project, control):
+    # Close review close-r1, F2: git's -z listings were read as text, which turns a carriage return into a line
+    # break, so plain `changed` could not read the file at the base and exited 1. A line break in a name broke
+    # the request to git for the file's bytes.
+    name = "src/widget/a%sfile.py" % control
+    (project / "src/widget/a.py").write_text('"""A."""\n')
+    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n')
+    (project / ("assets/pic%sone.png" % control)).parent.mkdir()
+    (project / ("assets/pic%sone.png" % control)).write_bytes(b"x")
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n\n\ndef even(): pass\n')
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    # The test reads the output as text, which turns the carriage return into a line break as well.
+    assert "reread: core.aa (entry not edited): src/widget/a\nfile.py; new public names not in does or verbs: " \
+           "even" in out, out
+
+
+def test_changed_prints_a_file_whose_name_is_not_utf8(project):
+    # Close review close-r1, F2: a name git does not spell as UTF-8 stopped plain `changed` with a decoding
+    # error, even for a file no component holds. macOS refuses such a name, and the test with it.
+    raw = os.fsencode(str(project / "src/widget")) + b"/caf\xe9.py"
+    try:
+        with open(raw, "wb") as handle:
+            handle.write(b'"""Cafe."""\n')
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    (project / "assets").mkdir()
+    with open(os.fsencode(str(project / "assets")) + b"/pic\xff.png", "wb") as handle:
+        handle.write(b"x")
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    with open(raw, "ab") as handle:
+        handle.write(b"\n\ndef brew(): pass\n")
+    code, out = tool(project, "write", script=INDEX)
+    assert code == 0, out
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert lines == ["reread: core.aa (entry not edited): src/widget/caf\\udce9.py; "
+                     "new public names not in does or verbs: brew"], out
+
+
 def test_changed_and_review_agree_on_a_reread_line_after_a_no_break_space(project):
     # Review pr-51-r2, F6: `changed` took the line as an answer and `review` did not date the entry from it.
     (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
