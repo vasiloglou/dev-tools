@@ -670,7 +670,7 @@ def external_inventory(root: Path) -> tuple[dict, list[dict], dict, list[str]]:
                 row['label'] = dotted + '.' + row['label']
                 hits.append({'kind': 'external', 'id': full, 'summary': row['summary'],
                              'text': full + ' ' + row['summary']})
-            lines.extend([f'## {dotted}', summary(tree), '', *table(rows), ''])
+            lines.extend([f'## {shown(dotted)}', summary(tree), '', *table(rows), ''])
         files[BASE + f'external/{name}.md'] = '\n'.join(lines)
     return files, hits, versions, errors
 
@@ -1035,8 +1035,8 @@ def write_or_check(root: Path, check: bool, strict: bool = False) -> int:
         baseline = root / BASE / 'unassigned-baseline.txt'
         refused = strict and baseline.is_file() and not SETTINGS['allow_baseline']
         if refused:
-            print(f'baseline refused: {BASE}unassigned-baseline.txt exists and allow_baseline is false '
-                  f'(give its modules a component, then delete the file)')
+            print(shown(f'baseline refused: {BASE}unassigned-baseline.txt exists and allow_baseline is false '
+                        f'(give its modules a component, then delete the file)'))
         tolerated = set(baseline.read_text(encoding='utf-8').split()) if baseline.is_file() and not refused else set()
         unassigned = [p for p in coverage(root, read_components(root))[0] if p not in tolerated] if strict else []
         for path in unassigned:
@@ -1058,8 +1058,9 @@ def write_or_check(root: Path, check: bool, strict: bool = False) -> int:
 def git(root: Path, *args: str, check: bool = True) -> str:
     """Output of a git command run in `root`; '' when it fails and `check` is off."""
     try:
+        # A byte git writes that is not UTF-8 (a folder name in a message) is kept, not stopped on.
         done = subprocess.run(['git', '-C', str(root), '-c', 'core.quotepath=off', *args],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, errors='surrogateescape')
     except OSError as exc:
         raise ValueError(f'git is not available: {exc}')
     if done.returncode and check:
@@ -1306,7 +1307,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
     # names, now or at the base. Every entry's names are taken, as a file one entry names can move to a folder
     # another entry names.
     named = set().union(*(module_paths(e.get('modules', ''))[0] for e in (*entries, *old_entries)))
-    untracked = {p for p in (package | named) - tracked if (root / p).is_file() or (root / p).is_symlink()}
+    untracked = {p for p in (package | named) - tracked if os.path.lexists(root / p) and not (root / p).is_dir()}
 
     def code_paths(name):
         """The files that say a component's code is not what it was at the base: one that differs and that the
@@ -1372,8 +1373,8 @@ def changed(root: Path, base: str, strict: bool) -> int:
         for row in rows:
             print(shown(f'{prefix}: {row}'))
     of_them = f', {len(advisory)} of them subsystem(s)' if advisory else ''
-    print(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
-          f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}')
+    print(shown(f'changed against {base} ({anchor[:7]}): {len(status)} file(s) differ; '
+                f'{len(fails)} to fix, {len(warns)} warning(s), {len(rereads) + len(advisory)} to reread{of_them}'))
     return int(bool(fails or (strict and (warns or rereads))))
 
 
@@ -1897,7 +1898,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         return write_or_check(args.root, args.check, args.strict)
     except (OSError, ValueError, SyntaxError) as exc:
-        print(str(exc), file=sys.stderr)
+        print(shown(str(exc)), file=sys.stderr)
         return 1
     finally:
         save_caches()

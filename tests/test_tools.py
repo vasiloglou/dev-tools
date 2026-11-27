@@ -2757,6 +2757,61 @@ def test_changed_asks_both_components_when_an_ignored_link_without_its_target_mo
                      "reread: core.beta (only modules edited): tools/gen/keep.txt, tools/gen/latest.py"], out
 
 
+def test_changed_asks_both_components_when_an_ignored_pipe_moves(project):
+    # Review pr-53-r4, F2: a candidate git does not track was kept when it was a file or a link only, so a named pipe
+    # a modules line names moved silently. Anything here but a folder is kept.
+    (project / ".gitignore").write_text("tools/gen/events\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/keep.txt").write_text("kept\n")
+    os.mkfifo(project / "tools/gen/events")
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/events"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/events\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/events",
+                     "reread: core.beta (only modules edited): tools/gen/events, tools/gen/keep.txt"], out
+
+
+def test_changed_prints_its_summary_as_one_line_for_a_base_with_a_line_break(project):
+    # Review pr-53-r4, F4: the summary line named the base as it was given, so a base spelled with a line break
+    # split it, and the second part could begin `reread:`.
+    (project / "src/widget/a.py").write_text('"""A."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/a.py"))
+    commit(project)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "--allow-empty",
+                    "-m", "keep\nreread: extra"], cwd=project, check=True)
+    code, out = tool(project, "changed", "--base", "HEAD^{/keep\nreread: extra}", script=INDEX)
+    assert code == 0, out
+    assert [line for line in out.splitlines() if line.startswith("changed against ")] == [
+        "changed against HEAD^{/keep\\nreread: extra} (%s): 0 file(s) differ; 0 to fix, 0 warning(s), "
+        "0 to reread" % out.split("(")[1][:7]], out
+    assert not [line for line in out.splitlines() if line.startswith("reread:")], out
+
+
+def test_changed_runs_when_the_base_has_no_catalog_under_a_folder_not_utf8(tmp_path):
+    # Review pr-53-r4, F3: git names the missing catalog with the project's folder, and a folder name that is not
+    # UTF-8 stopped the text read of that message. macOS refuses such a name.
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    raw = os.fsencode(str(outer)) + b"/bad\xff"
+    try:
+        os.mkdir(raw)
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    project = new_project(Path(os.fsdecode(raw)))
+    shutil.move(str(project / ".git"), str(outer / ".git"))
+    subprocess.run(["git", "add", "-A", "--", ".", ":!docs/components"], cwd=project, check=True)
+    subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-qm", "x"],
+                   cwd=project, check=True)
+    code, out = tool(project, "changed", "--base", "main", script=INDEX)
+    assert code == 0, out
+
+
 def test_a_name_with_a_line_break_or_a_backslash_is_one_line_everywhere_it_is_printed(project):
     # Review pr-53-r3, F3, F4 and F5: a stale page's name and a validation message printed a name as it is, so a
     # line break split them; a literal backslash-n printed like a line break; a generated page's heading kept the
@@ -2768,11 +2823,9 @@ def test_a_name_with_a_line_break_or_a_backslash_is_one_line_everywhere_it_is_pr
     (project / "src/widget/a\\nb.py").write_text('"""Backslash."""\n')
     catalog(project, entry("core.aa", "Do a", "src/widget/"))
     commit(project)
-    page = (project / "docs/components/modules").glob("west*")
-    assert all("\n" not in heading for heading in
-               (line for path in page for line in path.read_text().split("\n") if line.startswith("#"))
-               if "reread" in heading)
     text = "".join(p.read_text() for p in (project / "docs/components/modules").glob("*.md"))
+    # Review pr-53-r4, F7: the heading is checked whole.
+    assert "\n# west\\nreread: extra symbol inventory\n" in "\n" + text, text
     assert "`src/widget/a\\nb.py`" in text and "`src/widget/a\\\\nb.py`" in text, text
     (project / folder / "y.py").write_text('"""Y."""\n')
     catalog_file = project / "docs/components/COMPONENTS.md"
