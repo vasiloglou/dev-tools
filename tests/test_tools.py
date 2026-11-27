@@ -2735,6 +2735,63 @@ def test_changed_prints_a_name_that_holds_a_line_break_as_one_line(project):
                      "edited): x.py"], out
 
 
+def test_changed_asks_both_components_when_an_ignored_link_without_its_target_moves(project):
+    # Review pr-53-r3, F1: a candidate git does not track was kept only when it opened as a regular file, so an
+    # ignored link whose target is gone moved from a name in one entry to a folder in another and asked neither.
+    (project / ".gitignore").write_text("tools/gen/latest.py\n")
+    (project / "tools/gen").mkdir(parents=True)
+    (project / "tools/gen/keep.txt").write_text("kept\n")
+    os.symlink("target.py", project / "tools/gen/latest.py")
+    (project / "tools/gen/target.py").write_text('"""Target."""\n')
+    for name in ("a", "b"):
+        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
+    catalog(project, entry("core.alpha", "Do alpha", "src/widget/a.py, tools/gen/latest.py"),
+            entry("core.beta", "Do beta", "src/widget/b.py"))
+    (project / "tools/gen/target.py").unlink()
+    commit(project)
+    edit_catalog(project, "- modules: src/widget/a.py, tools/gen/latest.py\n", "- modules: src/widget/a.py\n")
+    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: src/widget/b.py, tools/gen/\n")
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.alpha (only modules edited): tools/gen/latest.py",
+                     "reread: core.beta (only modules edited): tools/gen/keep.txt, tools/gen/latest.py"], out
+
+
+def test_a_name_with_a_line_break_or_a_backslash_is_one_line_everywhere_it_is_printed(project):
+    # Review pr-53-r3, F3, F4 and F5: a stale page's name and a validation message printed a name as it is, so a
+    # line break split them; a literal backslash-n printed like a line break; a generated page's heading kept the
+    # line break. Every line changed and --check print is escaped whole, and so is a page's heading.
+    folder = "src/widget/west\nreread: extra"
+    (project / folder).mkdir()
+    (project / folder / "x.py").write_text('"""X."""\n')
+    (project / "src/widget/a\nb.py").write_text('"""Break."""\n')
+    (project / "src/widget/a\\nb.py").write_text('"""Backslash."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    page = (project / "docs/components/modules").glob("west*")
+    assert all("\n" not in heading for heading in
+               (line for path in page for line in path.read_text().split("\n") if line.startswith("#"))
+               if "reread" in heading)
+    text = "".join(p.read_text() for p in (project / "docs/components/modules").glob("*.md"))
+    assert "`src/widget/a\\nb.py`" in text and "`src/widget/a\\\\nb.py`" in text, text
+    (project / folder / "y.py").write_text('"""Y."""\n')
+    catalog_file = project / "docs/components/COMPONENTS.md"
+    catalog_file.write_text(catalog_file.read_text().replace("- modules: src/widget/\n",
+                                                             "- modules: src/widget/, gone\u2028here.py\n"))
+    for args in (("--check",), ("changed", "--base", "main")):
+        code, out = tool(project, *args, script=INDEX)
+        assert code == 1, out
+        assert not [line for line in out.splitlines() if line.startswith("reread: extra")], out
+        assert "gone\\u2028here.py" in out, out
+    (project / "src/widget/a\nb.py").write_text('"""Break, edited."""\n')
+    (project / "src/widget/a\\nb.py").write_text('"""Backslash, edited."""\n')
+    edit_catalog(project, "- modules: src/widget/, gone\u2028here.py\n", "- modules: src/widget/\n")
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert lines == ["reread: core.aa (entry not edited): src/widget/a\\nb.py, src/widget/a\\\\nb.py, "
+                     "src/widget/west\\nreread: extra/y.py"], out
+
+
 def test_changed_runs_in_a_project_whose_folder_name_is_not_utf8(tmp_path):
     # Review pr-53-r2, F5: the parse cache is named for the checkout's folder, hashed from its name as UTF-8, so a
     # folder name that is not UTF-8 stopped the command as it saved the cache. macOS refuses such a name.
