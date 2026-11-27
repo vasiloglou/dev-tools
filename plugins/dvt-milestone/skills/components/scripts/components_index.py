@@ -563,7 +563,7 @@ def top_level(rows: list[dict]) -> list[dict]:
 def cache_path(root: Path) -> Path:
     """Where the facts read from the source files are kept: outside the checkout, one file per checkout."""
     home = Path(os.environ.get('XDG_CACHE_HOME') or Path.home() / '.cache')
-    return home / 'components-index' / (hashlib.sha256(str(root.resolve()).encode()).hexdigest()[:16] + '.json')
+    return home / 'components-index' / (hashlib.sha256(os.fsencode(root.resolve())).hexdigest()[:16] + '.json')
 
 
 def cache_stamp() -> list:
@@ -1040,7 +1040,7 @@ def write_or_check(root: Path, check: bool, strict: bool = False) -> int:
         tolerated = set(baseline.read_text(encoding='utf-8').split()) if baseline.is_file() and not refused else set()
         unassigned = [p for p in coverage(root, read_components(root))[0] if p not in tolerated] if strict else []
         for path in unassigned:
-            print(f'no component: {path} (add it to the modules of an entry in {BASE}COMPONENTS.md)')
+            print(f'no component: {shown(path)} (add it to the modules of an entry in {BASE}COMPONENTS.md)')
         return int(bool(stale or errors or unassigned or refused))
     if errors:
         for error in errors:
@@ -1065,6 +1065,13 @@ def git(root: Path, *args: str, check: bool = True) -> str:
     if done.returncode and check:
         raise ValueError(f'git {" ".join(args)}: {done.stderr.strip() or "failed"}')
     return '' if done.returncode else done.stdout
+
+
+def shown(path: str) -> str:
+    """A file name as a line of output prints it: each character that is not printable (a line break, a carriage
+    return, a byte that is not UTF-8 as os.fsdecode holds it) as its backslash escape, so a name is one line, and
+    no line it prints can be taken for another kind of line."""
+    return ''.join(c if c.isprintable() else c.encode('unicode_escape').decode('ascii') for c in path)
 
 
 def git_bytes(root: Path, *args: str) -> bytes:
@@ -1265,7 +1272,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
     package = set(counted_modules(root))
     for path in sorted(status):
         if status[path] == 'A' and path in package and not any(covers(e, path) for e in entries):
-            fails.append(f'no component: {path} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
+            fails.append(f'no component: {shown(path)} (new file; add it to the modules of an entry in {BASE}COMPONENTS.md)')
 
     old_edges = component_graph(root, old_entries, overrides)
     retired = {e['id']: e['status'] for e in entries
@@ -1286,7 +1293,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
         added = sorted(pair for pair in set(pairs) - set(old_edges.get((caller, callee), []))
                        if not imported_before(*pair))
         if callee in retired and callee in known and added:
-            evidence = ', '.join(f'{a} -> {b}' for a, b in added[:3])
+            evidence = ', '.join(f'{shown(a)} -> {shown(b)}' for a, b in added[:3])
             warns.append(f'new caller of {callee} ({retired[callee]}): {caller}: {evidence}')
 
     before = {e['id']: e for e in old_entries}
@@ -1354,7 +1361,7 @@ def changed(root: Path, base: str, strict: bool) -> int:
         elif touched[name]:
             paths = touched[name]
             more = f', +{len(paths) - 5} more' if len(paths) > 5 else ''
-            rereads.append(f'{name} ({state}): {", ".join(paths[:5])}{more}{names_lead(old, entry, paths)}')
+            rereads.append(f'{name} ({state}): {", ".join(map(shown, paths[:5]))}{more}{names_lead(old, entry, paths)}')
 
     notes = [said] if said else []
     if strict and rereads:

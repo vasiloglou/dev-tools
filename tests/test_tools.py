@@ -2714,9 +2714,45 @@ def test_changed_reads_a_file_whose_name_holds_a_line_break(project, control):
     assert code == 0, out
     code, lines, out = rereads(project)
     assert code == 0, out
-    # The test reads the output as text, which turns the carriage return into a line break as well.
-    assert "reread: core.aa (entry not edited): src/widget/a\nfile.py; new public names not in does or verbs: " \
-           "even" in out, out
+    # Review pr-53-r2, F8: the name is printed with the control character escaped, so it stays one line.
+    escaped = control.encode("unicode_escape").decode()
+    assert lines == ["reread: core.aa (entry not edited): src/widget/a%sfile.py; new public names not in does or "
+                     "verbs: even" % escaped], out
+
+
+def test_changed_prints_a_name_that_holds_a_line_break_as_one_line(project):
+    # Review pr-53-r2, F8: a line break in a name was printed as it is, so the rest of the name read as a line of
+    # its own, and one that began `reread:` read as a second component to reread.
+    name = "src/widget/part\nreread: core.spare (entry not edited): x.py"
+    (project / name).write_text('"""Part."""\n')
+    catalog(project, entry("core.aa", "Do a", "src/widget/"))
+    commit(project)
+    (project / name).write_text('"""Part, edited."""\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project, "--strict")
+    assert code == 1, out
+    assert lines == ["reread: core.aa (entry not edited): src/widget/part\\nreread: core.spare (entry not "
+                     "edited): x.py"], out
+
+
+def test_changed_runs_in_a_project_whose_folder_name_is_not_utf8(tmp_path):
+    # Review pr-53-r2, F5: the parse cache is named for the checkout's folder, hashed from its name as UTF-8, so a
+    # folder name that is not UTF-8 stopped the command as it saved the cache. macOS refuses such a name.
+    outer = os.fsencode(str(tmp_path)) + b"/proj\xff"
+    try:
+        os.mkdir(outer)
+    except OSError as exc:
+        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
+    project = new_project(Path(os.fsdecode(outer)))
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
+    catalog(project, entry("core.sizes", "Format sizes", "src/widget/sizes.py"))
+    commit(project)
+    (project / "src/widget/sizes.py").write_text('"""Sizes."""\n\n\ndef parse(): pass\n')
+    assert tool(project, "write", script=INDEX)[0] == 0
+    code, lines, out = rereads(project)
+    assert code == 0, out
+    assert lines == ["reread: core.sizes (entry not edited): src/widget/sizes.py; "
+                     "new public names not in does or verbs: parse"], out
 
 
 def test_changed_prints_a_file_whose_name_is_not_utf8(project):
