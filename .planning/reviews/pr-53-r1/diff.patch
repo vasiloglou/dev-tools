@@ -1,0 +1,544 @@
+diff --git a/.devtools/components/COMPONENTS.md b/.devtools/components/COMPONENTS.md
+index 07df78c..2b2a21b 100644
+--- a/.devtools/components/COMPONENTS.md
++++ b/.devtools/components/COMPONENTS.md
+@@ -102,6 +102,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - file mode drift: sync.copies
+ - file modes: plugins.build
+ - file name git quotes: components.index
++- file name not utf-8: components.index
++- file name with a line break: components.index
+ - fill tokens: sync.copies
+ - find existing code: components.index
+ - findings ledger: review.rounds
+@@ -129,6 +131,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - handoff note: handoff.notes
+ - how many coders: phase.coder_pool
+ - ignore supervisor files: phase.codex_gate
++- ignored file moved to another component: components.index
+ - ignored inventory: handoff.notes
+ - import graph: components.index
+ - import loop rule: components.rules
+@@ -337,8 +340,8 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ ## The component index
+ 
+ ### components.index
+-- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread of a component when a file it holds now or held at the base differs or its modules line took a tracked file in or gave one up (two spellings of a path being one file), unless does, verbs, flow or reread holds new words (one deleted or left empty is no answer, and review dates nothing from an empty one), names the public names the files gained that does and verbs do not speak of and the ones they lost that are still spoken of, says other lines when an edited line of the entry is no field, reads an entry up to the next heading of any level, and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
+-- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, module removed from a component, module moved to another component, deleted reread line, new public names not in verbs, removed names still described, edited line that is no field, where an entry ends, field under a later heading, path spelling, folder moved to another component, file name git quotes, source encoding, sha256 repository, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
++- does: Check the hand-written component catalog against the source ASTs, write its generated lines and module pages, and search it by capability: init, write, --check [--strict], search, stats, draft, list, changed, facts, review, show; changed and facts --base compare with the upstream of a local base that is behind it, a reread: line dates an entry read and found true and answers changed, which asks for a reread of a component when a file it holds now or held at the base differs or its modules line took a file in or gave one up (a file it names, tracked or ignored, or under a folder it names a tracked file or a counted module; two spellings of a path being one file; git's names read as bytes, so a name with a line break or one that is not UTF-8 is still its file), unless does, verbs, flow or reread holds new words (one deleted or left empty is no answer, and review dates nothing from an empty one), names the public names the files gained that does and verbs do not speak of and the ones they lost that are still spoken of, says other lines when an edited line of the entry is no field, reads an entry up to the next heading of any level, and with --strict fails while a component's is left (a subsystem's never fails), and allow_baseline false makes the strict check refuse a baseline (components_index.py)
++- verbs: component index, component catalog, search components, find existing code, does the project already have, generate index, check index stale, strict check, validate catalog, starter catalog, list components by area, unassigned modules, coverage, unassigned baseline, refuse a baseline, allow baseline, count extra dirs, draft entries, changed since base, base behind its upstream, stale local main, new caller of deprecated component, entries to reread, mark an entry reread, unanswered reread line, fail on a reread line, strict changed, module removed from a component, module moved to another component, deleted reread line, new public names not in verbs, removed names still described, edited line that is no field, where an entry ends, field under a later heading, path spelling, folder moved to another component, ignored file moved to another component, file name git quotes, file name with a line break, file name not UTF-8, source encoding, sha256 repository, review the index, duplicate names, import loops, show component, import graph, facts for rules, external libraries, parse cache
+ - status: canonical
+ - modules: skills/components/scripts/components_index.py
+ - uses: (none)
+@@ -449,7 +452,7 @@ a `uses` line; where one script runs another, the subsystems at the end say so.
+ - members_uses: (none)
+ - flow: components.rules -> phase.state -> components.index
+ - notes: Run-time calls, which the import graph cannot see; components_index.py and phase_tool.py never call each other, rules_check.py calls each. The flow is check --phase: phase_tool.py facts first, then components_index.py facts --modules. check, test and suggest run components_index.py facts as a subprocess, and test loads phase_tool.py with importlib for its fact types.
+-- reread: 2026-11-26, issue 50 and review pr-51-r1: its member components.index changed (what changed asks to be reread and what answers it, and review's reading of an empty line; facts is untouched); the flow and the calls are as described
++- reread: 2026-11-27, close review close-r1 F1 and F2: its member components.index changed (which regrouped files changed asks about, and how it reads the names git lists; facts is untouched); the flow and the calls are as described
+ 
+ ### subsystem.phase_status
+ - does: Warn about the plans of a phase: phase_tool.py check --plans asks coder_pool.py how many tracks run at once
+diff --git a/.devtools/components/modules/skills.md b/.devtools/components/modules/skills.md
+index 35948bc..ccf7096 100644
+--- a/.devtools/components/modules/skills.md
++++ b/.devtools/components/modules/skills.md
+@@ -76,20 +76,21 @@ Generate and search the component catalog using source ASTs, never package impor
+ | `stale_files(root, files) -> list[str]` | function | 1009 | Return sorted stale or missing index paths without writing or printing. |
+ | `write_or_check(root, check, strict) -> int` | function | 1019 | (no docstring) |
+ | `git(root, *args, check) -> str` | function | 1052 | Output of a git command run in `root`; '' when it fails and `check` is off. |
+-| `files_at(root, commit, paths) -> dict[str, bytes]` | function | 1064 | The bytes each path (relative to `root`) had at a commit, read with one git process. |
+-| `package_imports(root) -> dict[str, set[str]]` | function | 1086 | Each package module -> the package modules it imports at run time. |
+-| `draft(root, entries, only, by_importers) -> list[str]` | function | 1092 | Stub entries for the modules no component covers: a starting point, never a catalog. |
+-| `resolve_base(root, base) -> tuple[str, str]` | function | 1151 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
+-| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str, dict]` | function | 1183 | The checkout as it was at the merge base with `base`. |
+-| `changed(root, base, strict) -> int` | function | 1208 | Check the index against the files that differ from the merge base with `base`. |
+-| `facts(root, base, modules, notes) -> dict` | function | 1349 | The catalog and the import graph as rows of facts, for a rule checker. |
+-| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1418 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
+-| `is_retired(entry) -> bool` | function | 1451 | (no docstring) |
+-| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1455 | Package module -> the files in tests/ and the extra source directories that import it. |
+-| `some(items, cap) -> str` | function | 1473 | (no docstring) |
+-| `review(root, areas, everything) -> list[str]` | function | 1478 | Leads for a review of the index. Each one is a place to look, not a finding. |
+-| `show(root, name) -> list[str]` | function | 1663 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
+-| `main(argv) -> int` | function | 1706 | (no docstring) |
++| `git_paths(root, *args) -> list[str]` | function | 1064 | The fields of a git command run with -z, each a name as the file system spells it. |
++| `files_at(root, commit, paths) -> dict[str, bytes]` | function | 1079 | The bytes each path (relative to `root`) had at a commit, read with one git process. |
++| `package_imports(root) -> dict[str, set[str]]` | function | 1114 | Each package module -> the package modules it imports at run time. |
++| `draft(root, entries, only, by_importers) -> list[str]` | function | 1120 | Stub entries for the modules no component covers: a starting point, never a catalog. |
++| `resolve_base(root, base) -> tuple[str, str]` | function | 1179 | The ref to compare with for `base`, and a line to print when it is not the one asked for ('' otherwise). |
++| `base_snapshot(root, base) -> tuple[str, str, dict, list[dict], dict, str, dict]` | function | 1211 | The checkout as it was at the merge base with `base`. |
++| `changed(root, base, strict) -> int` | function | 1236 | Check the index against the files that differ from the merge base with `base`. |
++| `facts(root, base, modules, notes) -> dict` | function | 1380 | The catalog and the import graph as rows of facts, for a rule checker. |
++| `entry_commits(root) -> dict[str, tuple[str, int, str]]` | function | 1449 | Component id -> (commit, time, field) of the newest of its lines that date it: does, verbs, flow, and |
++| `is_retired(entry) -> bool` | function | 1482 | (no docstring) |
++| `outside_importers(root, package) -> dict[str, list[str]]` | function | 1486 | Package module -> the files in tests/ and the extra source directories that import it. |
++| `some(items, cap) -> str` | function | 1504 | (no docstring) |
++| `review(root, areas, everything) -> list[str]` | function | 1509 | Leads for a review of the index. Each one is a place to look, not a finding. |
++| `show(root, name) -> list[str]` | function | 1694 | One component as a reviewer needs it: the entry, then each module with its names and its imports. |
++| `main(argv) -> int` | function | 1737 | (no docstring) |
+ 
+ ## skills.components.scripts.rules_check — `skills/components/scripts/rules_check.py`
+ Components: components.rules
+diff --git a/devtools/PLUGIN_VERSION b/devtools/PLUGIN_VERSION
+index 699c6c6..1a03094 100644
+--- a/devtools/PLUGIN_VERSION
++++ b/devtools/PLUGIN_VERSION
+@@ -1 +1 @@
+-0.1.8
++0.1.9
+diff --git a/plugins/dvt-milestone/.claude-plugin/plugin.json b/plugins/dvt-milestone/.claude-plugin/plugin.json
+index d4d50a8..ce2cf6c 100644
+--- a/plugins/dvt-milestone/.claude-plugin/plugin.json
++++ b/plugins/dvt-milestone/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-milestone",
+-  "version": "0.1.8",
++  "version": "0.1.9",
+   "description": "The dev-tools milestone workflow: plan, run and close milestones phase by phase (start-milestone, process-milestone, process-phase), independent PR reviews (review-pr), the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-milestone/skills/components/SKILL.md b/plugins/dvt-milestone/skills/components/SKILL.md
+index 6494e61..1860bc8 100644
+--- a/plugins/dvt-milestone/skills/components/SKILL.md
++++ b/plugins/dvt-milestone/skills/components/SKILL.md
+@@ -240,7 +240,8 @@ The index must change in the same commit as the code.
+   - `reread: <id>` The code of that component changed and its description did not. Its
+     code changed when a file it holds differs from the base, when a file it held there
+     was deleted or renamed, and when its `modules` line took a file in or gave one up
+-    (a file it names, or any tracked file under a folder it names),
++    (a file it names, whether git tracks it or ignores it, and under a folder it names
++    any file git tracks and any module the index counts),
+     even a file nobody edited: the entry that gave it up may now say too much, and the
+     one that took it too little. The end of the line says what to look for: the public
+     names those files gained that `does` and `verbs` do not speak of, and the ones they
+diff --git a/plugins/dvt-milestone/skills/components/scripts/components_index.py b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+index b3e6dc8..10deebf 100644
+--- a/plugins/dvt-milestone/skills/components/scripts/components_index.py
++++ b/plugins/dvt-milestone/skills/components/scripts/components_index.py
+@@ -1061,18 +1061,46 @@ def git(root: Path, *args: str, check: bool = True) -> str:
+     return '' if done.returncode else done.stdout
+ 
+ 
++def git_paths(root: Path, *args: str) -> list[str]:
++    """The fields of a git command run with -z, each a name as the file system spells it.
++
++    Read as bytes: read as text, a carriage return in a name becomes a line break, and a name that is not
++    UTF-8 stops the read. Each field is decoded as os.fsdecode does, so the name opens the file it names.
++    """
++    try:
++        done = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
++    except OSError as exc:
++        raise ValueError(f'git is not available: {exc}')
++    if done.returncode:
++        raise ValueError(f'git {" ".join(args)}: {done.stderr.decode(errors="replace").strip() or "failed"}')
++    return [os.fsdecode(field) for field in done.stdout.split(b'\0')]
++
++
+ def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
+-    """The bytes each path (relative to `root`) had at a commit, read with one git process."""
++    """The bytes each path (relative to `root`) had at a commit, read with one git process.
++
++    A name that holds a line break cannot be asked for in that one process, which reads a name a line:
++    such a file is read with a git process of its own.
++    """
+     if not paths:
+         return {}
+-    prefix = git(root, 'rev-parse', '--show-prefix').strip()
++    prefix = os.fsencode(git(root, 'rev-parse', '--show-prefix').strip())
++    batch = [p for p in paths if '\n' not in p]
+     try:
+         done = subprocess.run(['git', '-C', str(root), 'cat-file', '--batch'], capture_output=True,
+-                              input=''.join(f'{commit}:{prefix}{p}\n' for p in paths).encode('utf-8'))
++                              input=b''.join(commit.encode() + b':' + prefix + os.fsencode(p) + b'\n' for p in batch))
++        alone = {p: subprocess.run(['git', '-C', str(root), 'cat-file', 'blob',
++                                    commit.encode() + b':' + prefix + os.fsencode(p)], capture_output=True)
++                 for p in paths if p not in batch}
+     except OSError as exc:
+         raise ValueError(f'git is not available: {exc}')
+-    out, at, texts = done.stdout, 0, {}
+-    for path in paths:
++    texts = {}
++    for path, one in alone.items():
++        if one.returncode:
++            raise ValueError(f'git cannot read {path} at {commit[:7]}: {one.stderr.decode(errors="replace").strip()}')
++        texts[path] = one.stdout
++    out, at = done.stdout, 0
++    for path in batch:
+         end = out.find(b'\n', at)
+         head = out[at:end].split()
+         if done.returncode or end < 0 or len(head) != 3 or head[1] != b'blob':
+@@ -1194,9 +1222,9 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+     status = {}
+     # With -z git writes each name as it is: without it a name that holds a quote, a backslash or a control
+     # character comes quoted, and is no file of any component.
+-    fields = git(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor).split('\0')
++    fields = git_paths(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor)
+     status.update(zip(fields[1::2], fields[0::2]))
+-    for path in filter(None, git(root, 'ls-files', '--others', '--exclude-standard', '-z').split('\0')):
++    for path in filter(None, git_paths(root, 'ls-files', '--others', '--exclude-standard', '-z')):
+         status.setdefault(path, 'A')
+     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
+     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
+@@ -1250,8 +1278,9 @@ def imported_before(path, target):
+ 
+     before = {e['id']: e for e in old_entries}
+     now = {e['id']: e for e in entries}
+-    # Every file git tracks here, named or reached through a folder, in the package or outside it.
+-    tracked = [p for p in git(root, 'ls-files', '-z').split('\0') if p]
++    # The files a regrouping can move: every file git tracks, named or reached through a folder, in the package
++    # or outside it, and the ones git does not track that are counted modules or that a modules line names.
++    tracked = set(filter(None, git_paths(root, 'ls-files', '-z'))) | package
+ 
+     def code_paths(name):
+         """The files that say a component's code is not what it was at the base: one that differs and that the
+@@ -1260,7 +1289,9 @@ def code_paths(name):
+         new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
+         paths = {p for p in status if covers(new, p) or covers(old, p)}
+         if new.get('modules', '') != old.get('modules', ''):
+-            paths |= {p for p in tracked if p not in status and covers(new, p) != covers(old, p)}
++            named = module_paths(new.get('modules', ''))[0] | module_paths(old.get('modules', ''))[0]
++            paths |= {p for p in tracked | named if p not in status and covers(new, p) != covers(old, p)
++                      and (root / p).is_file()}
+         return sorted(paths)
+ 
+     def source(path, at_base):
+@@ -1740,6 +1771,11 @@ def main(argv: list[str] | None = None) -> int:
+     names = commands.add_parser('list')
+     names.add_argument('area', nargs='?', default='')
+     args = parser.parse_args(argv)
++    # A file name that is not UTF-8 is held as os.fsdecode spells it, which no UTF-8 stream can write: it is
++    # printed with a backslash escape in place of the byte, not stopped on.
++    for stream in (sys.stdout, sys.stderr):
++        if isinstance(stream, io.TextIOWrapper):
++            stream.reconfigure(errors='backslashreplace')
+     if args.check and args.command:
+         parser.error('--check cannot be combined with a subcommand')
+     if args.strict and not args.check:
+diff --git a/plugins/dvt-phase/.claude-plugin/plugin.json b/plugins/dvt-phase/.claude-plugin/plugin.json
+index 7f32c46..d1d93e5 100644
+--- a/plugins/dvt-phase/.claude-plugin/plugin.json
++++ b/plugins/dvt-phase/.claude-plugin/plugin.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "dvt-phase",
+-  "version": "0.1.8",
++  "version": "0.1.9",
+   "description": "The dev-tools phase workflow: roadmap phases run test first through the .planning/ contract (process-phase, phase-tests), its helper agents, the component index, GitHub issue handling (handle-issue), and hand-offs between assistants and machines (dev-handoff, dev-takeover).",
+   "author": {
+     "name": "vasiloglou",
+diff --git a/plugins/dvt-phase/skills/components/SKILL.md b/plugins/dvt-phase/skills/components/SKILL.md
+index 7d03524..7e9cc73 100644
+--- a/plugins/dvt-phase/skills/components/SKILL.md
++++ b/plugins/dvt-phase/skills/components/SKILL.md
+@@ -240,7 +240,8 @@ The index must change in the same commit as the code.
+   - `reread: <id>` The code of that component changed and its description did not. Its
+     code changed when a file it holds differs from the base, when a file it held there
+     was deleted or renamed, and when its `modules` line took a file in or gave one up
+-    (a file it names, or any tracked file under a folder it names),
++    (a file it names, whether git tracks it or ignores it, and under a folder it names
++    any file git tracks and any module the index counts),
+     even a file nobody edited: the entry that gave it up may now say too much, and the
+     one that took it too little. The end of the line says what to look for: the public
+     names those files gained that `does` and `verbs` do not speak of, and the ones they
+diff --git a/plugins/dvt-phase/skills/components/scripts/components_index.py b/plugins/dvt-phase/skills/components/scripts/components_index.py
+index b3e6dc8..10deebf 100644
+--- a/plugins/dvt-phase/skills/components/scripts/components_index.py
++++ b/plugins/dvt-phase/skills/components/scripts/components_index.py
+@@ -1061,18 +1061,46 @@ def git(root: Path, *args: str, check: bool = True) -> str:
+     return '' if done.returncode else done.stdout
+ 
+ 
++def git_paths(root: Path, *args: str) -> list[str]:
++    """The fields of a git command run with -z, each a name as the file system spells it.
++
++    Read as bytes: read as text, a carriage return in a name becomes a line break, and a name that is not
++    UTF-8 stops the read. Each field is decoded as os.fsdecode does, so the name opens the file it names.
++    """
++    try:
++        done = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
++    except OSError as exc:
++        raise ValueError(f'git is not available: {exc}')
++    if done.returncode:
++        raise ValueError(f'git {" ".join(args)}: {done.stderr.decode(errors="replace").strip() or "failed"}')
++    return [os.fsdecode(field) for field in done.stdout.split(b'\0')]
++
++
+ def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
+-    """The bytes each path (relative to `root`) had at a commit, read with one git process."""
++    """The bytes each path (relative to `root`) had at a commit, read with one git process.
++
++    A name that holds a line break cannot be asked for in that one process, which reads a name a line:
++    such a file is read with a git process of its own.
++    """
+     if not paths:
+         return {}
+-    prefix = git(root, 'rev-parse', '--show-prefix').strip()
++    prefix = os.fsencode(git(root, 'rev-parse', '--show-prefix').strip())
++    batch = [p for p in paths if '\n' not in p]
+     try:
+         done = subprocess.run(['git', '-C', str(root), 'cat-file', '--batch'], capture_output=True,
+-                              input=''.join(f'{commit}:{prefix}{p}\n' for p in paths).encode('utf-8'))
++                              input=b''.join(commit.encode() + b':' + prefix + os.fsencode(p) + b'\n' for p in batch))
++        alone = {p: subprocess.run(['git', '-C', str(root), 'cat-file', 'blob',
++                                    commit.encode() + b':' + prefix + os.fsencode(p)], capture_output=True)
++                 for p in paths if p not in batch}
+     except OSError as exc:
+         raise ValueError(f'git is not available: {exc}')
+-    out, at, texts = done.stdout, 0, {}
+-    for path in paths:
++    texts = {}
++    for path, one in alone.items():
++        if one.returncode:
++            raise ValueError(f'git cannot read {path} at {commit[:7]}: {one.stderr.decode(errors="replace").strip()}')
++        texts[path] = one.stdout
++    out, at = done.stdout, 0
++    for path in batch:
+         end = out.find(b'\n', at)
+         head = out[at:end].split()
+         if done.returncode or end < 0 or len(head) != 3 or head[1] != b'blob':
+@@ -1194,9 +1222,9 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+     status = {}
+     # With -z git writes each name as it is: without it a name that holds a quote, a backslash or a control
+     # character comes quoted, and is no file of any component.
+-    fields = git(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor).split('\0')
++    fields = git_paths(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor)
+     status.update(zip(fields[1::2], fields[0::2]))
+-    for path in filter(None, git(root, 'ls-files', '--others', '--exclude-standard', '-z').split('\0')):
++    for path in filter(None, git_paths(root, 'ls-files', '--others', '--exclude-standard', '-z')):
+         status.setdefault(path, 'A')
+     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
+     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
+@@ -1250,8 +1278,9 @@ def imported_before(path, target):
+ 
+     before = {e['id']: e for e in old_entries}
+     now = {e['id']: e for e in entries}
+-    # Every file git tracks here, named or reached through a folder, in the package or outside it.
+-    tracked = [p for p in git(root, 'ls-files', '-z').split('\0') if p]
++    # The files a regrouping can move: every file git tracks, named or reached through a folder, in the package
++    # or outside it, and the ones git does not track that are counted modules or that a modules line names.
++    tracked = set(filter(None, git_paths(root, 'ls-files', '-z'))) | package
+ 
+     def code_paths(name):
+         """The files that say a component's code is not what it was at the base: one that differs and that the
+@@ -1260,7 +1289,9 @@ def code_paths(name):
+         new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
+         paths = {p for p in status if covers(new, p) or covers(old, p)}
+         if new.get('modules', '') != old.get('modules', ''):
+-            paths |= {p for p in tracked if p not in status and covers(new, p) != covers(old, p)}
++            named = module_paths(new.get('modules', ''))[0] | module_paths(old.get('modules', ''))[0]
++            paths |= {p for p in tracked | named if p not in status and covers(new, p) != covers(old, p)
++                      and (root / p).is_file()}
+         return sorted(paths)
+ 
+     def source(path, at_base):
+@@ -1740,6 +1771,11 @@ def main(argv: list[str] | None = None) -> int:
+     names = commands.add_parser('list')
+     names.add_argument('area', nargs='?', default='')
+     args = parser.parse_args(argv)
++    # A file name that is not UTF-8 is held as os.fsdecode spells it, which no UTF-8 stream can write: it is
++    # printed with a backslash escape in place of the byte, not stopped on.
++    for stream in (sys.stdout, sys.stderr):
++        if isinstance(stream, io.TextIOWrapper):
++            stream.reconfigure(errors='backslashreplace')
+     if args.check and args.command:
+         parser.error('--check cannot be combined with a subcommand')
+     if args.strict and not args.check:
+diff --git a/skills/components/SKILL.md b/skills/components/SKILL.md
+index 1661173..7251795 100644
+--- a/skills/components/SKILL.md
++++ b/skills/components/SKILL.md
+@@ -238,7 +238,8 @@ The index must change in the same commit as the code.
+   - `reread: <id>` The code of that component changed and its description did not. Its
+     code changed when a file it holds differs from the base, when a file it held there
+     was deleted or renamed, and when its `modules` line took a file in or gave one up
+-    (a file it names, or any tracked file under a folder it names),
++    (a file it names, whether git tracks it or ignores it, and under a folder it names
++    any file git tracks and any module the index counts),
+     even a file nobody edited: the entry that gave it up may now say too much, and the
+     one that took it too little. The end of the line says what to look for: the public
+     names those files gained that `does` and `verbs` do not speak of, and the ones they
+diff --git a/skills/components/scripts/components_index.py b/skills/components/scripts/components_index.py
+index b3e6dc8..10deebf 100644
+--- a/skills/components/scripts/components_index.py
++++ b/skills/components/scripts/components_index.py
+@@ -1061,18 +1061,46 @@ def git(root: Path, *args: str, check: bool = True) -> str:
+     return '' if done.returncode else done.stdout
+ 
+ 
++def git_paths(root: Path, *args: str) -> list[str]:
++    """The fields of a git command run with -z, each a name as the file system spells it.
++
++    Read as bytes: read as text, a carriage return in a name becomes a line break, and a name that is not
++    UTF-8 stops the read. Each field is decoded as os.fsdecode does, so the name opens the file it names.
++    """
++    try:
++        done = subprocess.run(['git', '-C', str(root), *args], capture_output=True)
++    except OSError as exc:
++        raise ValueError(f'git is not available: {exc}')
++    if done.returncode:
++        raise ValueError(f'git {" ".join(args)}: {done.stderr.decode(errors="replace").strip() or "failed"}')
++    return [os.fsdecode(field) for field in done.stdout.split(b'\0')]
++
++
+ def files_at(root: Path, commit: str, paths: list[str]) -> dict[str, bytes]:
+-    """The bytes each path (relative to `root`) had at a commit, read with one git process."""
++    """The bytes each path (relative to `root`) had at a commit, read with one git process.
++
++    A name that holds a line break cannot be asked for in that one process, which reads a name a line:
++    such a file is read with a git process of its own.
++    """
+     if not paths:
+         return {}
+-    prefix = git(root, 'rev-parse', '--show-prefix').strip()
++    prefix = os.fsencode(git(root, 'rev-parse', '--show-prefix').strip())
++    batch = [p for p in paths if '\n' not in p]
+     try:
+         done = subprocess.run(['git', '-C', str(root), 'cat-file', '--batch'], capture_output=True,
+-                              input=''.join(f'{commit}:{prefix}{p}\n' for p in paths).encode('utf-8'))
++                              input=b''.join(commit.encode() + b':' + prefix + os.fsencode(p) + b'\n' for p in batch))
++        alone = {p: subprocess.run(['git', '-C', str(root), 'cat-file', 'blob',
++                                    commit.encode() + b':' + prefix + os.fsencode(p)], capture_output=True)
++                 for p in paths if p not in batch}
+     except OSError as exc:
+         raise ValueError(f'git is not available: {exc}')
+-    out, at, texts = done.stdout, 0, {}
+-    for path in paths:
++    texts = {}
++    for path, one in alone.items():
++        if one.returncode:
++            raise ValueError(f'git cannot read {path} at {commit[:7]}: {one.stderr.decode(errors="replace").strip()}')
++        texts[path] = one.stdout
++    out, at = done.stdout, 0
++    for path in batch:
+         end = out.find(b'\n', at)
+         head = out[at:end].split()
+         if done.returncode or end < 0 or len(head) != 3 or head[1] != b'blob':
+@@ -1194,9 +1222,9 @@ def base_snapshot(root: Path, base: str) -> tuple[str, str, dict, list[dict], di
+     status = {}
+     # With -z git writes each name as it is: without it a name that holds a quote, a backslash or a control
+     # character comes quoted, and is no file of any component.
+-    fields = git(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor).split('\0')
++    fields = git_paths(root, 'diff', '--name-status', '--no-renames', '--relative', '-z', anchor)
+     status.update(zip(fields[1::2], fields[0::2]))
+-    for path in filter(None, git(root, 'ls-files', '--others', '--exclude-standard', '-z').split('\0')):
++    for path in filter(None, git_paths(root, 'ls-files', '--others', '--exclude-standard', '-z')):
+         status.setdefault(path, 'A')
+     old_entries = parse_components(git(root, 'show', f'{anchor}:./{BASE}COMPONENTS.md', check=False))
+     overrides = {p: None for p, code in status.items() if p.endswith('.py')}
+@@ -1250,8 +1278,9 @@ def imported_before(path, target):
+ 
+     before = {e['id']: e for e in old_entries}
+     now = {e['id']: e for e in entries}
+-    # Every file git tracks here, named or reached through a folder, in the package or outside it.
+-    tracked = [p for p in git(root, 'ls-files', '-z').split('\0') if p]
++    # The files a regrouping can move: every file git tracks, named or reached through a folder, in the package
++    # or outside it, and the ones git does not track that are counted modules or that a modules line names.
++    tracked = set(filter(None, git_paths(root, 'ls-files', '-z'))) | package
+ 
+     def code_paths(name):
+         """The files that say a component's code is not what it was at the base: one that differs and that the
+@@ -1260,7 +1289,9 @@ def code_paths(name):
+         new, old = now.get(name, {'id': name}), before.get(name, {'id': name})
+         paths = {p for p in status if covers(new, p) or covers(old, p)}
+         if new.get('modules', '') != old.get('modules', ''):
+-            paths |= {p for p in tracked if p not in status and covers(new, p) != covers(old, p)}
++            named = module_paths(new.get('modules', ''))[0] | module_paths(old.get('modules', ''))[0]
++            paths |= {p for p in tracked | named if p not in status and covers(new, p) != covers(old, p)
++                      and (root / p).is_file()}
+         return sorted(paths)
+ 
+     def source(path, at_base):
+@@ -1740,6 +1771,11 @@ def main(argv: list[str] | None = None) -> int:
+     names = commands.add_parser('list')
+     names.add_argument('area', nargs='?', default='')
+     args = parser.parse_args(argv)
++    # A file name that is not UTF-8 is held as os.fsdecode spells it, which no UTF-8 stream can write: it is
++    # printed with a backslash escape in place of the byte, not stopped on.
++    for stream in (sys.stdout, sys.stderr):
++        if isinstance(stream, io.TextIOWrapper):
++            stream.reconfigure(errors='backslashreplace')
+     if args.check and args.command:
+         parser.error('--check cannot be combined with a subcommand')
+     if args.strict and not args.check:
+diff --git a/tests/test_tools.py b/tests/test_tools.py
+index c3b848c..709e8fc 100644
+--- a/tests/test_tools.py
++++ b/tests/test_tools.py
+@@ -2601,6 +2601,76 @@ def test_changed_asks_for_a_file_whose_name_git_would_quote(project):
+     assert 'fail: no component: src/widget/new"one.py ' in out, out
+ 
+ 
++@pytest.mark.parametrize("ignored, alpha, beta", [
++    # A file a modules line names one by one, outside the package.
++    ("tools/gen.py", "src/widget/a.py, tools/gen.py", "src/widget/b.py, tools/gen.py"),
++    # A package module reached through a folder: it is counted, so it needs a component.
++    ("src/widget/gen/out.py", "src/widget/a.py, src/widget/gen/", "src/widget/b.py, src/widget/gen/"),
++])
++def test_changed_asks_both_components_when_a_file_git_ignores_moves(project, ignored, alpha, beta):
++    # Close review close-r1, F1: the regrouped files were looked for among the files git tracks only, so a
++    # file that git ignores moved from one entry to another and `changed --strict` asked neither.
++    (project / ".gitignore").write_text(ignored + "\n")
++    (project / ignored).parent.mkdir(parents=True, exist_ok=True)
++    (project / ignored).write_text('"""Generated."""\n')
++    for name in ("a", "b"):
++        (project / "src/widget" / (name + ".py")).write_text('"""%s."""\n' % name)
++    catalog(project, entry("core.alpha", "Do alpha", alpha), entry("core.beta", "Do beta", "src/widget/b.py"))
++    commit(project)
++    edit_catalog(project, "- modules: %s\n" % alpha, "- modules: src/widget/a.py\n")
++    edit_catalog(project, "- modules: src/widget/b.py\n", "- modules: %s\n" % beta)
++    code, lines, out = rereads(project, "--strict")
++    assert code == 1, out
++    assert lines == ["reread: core.alpha (only modules edited): %s" % ignored,
++                     "reread: core.beta (only modules edited): %s" % ignored], out
++
++
++@pytest.mark.parametrize("control", ["\r", "\n"])
++def test_changed_reads_a_file_whose_name_holds_a_line_break(project, control):
++    # Close review close-r1, F2: git's -z listings were read as text, which turns a carriage return into a line
++    # break, so plain `changed` could not read the file at the base and exited 1. A line break in a name broke
++    # the request to git for the file's bytes.
++    name = "src/widget/a%sfile.py" % control
++    (project / "src/widget/a.py").write_text('"""A."""\n')
++    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n')
++    (project / ("assets/pic%sone.png" % control)).parent.mkdir()
++    (project / ("assets/pic%sone.png" % control)).write_bytes(b"x")
++    catalog(project, entry("core.aa", "Do a", "src/widget/"))
++    commit(project)
++    (project / name).write_text('"""Odd."""\n\n\ndef odd(): pass\n\n\ndef even(): pass\n')
++    code, out = tool(project, "write", script=INDEX)
++    assert code == 0, out
++    code, lines, out = rereads(project)
++    assert code == 0, out
++    # The test reads the output as text, which turns the carriage return into a line break as well.
++    assert "reread: core.aa (entry not edited): src/widget/a\nfile.py; new public names not in does or verbs: " \
++           "even" in out, out
++
++
++def test_changed_prints_a_file_whose_name_is_not_utf8(project):
++    # Close review close-r1, F2: a name git does not spell as UTF-8 stopped plain `changed` with a decoding
++    # error, even for a file no component holds. macOS refuses such a name, and the test with it.
++    raw = os.fsencode(str(project / "src/widget")) + b"/caf\xe9.py"
++    try:
++        with open(raw, "wb") as handle:
++            handle.write(b'"""Cafe."""\n')
++    except OSError as exc:
++        pytest.skip("the file system refuses a name that is not UTF-8: %s" % exc)
++    (project / "assets").mkdir()
++    with open(os.fsencode(str(project / "assets")) + b"/pic\xff.png", "wb") as handle:
++        handle.write(b"x")
++    catalog(project, entry("core.aa", "Do a", "src/widget/"))
++    commit(project)
++    with open(raw, "ab") as handle:
++        handle.write(b"\n\ndef brew(): pass\n")
++    code, out = tool(project, "write", script=INDEX)
++    assert code == 0, out
++    code, lines, out = rereads(project)
++    assert code == 0, out
++    assert lines == ["reread: core.aa (entry not edited): src/widget/caf\\udce9.py; "
++                     "new public names not in does or verbs: brew"], out
++
++
+ def test_changed_and_review_agree_on_a_reread_line_after_a_no_break_space(project):
+     # Review pr-51-r2, F6: `changed` took the line as an answer and `review` did not date the entry from it.
+     (project / "src/widget/sizes.py").write_text('"""Sizes."""\n')
